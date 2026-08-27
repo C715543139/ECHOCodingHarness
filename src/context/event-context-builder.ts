@@ -141,7 +141,7 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
 
 interface ConversationTurn {
   assistant: { content: string; toolCalls: { id: string; name: string; arguments: unknown }[] };
-  toolMessages: { toolCallId: string; status: string; content: string }[];
+  toolMessages: { toolCallId: string; toolName: string; status: string; content: string }[];
 }
 
 function collectConversation(events: readonly EchoEvent[]): readonly ConversationTurn[] {
@@ -183,7 +183,12 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
         const summary = result.content ?? result.summary;
         current.toolMessages = [
           ...current.toolMessages,
-          { toolCallId: result.toolCallId, status, content: summary },
+          {
+            toolCallId: result.toolCallId,
+            toolName: result.toolName,
+            status,
+            content: summary,
+          },
         ];
         break;
       }
@@ -210,22 +215,31 @@ function conversationMessages(
   toolResultMaxChars: number,
   truncations: ContextTruncation[],
 ): readonly ModelMessage[] {
-  const messages: ModelMessage[] = [
-    {
+  const pairedCalls = turn.assistant.toolCalls.filter((call) =>
+    turn.toolMessages.some(
+      (result) => result.toolCallId === call.id && result.toolName === call.name,
+    ),
+  );
+  const pairedResults = turn.toolMessages.filter((result) =>
+    pairedCalls.some((call) => call.id === result.toolCallId && call.name === result.toolName),
+  );
+  const messages: ModelMessage[] = [];
+  if (turn.assistant.content.length > 0 || pairedCalls.length > 0) {
+    messages.push({
       role: 'assistant',
       content: turn.assistant.content,
-      ...(turn.assistant.toolCalls.length > 0
+      ...(pairedCalls.length > 0
         ? {
-            toolCalls: turn.assistant.toolCalls.map((call) => ({
+            toolCalls: pairedCalls.map((call) => ({
               id: call.id,
               name: call.name,
               arguments: call.arguments,
             })),
           }
         : {}),
-    },
-  ];
-  for (const toolMessage of turn.toolMessages) {
+    });
+  }
+  for (const toolMessage of pairedResults) {
     const trimmed = truncateToLimit(toolMessage.content, toolResultMaxChars);
     if (trimmed.truncated) {
       truncations.push({

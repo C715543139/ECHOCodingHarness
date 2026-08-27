@@ -48,4 +48,30 @@ describe('checkConfig', () => {
       true,
     );
   });
+
+  it('fails for an invalid or credential-bearing provider URL', () => {
+    const invalid = checkConfig({
+      ...buildConfig({ env: { ECHO_API_KEY: 'key', ECHO_MODEL: 'm' } }),
+      baseUrl: 'not-a-url',
+    });
+    const credentialBearing = checkConfig({
+      ...buildConfig({ env: { ECHO_API_KEY: 'key', ECHO_MODEL: 'm' } }),
+      baseUrl: 'https://user:password@example.test/v1',
+    });
+
+    expect(invalid.ok).toBe(false);
+    expect(credentialBearing.ok).toBe(false);
+    expect(JSON.stringify(credentialBearing.issues)).not.toContain('password');
+  });
+
+  it('fails when an invalid safety mode crosses the runtime boundary', () => {
+    const config = {
+      ...buildConfig({ env: { ECHO_API_KEY: 'key', ECHO_MODEL: 'm' } }),
+      safetyMode: 'unsafe',
+    } as unknown as ReturnType<typeof loadConfig>['config'];
+
+    const result = checkConfig(config);
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((issue) => issue.message.includes('Safety mode'))).toBe(true);
+  });
 });

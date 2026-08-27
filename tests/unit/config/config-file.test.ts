@@ -32,7 +32,7 @@ describe('loadConfigFile', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('skips unknown keys so they surface later as config warnings', async () => {
+  it('preserves unknown keys so they surface later as config warnings', async () => {
     const dir = await makeTempDir();
     await fs.writeFile(
       path.join(dir, '.echo-config.json'),
@@ -41,7 +41,7 @@ describe('loadConfigFile', () => {
     );
 
     const result = await loadConfigFile(dir);
-    expect(result.config).toEqual({ model: 'm' });
+    expect(result.config).toEqual({ model: 'm', totallyUnknown: 1 });
   });
 
   it('returns undefined when no config file exists', async () => {

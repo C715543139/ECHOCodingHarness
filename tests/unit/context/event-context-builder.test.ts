@@ -32,10 +32,12 @@ function event<TType extends EchoEvent['type']>(
 function toolResult<TStatus extends ToolTerminalStatus>(
   status: TStatus,
   content: string,
+  toolCallId = 'call-1',
+  toolName = 'read_file',
 ): ToolResultMessage<TStatus> {
   return {
-    toolCallId: 'call-1',
-    toolName: 'read_file',
+    toolCallId,
+    toolName,
     status,
     summary: content.slice(0, 20),
     ...(status === 'completed' ? { content } : {}),
@@ -98,7 +100,7 @@ describe('EventContextBuilder', () => {
         call: { id: 'call-1', name: 'run_command', arguments: { command: 'pnpm test' } },
       }),
       event('tool.completed', {
-        result: toolResult('completed', 'x'.repeat(500)),
+        result: toolResult('completed', 'x'.repeat(500), 'call-1', 'run_command'),
         durationMs: 10,
       }),
     ];
@@ -139,7 +141,7 @@ describe('EventContextBuilder', () => {
       );
       history.push(
         event('tool.completed', {
-          result: toolResult('completed', `content ${step}`),
+          result: toolResult('completed', `content ${step}`, `call-${step}`),
           durationMs: 2,
         }),
       );
@@ -179,7 +181,7 @@ describe('EventContextBuilder', () => {
       );
       history.push(
         event('tool.completed', {
-          result: toolResult('completed', `result for step ${step}`),
+          result: toolResult('completed', `result for step ${step}`, `call-${step}`),
           durationMs: 2,
         }),
       );
@@ -216,14 +218,14 @@ describe('EventContextBuilder', () => {
         call: { id: 'call-2', name: 'run_command', arguments: { command: 'bad' } },
       }),
       event('tool.failed', {
-        result: { ...toolResult('failed', 'boom'), status: 'failed' },
+        result: toolResult('failed', 'boom', 'call-2', 'run_command'),
         durationMs: 5,
       }),
       event('model.tool_call', {
         call: { id: 'call-3', name: 'write_file', arguments: { path: 'x' } },
       }),
       event('tool.denied', {
-        result: { ...toolResult('denied', 'outside workspace'), status: 'denied' },
+        result: toolResult('denied', 'outside workspace', 'call-3', 'write_file'),
         hard: true,
       }),
     ];
@@ -235,6 +237,36 @@ describe('EventContextBuilder', () => {
 
     expect(contents.some((content) => content.startsWith('[failed]'))).toBe(true);
     expect(contents.some((content) => content.startsWith('[denied]'))).toBe(true);
+  });
+
+  it('omits orphaned or mismatched tool calls and results', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'goal' }),
+      event('step.started', { step: 1 }),
+      event('model.tool_call', {
+        call: { id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } },
+      }),
+      event('tool.completed', {
+        result: toolResult('completed', 'wrong result', 'call-other', 'read_file'),
+        durationMs: 2,
+      }),
+      event('model.tool_call', {
+        call: { id: 'call-2', name: 'write_file', arguments: { path: 'src/b.ts' } },
+      }),
+      event('tool.completed', {
+        result: toolResult('completed', 'wrong tool', 'call-2', 'read_file'),
+        durationMs: 2,
+      }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    expect(projection.messages.some((message) => message.role === 'tool')).toBe(false);
+    expect(
+      projection.messages.some(
+        (message) => message.role === 'assistant' && message.toolCalls !== undefined,
+      ),
+    ).toBe(false);
   });
 
   it('produces a deterministic projection for identical inputs', () => {

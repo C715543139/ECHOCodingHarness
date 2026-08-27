@@ -3,10 +3,12 @@ export {
   type ProviderRetryPolicy,
   computeBackoffMs,
   providerError,
+  sanitizeProviderText,
   shouldRetry,
   withRetries,
 } from './errors.js';
 export { mapFinishReason } from './finish-reason.js';
+export { type FakeProviderResponse, FakeProvider } from './fake-provider.js';
 export {
   type OpenAICompatibleProviderOptions,
   OpenAICompatibleProvider,

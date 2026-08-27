@@ -53,7 +53,10 @@ export function createOpenAIClient(
     async createStream(wireRequest, requestOptions) {
       const stream = await client.chat.completions.create(
         wireRequest as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
-        { signal: requestOptions.signal },
+        {
+          signal: requestOptions.signal,
+          ...(requestOptions.timeoutMs !== undefined ? { timeout: requestOptions.timeoutMs } : {}),
+        },
       );
       async function* toChunks(): AsyncGenerator<NormalizedChunk> {
         for await (const chunk of stream) {

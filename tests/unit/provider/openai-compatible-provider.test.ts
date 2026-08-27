@@ -108,12 +108,62 @@ describe('OpenAICompatibleProvider', () => {
     ]);
     const events = await collectEvents(provider);
 
+    expect(events.slice(0, 2)).toEqual([
+      { type: 'tool_call_delta', callId: 'call-1', delta: '{"pa' },
+      { type: 'tool_call_delta', callId: 'call-1', delta: 'th":"src/a.ts"}' },
+    ]);
+
     const toolCall = events.find((event) => event.type === 'tool_call');
     expect(toolCall).toEqual({
       type: 'tool_call',
       call: { id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } },
     });
     expect(events[events.length - 1]).toEqual({ type: 'completed', finishReason: 'tool_calls' });
+  });
+
+  it('uses one stable fallback id when streamed fragments omit an id', async () => {
+    const provider = makeProvider([
+      toolCallChunk({ index: 0, function: { name: 'noop', arguments: '{' } }),
+      toolCallChunk({ index: 0, id: 'late-id', function: { arguments: '}' } }),
+      finishChunk('tool_calls'),
+    ]);
+
+    const events = await collectEvents(provider);
+    expect(events.filter((event) => event.type === 'tool_call_delta')).toEqual([
+      { type: 'tool_call_delta', callId: 'call_0', delta: '{' },
+      { type: 'tool_call_delta', callId: 'call_0', delta: '}' },
+    ]);
+    expect(events).toContainEqual({
+      type: 'tool_call',
+      call: { id: 'call_0', name: 'noop', arguments: {} },
+    });
+  });
+
+  it('classifies HTTP authentication and rate-limit failures without leaking secrets', async () => {
+    const retryPolicy = { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 };
+    const auth = new OpenAICompatibleProvider({
+      client: clientFromChunks([], {
+        failFirstWith: {
+          status: 401,
+          message: 'Authorization: Bearer sk-supersecretvalue',
+        },
+      }),
+      model: 'm',
+      retryPolicy,
+    });
+    const rateLimited = new OpenAICompatibleProvider({
+      client: clientFromChunks([], { failFirstWith: { status: 429, message: 'slow down' } }),
+      model: 'm',
+      retryPolicy,
+    });
+
+    const authError = await collectEvents(auth).catch((error: unknown) => error);
+    expect(authError).toMatchObject({ category: 'provider_auth', retryable: false });
+    expect(JSON.stringify(authError)).not.toContain('sk-supersecretvalue');
+    await expect(collectEvents(rateLimited)).rejects.toMatchObject({
+      category: 'provider_rate_limit',
+      retryable: true,
+    });
   });
 
   it('emits tool_call events before completed even with an inconsistent finish reason', async () => {
@@ -251,17 +301,7 @@ describe('OpenAICompatibleProvider', () => {
   });
 
   it('normalizes unexpected client errors into provider_network', async () => {
-    const provider = makeProvider([finishChunk('stop')], {
-      failFirstWith: new Error('socket hang up'),
-    });
     const retryPolicy = { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 };
-    const singleShot = new OpenAICompatibleProvider({
-      client: clientFromChunks([], { failFirstWith: new Error('socket hang up') }),
-      model: 'm',
-      retryPolicy,
-    });
-    void provider;
-    void singleShot;
     const failing = new OpenAICompatibleProvider({
       client: clientFromChunks([finishChunk('stop')], { failFirstWith: new Error('boom') }),
       model: 'm',

@@ -60,6 +60,7 @@ export interface ConfigFileResult {
 }
 
 export interface RawConfigValues {
+  readonly [key: string]: unknown;
   readonly baseUrl?: unknown;
   readonly model?: unknown;
   readonly safetyMode?: unknown;

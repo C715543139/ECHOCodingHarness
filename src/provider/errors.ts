@@ -14,6 +14,36 @@ export const DEFAULT_RETRY_POLICY: ProviderRetryPolicy = {
 
 export const RETRYABLE_CATEGORIES: readonly string[] = ['provider_rate_limit', 'provider_network'];
 
+const SENSITIVE_KEY = '(?:api[_-]?key|access[_-]?token|token|secret|authorization)';
+
+export function sanitizeProviderText(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(
+      new RegExp(`(${SENSITIVE_KEY}["']?\\s*[:=]\\s*["']?)([^"'\\s,;&]+)`, 'gi'),
+      '$1[REDACTED]',
+    )
+    .replace(/([?&](?:api[_-]?key|access[_-]?token|token|key)=)[^&#\s]+/gi, '$1[REDACTED]')
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/gi, '$1[REDACTED]@')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]')
+    .replace(/\b[A-Za-z]:\\Users\\[^\\\s]+/gi, '[USER_HOME]')
+    .replace(/\/(?:home|Users)\/[^/\s]+/g, '[USER_HOME]');
+}
+
+function sanitizeDetails(
+  details: Record<string, string | number | boolean | null> | undefined,
+): Record<string, string | number | boolean | null> | undefined {
+  if (details === undefined) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    Object.entries(details).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? sanitizeProviderText(value) : value,
+    ]),
+  );
+}
+
 export function providerError(
   category:
     | 'provider_auth'
@@ -26,7 +56,14 @@ export function providerError(
   retryable: boolean,
   details?: Record<string, string | number | boolean | null>,
 ): EchoError {
-  return { category, code, message, retryable, ...(details ? { details } : {}) };
+  const safeDetails = sanitizeDetails(details);
+  return {
+    category,
+    code,
+    message: sanitizeProviderText(message),
+    retryable,
+    ...(safeDetails ? { details: safeDetails } : {}),
+  };
 }
 
 export function cancellationError(message: string): EchoError {
@@ -84,13 +121,55 @@ export async function withRetries<T>(
 
 export function toEchoError(error: unknown): EchoError {
   if (isEchoError(error)) {
-    return error;
+    return {
+      ...error,
+      message: sanitizeProviderText(error.message),
+      ...(error.details === undefined
+        ? {}
+        : { details: sanitizeDetails({ ...error.details }) as NonNullable<EchoError['details']> }),
+    };
   }
   const name = error instanceof Error ? error.name : '';
-  const message = error instanceof Error ? error.message : String(error);
   if (name === 'AbortError' || name === 'APIUserAbortError') {
     return cancellationError('The model request was cancelled.');
   }
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error
+      ? (error as { status?: unknown }).status
+      : undefined;
+  if (status === 401 || status === 403) {
+    return providerError(
+      'provider_auth',
+      'PROVIDER_AUTH_FAILED',
+      'The model provider rejected authentication.',
+      false,
+    );
+  }
+  if (status === 429) {
+    return providerError(
+      'provider_rate_limit',
+      'PROVIDER_RATE_LIMITED',
+      'The model provider rate limit was exceeded.',
+      true,
+    );
+  }
+  if (typeof status === 'number' && status >= 400 && status < 500 && status !== 408) {
+    return providerError(
+      'provider_protocol',
+      'PROVIDER_REQUEST_REJECTED',
+      `The model provider rejected the request with HTTP ${String(status)}.`,
+      false,
+    );
+  }
+  if (name === 'APIConnectionTimeoutError') {
+    return providerError(
+      'provider_network',
+      'PROVIDER_TIMEOUT',
+      'The model provider request timed out.',
+      true,
+    );
+  }
+  const message = error instanceof Error ? error.message : String(error);
   return providerError(
     'provider_network',
     'PROVIDER_REQUEST_FAILED',
@@ -104,8 +183,13 @@ export function isEchoError(value: unknown): value is EchoError {
     typeof value === 'object' &&
     value !== null &&
     'category' in value &&
+    typeof (value as { category?: unknown }).category === 'string' &&
     'code' in value &&
-    'retryable' in value
+    typeof (value as { code?: unknown }).code === 'string' &&
+    'message' in value &&
+    typeof (value as { message?: unknown }).message === 'string' &&
+    'retryable' in value &&
+    typeof (value as { retryable?: unknown }).retryable === 'boolean'
   );
 }
 

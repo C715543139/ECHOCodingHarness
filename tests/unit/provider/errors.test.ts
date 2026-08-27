@@ -4,7 +4,9 @@ import type { EchoError } from '../../../src/contracts/index.js';
 import {
   DEFAULT_RETRY_POLICY,
   computeBackoffMs,
+  sanitizeProviderText,
   shouldRetry,
+  toEchoError,
   withRetries,
 } from '../../../src/provider/errors.js';
 
@@ -80,5 +82,46 @@ describe('provider retry policy', () => {
   it('uses bounded default retry settings', () => {
     expect(DEFAULT_RETRY_POLICY.maxAttempts).toBeLessThanOrEqual(4);
     expect(DEFAULT_RETRY_POLICY.maxDelayMs).toBeLessThanOrEqual(10_000);
+  });
+
+  it('classifies authentication and rate-limit HTTP errors', () => {
+    expect(toEchoError({ status: 401, message: 'unauthorized' })).toMatchObject({
+      category: 'provider_auth',
+      retryable: false,
+    });
+    expect(toEchoError({ status: 429, message: 'slow down' })).toMatchObject({
+      category: 'provider_rate_limit',
+      retryable: true,
+    });
+    expect(toEchoError({ status: 400, message: 'bad request' })).toMatchObject({
+      category: 'provider_protocol',
+      retryable: false,
+    });
+  });
+
+  it('redacts authorization headers, tokens, URL credentials, and query keys', () => {
+    const secret = 'sk-supersecretvalue';
+    const text = sanitizeProviderText(
+      `Authorization: Bearer ${secret} url=https://user:pass@example.test/v1?api_key=${secret} path=C:\\Users\\private-user\\repo`,
+    );
+
+    expect(text).not.toContain(secret);
+    expect(text).not.toContain('user:pass');
+    expect(text).not.toContain('private-user');
+    expect(text).toContain('[REDACTED]');
+  });
+
+  it('sanitizes messages and details on existing EchoErrors', () => {
+    const mapped = toEchoError({
+      category: 'provider_network',
+      code: 'UPSTREAM',
+      message: 'Bearer secret-token',
+      retryable: true,
+      details: { endpoint: 'https://user:pass@example.test', token: 'sk-secretvalue' },
+    });
+
+    expect(JSON.stringify(mapped)).not.toContain('secret-token');
+    expect(JSON.stringify(mapped)).not.toContain('user:pass');
+    expect(JSON.stringify(mapped)).not.toContain('sk-secretvalue');
   });
 });

@@ -11,6 +11,7 @@ import {
   DEFAULT_RETRY_POLICY,
   providerError,
   type ProviderRetryPolicy,
+  toEchoError,
   withRetries,
 } from './errors.js';
 import { collectStreamedToolCalls, toModelToolCall } from './stream-aggregation.js';
@@ -61,35 +62,21 @@ function mapStreamError(error: unknown): EchoError {
     return providerError(
       'provider_protocol',
       'PROVIDER_INVALID_TOOL_ARGUMENTS',
-      `The model stream contained invalid JSON: ${error.message}`,
+      'The model stream contained invalid tool-call JSON.',
       false,
     );
   }
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'category' in error &&
-    typeof (error as { category: unknown }).category === 'string'
-  ) {
-    const echoError = error as EchoError;
-    if (echoError.category === 'provider_network' && echoError.code === 'PROVIDER_REQUEST_FAILED') {
-      return providerError(
-        'provider_network',
-        'PROVIDER_STREAM_FAILED',
-        echoError.message,
-        echoError.retryable,
-        echoError.details,
-      );
-    }
-    return echoError;
+  const echoError = toEchoError(error);
+  if (echoError.category === 'provider_network' && echoError.code === 'PROVIDER_REQUEST_FAILED') {
+    return providerError(
+      'provider_network',
+      'PROVIDER_STREAM_FAILED',
+      echoError.message,
+      echoError.retryable,
+      echoError.details === undefined ? undefined : { ...echoError.details },
+    );
   }
-  const message = error instanceof Error ? error.message : String(error);
-  return providerError(
-    'provider_network',
-    'PROVIDER_STREAM_FAILED',
-    `The model stream failed: ${message}`,
-    true,
-  );
+  return echoError;
 }
 
 /**
@@ -134,8 +121,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
         });
       }, retryPolicy);
 
-      const textParts: string[] = [];
       const toolFragments: Record<string, unknown>[] = [];
+      const toolCallIds = new Map<number, string>();
       let finishReason: ModelFinishReason = 'unknown';
       let usage: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined;
 
@@ -159,18 +146,33 @@ export class OpenAICompatibleProvider implements ModelProvider {
           continue;
         }
         if (typeof choice.delta?.content === 'string' && choice.delta.content.length > 0) {
-          textParts.push(choice.delta.content);
           yield { type: 'text_delta', delta: choice.delta.content };
         }
         const fragments = choice.delta?.tool_calls;
         if (fragments !== undefined && fragments !== null) {
           for (const fragment of fragments) {
-            toolFragments.push(fragment as Record<string, unknown>);
-            yield {
-              type: 'tool_call_delta',
-              callId: typeof fragment['id'] === 'string' ? fragment['id'] : '',
-              delta: '',
-            };
+            const index = fragment['index'];
+            if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
+              continue;
+            }
+            const rawId = fragment['id'];
+            const callId =
+              toolCallIds.get(index) ??
+              (typeof rawId === 'string' && rawId.length > 0 ? rawId : `call_${String(index)}`);
+            toolCallIds.set(index, callId);
+            toolFragments.push({ ...fragment, id: callId });
+
+            const fn = fragment['function'];
+            const argumentDelta =
+              typeof fn === 'object' &&
+              fn !== null &&
+              'arguments' in fn &&
+              typeof (fn as { arguments?: unknown }).arguments === 'string'
+                ? ((fn as { arguments: string }).arguments ?? '')
+                : '';
+            if (argumentDelta.length > 0) {
+              yield { type: 'tool_call_delta', callId, delta: argumentDelta };
+            }
           }
         }
         if (choice.finish_reason !== null && choice.finish_reason !== undefined) {

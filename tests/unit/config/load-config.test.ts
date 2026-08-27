@@ -124,6 +124,18 @@ describe('loadConfig', () => {
     expect(messages.some((message) => message.includes('cliTypo'))).toBe(true);
   });
 
+  it('reports an unknown key preserved by the config file loader', () => {
+    const { warnings } = loadConfig(
+      makeInput({ projectConfig: { model: 'm', misspelledModel: 'other' } }),
+    );
+
+    expect(warnings).toContainEqual({
+      source: 'project',
+      message:
+        'Unknown configuration key "misspelledModel" in project configuration was ignored; check for typos.',
+    });
+  });
+
   it('accepts a valid context budget from config files', () => {
     const { config } = loadConfig(
       makeInput({

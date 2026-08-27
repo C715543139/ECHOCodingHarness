@@ -15,19 +15,11 @@ function extract(raw: unknown): RawConfigValues | undefined {
   if (typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('configuration file root must be a JSON object');
   }
-  const allowed: readonly string[] = [
-    'baseUrl',
-    'model',
-    'safetyMode',
-    'maxSteps',
-    'timeoutMs',
-    'maxOutputChars',
-    'context',
-    'requestTimeoutMs',
-  ];
   const values: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
-    if (allowed.includes(key)) {
+    // Project files may never supply credentials. Other unknown keys are
+    // preserved so loadConfig can report actionable typo warnings.
+    if (key !== 'apiKey') {
       values[key] = value;
     }
   }

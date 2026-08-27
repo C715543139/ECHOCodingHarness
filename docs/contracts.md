@@ -271,6 +271,52 @@ tool.requested
 
 `tool.cancelled` 可以发生在等待审批、已授权但尚未启动，或执行过程中。每个 `tool.requested` 必须恰好对应一个工具终态事件：`tool.completed`、`tool.failed`、`tool.denied` 或 `tool.cancelled`。审批事件不是工具终态。进程崩溃后的恢复逻辑如发现悬空调用，应补记 `tool.cancelled` 或恢复诊断事件，不得把它视为成功。
 
+### 6.4 CLI 渲染契约
+
+```ts
+interface RenderCapabilities {
+  interactive: boolean;
+  color: boolean;
+  unicode: boolean;
+  verbose: boolean;
+}
+
+type OutputChannel = "stdout" | "stderr";
+
+interface RenderChunk {
+  channel: OutputChannel;
+  text: string;
+}
+
+interface EventRenderer {
+  renderEvent(
+    event: EchoEvent,
+    capabilities: RenderCapabilities,
+  ): readonly RenderChunk[];
+
+  renderResult(
+    result: AgentResult,
+    capabilities: RenderCapabilities,
+  ): readonly RenderChunk[];
+}
+```
+
+`interactive`、`color` 与 `unicode` 来自启动时的终端能力检测；`verbose` 默认是 `false`，只由显式 CLI `--verbose` 启用。详细模式只能增加经过脱敏且受输出上限约束的诊断信息，不能隐式打开颜色、泄露原始数据或改变 Agent 行为。
+
+渲染器必须满足：
+
+- 不执行工具、请求模型、修改 Session 或决定审批/终止；
+- 相同事件与能力输入产生确定性输出，不依赖墙钟时间或全局可变状态；
+- Turn 进度、审批、警告和诊断写入 stderr；正常最终答复写入 stdout；
+- `--help`、`--version` 和未来显式机器输出是 Turn 外的 stdout 例外；
+- 非 TTY、CI 或禁用颜色时不得产生 ANSI 控制序列或动态覆盖；
+- 颜色和 Unicode 不能是状态含义的唯一载体；
+- 不渲染推理字段、密钥、绝对个人路径或未经脱敏的参数；
+- 工具成功与 Turn 完成必须使用不同语义，不能由人类文本猜测状态；
+- 截断、拒绝、取消和限制必须明确显示，不能省略为普通成功。
+
+颜色、标签、间距和完整示例见 [cli-ux.md](./cli-ux.md)。未来 UI 必须消费 `EchoEvent`，不得解析 CLI 文本。
+
 ## 7. 会话存储
 
 ```ts
@@ -421,6 +467,8 @@ CLI 必须保证同一失败类别在交互与非交互运行中使用相同退�
 8. 取消和超时必须传播至在途 Provider 请求与子进程。
 9. CLI、测试和未来 UI 不得依赖 Provider 私有响应结构。
 10. 核心模块不得依赖 Agent 框架或第三方托管代码执行能力。
+11. 核心模块不得依赖 CLI Renderer；渲染不得改变 Agent 状态或工具结果。
+12. 非交互输出不得依赖颜色、动画或 Unicode 才能表达状态。
 
 ## 14. 接受流程
 

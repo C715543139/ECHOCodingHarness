@@ -31,7 +31,9 @@ ECHO Harness 需要在较短周期内交付一个高质量、可演示、可解�
 - pnpm；
 - TypeScript strict mode；
 - tsup 构建；
-- Vitest 测试；
+- Vitest 测试与 V8 覆盖率门禁；
+- ESLint 静态检查与 Prettier 格式化；
+- GitHub Actions Windows 质量流水线；
 - 首版采用单包结构，只有实际复杂度证明必要时才拆为 monorepo。
 
 ### 2.3 模型接入

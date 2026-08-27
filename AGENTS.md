@@ -17,6 +17,7 @@ The following documents are the Proposed v0.1 design baseline:
 - `docs/architecture.md`
 - `docs/contracts.md`
 - `docs/security.md`
+- `docs/cli-ux.md`
 - `docs/decisions/0001-project-foundation.md`
 
 Small implementation discoveries must update code, tests, and affected documentation together.

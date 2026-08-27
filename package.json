@@ -29,7 +29,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "15.0.0"
+    "commander": "15.0.0",
+    "openai": "6.21.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

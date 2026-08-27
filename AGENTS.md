@@ -74,6 +74,19 @@ a regression test that fails for the original behavior.
   points describing the change.
 - Before handoff, report changed files, commands run, results, and known limitations.
 
+### Parallel task isolation
+
+- Give each implementation task its own feature branch and Git worktree created from the latest
+  verified `main`; never run parallel agents in the primary worktree.
+- Freeze `src/contracts/` as the shared D1-2 boundary. A downstream task that needs a contract change
+  must report it for an integration change instead of creating a private competing type.
+- D1-3 owns `src/provider/`, `src/context/`, `src/config/`, and their focused tests.
+- D2-1 owns `src/tools/files/` and its focused tests.
+- D2-2 owns `src/tools/command/`, `src/execution/`, `src/security/`, and their focused tests.
+- D2-3 owns cross-module registration, orchestration, session storage, CLI integration, and
+  end-to-end tests. Shared registries are assembled there after the three parallel branches merge.
+- Keep worktree directories outside this repository and never commit host-specific absolute paths.
+
 ## Code conventions
 
 - Prefer small modules with explicit dependencies over global mutable state.

@@ -8,7 +8,9 @@
 
 ## 1. 文档目的
 
-本文定义 ECHO Harness 各核心模块之间的稳定边界。示例采用 TypeScript 表达设计意图，不等同于最终源文件；实现阶段可以调整字段，但不得破坏本文列出的不变量。
+本文定义 ECHO Harness 各核心模块之间的稳定边界。D1-2 对应的可编译共享类型位于
+`src/contracts/`；本文仍是语义与不变量的权威来源。实现阶段可以在同步文档、测试和集成方后
+细化字段，但不得在各模块内建立相互竞争的私有契约。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -250,7 +252,7 @@ type EchoEvent =
 
 `model.tool_call` 必须保存 Provider 聚合后的完整、Provider 无关工具调用，包括调用 ID、工具名和经脱敏但尚未做语义规范化的参数。`tool.requested` 则记录进入工具管线的输入及其规范化结果；即使后续校验、审批或执行失败，也能区分“模型原始请求”与“ECHO 实际尝试执行的操作”。
 
-`approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。所有 payload 类型在实现时细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
+`approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
 
 ### 6.3 工具状态机
 

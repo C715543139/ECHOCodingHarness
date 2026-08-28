@@ -1,12 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { BoundedTextBuffer } from '../../../src/execution/bounded-text-buffer.js';
+import {
+  buildControlledPowerShellExecutablePath,
+  discoverPowerShellExecutable,
+  resetDiscoveredPowerShellExecutableForTests,
+} from '../../../src/execution/discover-powershell.js';
 import {
   buildPowerShellArguments,
   sanitizeChildEnvironment,
 } from '../../../src/execution/powershell.js';
 
 describe('PowerShell execution helpers', () => {
+  afterEach(() => {
+    resetDiscoveredPowerShellExecutableForTests();
+  });
+
   it('passes the command as one argument behind all non-interactive boundaries', () => {
     const command = "Write-Output 'value with spaces'; Write-Output '--NoProfile'";
     const arguments_ = buildPowerShellArguments(command);
@@ -63,5 +72,21 @@ describe('PowerShell execution helpers', () => {
     expect(result.text).toMatch(/-TAIL$/u);
     expect(result.text).toContain('truncated');
     expect(result.originalChars).toBe(130);
+  });
+
+  it('targets the canonical WindowsPowerShell host instead of a PATH lookup', () => {
+    const systemRoot = process.env.SYSTEMROOT ?? 'C:\\Windows';
+    const discoveredPath = buildControlledPowerShellExecutablePath(systemRoot);
+
+    expect(discoveredPath).toMatch(/WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/iu);
+    expect(discoveredPath).not.toMatch(/System32[\\/]powershell\.exe$/iu);
+  });
+
+  it('discovers the installed Windows PowerShell host on Windows', async () => {
+    if (process.platform !== 'win32') return;
+
+    const discovered = await discoverPowerShellExecutable();
+    expect(discovered).toMatch(/WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/iu);
+    expect(discovered).not.toMatch(/System32[\\/]powershell\.exe$/iu);
   });
 });

@@ -3,6 +3,7 @@ import { realpath, stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 
 import { BoundedTextBuffer } from './bounded-text-buffer.js';
+import { discoverPowerShellExecutable } from './discover-powershell.js';
 
 const CHILD_ENVIRONMENT_ALLOWLIST = new Set(
   [
@@ -176,22 +177,28 @@ export async function executePowerShell(
   }
   if (options.signal.aborted) return preStartResult('cancelled', startedAt);
 
+  let executable: string;
+  try {
+    executable =
+      options.executable ?? (await discoverPowerShellExecutable(options.env ?? process.env));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to discover PowerShell.';
+    return preStartResult('spawn_error', startedAt, message);
+  }
+  if (options.signal.aborted) return preStartResult('cancelled', startedAt);
+
   const stdout = new BoundedTextBuffer(options.maxOutputChars);
   const stderr = new BoundedTextBuffer(options.maxOutputChars);
 
   return new Promise((resolve) => {
-    const child = spawn(
-      options.executable ?? 'powershell.exe',
-      buildPowerShellArguments(options.command),
-      {
-        cwd: workspaceRoot,
-        detached: process.platform !== 'win32',
-        env: sanitizeChildEnvironment(options.env ?? process.env),
-        shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      },
-    );
+    const child = spawn(executable, buildPowerShellArguments(options.command), {
+      cwd: workspaceRoot,
+      detached: process.platform !== 'win32',
+      env: sanitizeChildEnvironment(options.env ?? process.env),
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => stdout.append(chunk));

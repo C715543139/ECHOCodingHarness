@@ -119,10 +119,10 @@ ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操
 Windows 首版以 PowerShell 为受支持 Shell，并使用等价于以下的非交互约束：
 
 ```text
-powershell -NoLogo -NoProfile -NonInteractive -Command <command>
+%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command <command>
 ```
 
-实际可执行文件应从受控配置或系统发现结果确定，不从模型输入决定。子进程必须设置：
+实际可执行文件应通过受控配置或上述 Windows PowerShell 5.1 宿主路径发现，不得依赖 `PATH` 上的 `powershell.exe` 短名，也不从模型输入决定。子进程必须设置：
 
 - 工作目录为规范化后的工作区目录；
 - 显式超时；

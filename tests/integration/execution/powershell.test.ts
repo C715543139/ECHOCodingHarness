@@ -5,12 +5,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { discoverPowerShellExecutable } from '../../../src/execution/discover-powershell.js';
 import { executePowerShell } from '../../../src/execution/powershell.js';
 
 const describeWindows = process.platform === 'win32' ? describe : describe.skip;
-const COMMAND_TIMEOUT_MS = 20_000;
-const PROCESS_TREE_TIMEOUT_MS = 10_000;
-const WINDOWS_TEST_TIMEOUT_MS = 30_000;
 const workspaces: string[] = [];
 
 async function makeWorkspace(): Promise<string> {
@@ -32,7 +30,13 @@ afterEach(async () => {
   );
 });
 
-describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_MS }, () => {
+describeWindows('executePowerShell on Windows', () => {
+  it('discovers the canonical WindowsPowerShell host before spawning', async () => {
+    const discovered = await discoverPowerShellExecutable();
+    expect(discovered).toMatch(/WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/iu);
+    expect(discovered).not.toMatch(/System32[\\/]powershell\.exe$/iu);
+  });
+
   it('uses a fixed cwd and preserves Chinese text and spaced arguments', async () => {
     const workspaceRoot = await makeWorkspace();
     const result = await executePowerShell({
@@ -43,7 +47,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot,
     });
 
@@ -60,7 +64,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -78,7 +82,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 120,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -95,7 +99,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 100,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -116,7 +120,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: PROCESS_TREE_TIMEOUT_MS,
+      timeoutMs: 1_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -136,7 +140,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: controller.signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
     setTimeout(() => controller.abort(), 100);
@@ -161,7 +165,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       },
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -176,7 +180,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       executable: 'echo-harness-missing-powershell.exe',
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 

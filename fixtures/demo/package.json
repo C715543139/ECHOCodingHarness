@@ -1,0 +1,10 @@
+{
+  "name": "echo-demo-parser",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic failing TypeScript parser fixture for the ECHO P0 CLI demo.",
+  "scripts": {
+    "test": "node --test --test-reporter=tap test/parse-report.test.ts"
+  }
+}

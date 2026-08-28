@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { realpath, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import { BoundedTextBuffer } from './bounded-text-buffer.js';
@@ -28,6 +29,8 @@ const CHILD_ENVIRONMENT_ALLOWLIST = new Set(
     'TEMP',
     'TMP',
     'USERPROFILE',
+    'USERNAME',
+    'COMPUTERNAME',
     'WINDIR',
   ].map((name) => name.toUpperCase()),
 );
@@ -62,13 +65,27 @@ export interface PowerShellExecutionResult {
 }
 
 const UTF8_COMMAND_PREFIX =
-  '$echoUtf8 = New-Object System.Text.UTF8Encoding $false; ' +
-  '[Console]::InputEncoding = $echoUtf8; ' +
-  '[Console]::OutputEncoding = $echoUtf8; ' +
-  '$OutputEncoding = $echoUtf8; ';
+  '$echoUtf8 = [System.Text.UTF8Encoding]::new($false); ' +
+  '$OutputEncoding = $echoUtf8; ' +
+  '$echoStdOut = [System.IO.StreamWriter]::new([Console]::OpenStandardOutput(), $echoUtf8); ' +
+  '$echoStdOut.AutoFlush = $true; ' +
+  '[Console]::SetOut($echoStdOut); ' +
+  '$echoStdErr = [System.IO.StreamWriter]::new([Console]::OpenStandardError(), $echoUtf8); ' +
+  '$echoStdErr.AutoFlush = $true; ' +
+  '[Console]::SetError($echoStdErr); ';
 
 export function buildPowerShellArguments(command: string): readonly string[] {
-  return ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', UTF8_COMMAND_PREFIX + command];
+  return [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-InputFormat',
+    'Text',
+    '-OutputFormat',
+    'Text',
+    '-Command',
+    UTF8_COMMAND_PREFIX + command,
+  ];
 }
 
 export function sanitizeChildEnvironment(source: Readonly<NodeJS.ProcessEnv>): NodeJS.ProcessEnv {
@@ -77,6 +94,15 @@ export function sanitizeChildEnvironment(source: Readonly<NodeJS.ProcessEnv>): N
     if (value !== undefined && CHILD_ENVIRONMENT_ALLOWLIST.has(name.toUpperCase())) {
       sanitized[name] = value;
     }
+  }
+  return sanitized;
+}
+
+export function buildChildEnvironment(source: Readonly<NodeJS.ProcessEnv>): NodeJS.ProcessEnv {
+  const sanitized = sanitizeChildEnvironment(source);
+  const systemRoot = sanitized.SYSTEMROOT ?? sanitized.WINDIR;
+  if (systemRoot !== undefined && systemRoot.trim().length > 0) {
+    sanitized.PSModulePath = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules');
   }
   return sanitized;
 }
@@ -194,11 +220,12 @@ export async function executePowerShell(
     const child = spawn(executable, buildPowerShellArguments(options.command), {
       cwd: workspaceRoot,
       detached: process.platform !== 'win32',
-      env: sanitizeChildEnvironment(options.env ?? process.env),
+      env: buildChildEnvironment(options.env ?? process.env),
       shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
+    child.stdin.end();
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => stdout.append(chunk));

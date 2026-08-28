@@ -7,6 +7,7 @@ import {
   resetDiscoveredPowerShellExecutableForTests,
 } from '../../../src/execution/discover-powershell.js';
 import {
+  buildChildEnvironment,
   buildPowerShellArguments,
   sanitizeChildEnvironment,
 } from '../../../src/execution/powershell.js';
@@ -20,15 +21,20 @@ describe('PowerShell execution helpers', () => {
     const command = "Write-Output 'value with spaces'; Write-Output '--NoProfile'";
     const arguments_ = buildPowerShellArguments(command);
 
-    expect(arguments_.slice(0, 4)).toEqual([
+    expect(arguments_.slice(0, 8)).toEqual([
       '-NoLogo',
       '-NoProfile',
       '-NonInteractive',
+      '-InputFormat',
+      'Text',
+      '-OutputFormat',
+      'Text',
       '-Command',
     ]);
-    expect(arguments_).toHaveLength(5);
-    expect(arguments_[4]).toMatch(/OutputEncoding/u);
-    expect(arguments_[4]).toMatch(/Write-Output 'value with spaces'; Write-Output '--NoProfile'$/u);
+    expect(arguments_).toHaveLength(9);
+    expect(arguments_[8]).not.toMatch(/\[Console\]::(?:Input|Output)Encoding\s*=/u);
+    expect(arguments_[8]).toMatch(/OpenStandardOutput/u);
+    expect(arguments_[8]).toMatch(/Write-Output 'value with spaces'; Write-Output '--NoProfile'$/u);
   });
 
   it('builds an allowlisted environment and removes credentials case-insensitively', () => {
@@ -56,8 +62,22 @@ describe('PowerShell execution helpers', () => {
         'NPM_TOKEN',
         'AWS_SECRET_ACCESS_KEY',
         'CUSTOM_VALUE',
+        'PSMODULEPATH',
       ]),
     );
+  });
+
+  it('injects a system-only PSModulePath instead of inheriting user module directories', () => {
+    const env = buildChildEnvironment({
+      SYSTEMROOT: 'C:\\Windows',
+      Path: 'C:\\Windows\\System32',
+      PSModulePath: 'C:\\Users\\runner\\Documents\\WindowsPowerShell\\Modules',
+      ECHO_API_KEY: 'echo-secret',
+    });
+
+    expect(env.PSModulePath).toMatch(/System32[\\/]WindowsPowerShell[\\/]v1\.0[\\/]Modules$/iu);
+    expect(env.PSModulePath).not.toMatch(/Documents/u);
+    expect(env.ECHO_API_KEY).toBeUndefined();
   });
 
   it('keeps bounded head and tail output with an explicit truncation marker', () => {

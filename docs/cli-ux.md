@@ -4,7 +4,7 @@
 >
 > 版本：0.1
 >
-> 最后更新：2026-08-27
+> 最后更新：2026-08-28
 
 ## 1. 文档目的
 
@@ -89,6 +89,22 @@ stderr 承载执行过程和诊断：
 - Turn 创建前发生的配置或参数错误。
 
 进度写入 stderr 不表示失败。进程是否成功由 `AgentResult` 和 CLI 退出码决定。
+
+### 5.3 `run` 参数
+
+`echo-harness run <goal>` 支持以下 P0 参数：
+
+- `--workspace <path>`：固定工作区，默认当前目录；
+- `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；
+- `--safety-mode <safe|balanced|auto>`：覆盖安全模式；
+- `--max-steps <count>`：覆盖 Step 上限；
+- `--verbose`：增加脱敏且有界的诊断；
+- `--non-interactive`：禁止审批提示，遇到 `ask` 立即拒绝；
+- `--no-color`：禁用 ANSI 颜色。
+
+非 TTY、CI、`NO_COLOR` 或 `--no-color` 会关闭颜色；只有 stdin 与 stderr 均为 TTY 且未
+指定 `--non-interactive` 时才启用审批交互。Ctrl+C 通过同一个 `AbortSignal` 传播到
+Provider 与在途工具，并映射为退出码 130。
 
 ## 6. 终端能力检测
 

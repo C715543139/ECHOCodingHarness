@@ -1,0 +1,10 @@
+Allowed dual-blind fixtures used by tests and docs:
+
+- C:\Users\fixture\outside.txt
+- C:\Users\private-user\repo
+- C:\Users\private-name\secret.txt
+- C:\Users\runner\Documents\WindowsPowerShell\Modules
+- C:\Users\FIXTUR~1\AppData\Local\Temp\escape.txt
+- user:pass@example.test
+- reviewer@example.com
+- docs@example.org

@@ -18,7 +18,7 @@ jobs:
   quality:
     name: Windows quality gate
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -43,3 +43,18 @@ jobs:
 
       - name: Run quality gate
         run: pnpm check
+
+      - name: Run offline Fake Provider evals
+        run: pnpm eval:offline
+
+      - name: Demo-loop smoke
+        run: pnpm smoke:demo
+
+      - name: Scan secrets
+        run: pnpm scan:secrets
+
+      - name: Scan dual-blind identity
+        run: pnpm scan:identity
+
+      - name: Test known malicious scan samples
+        run: pnpm scan:self-test

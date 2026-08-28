@@ -6,8 +6,10 @@ semantics. On Windows, `path.relative` and the explicit `.git` comparison theref
 case-insensitive containment and write denial.
 
 Existing targets are resolved through symbolic links and directory junctions. A new target is
-rebased onto its immediate existing parent's real path. Writes repeat this resolution immediately
-before opening the file and fail if existence or the canonical target changed.
+rebased onto its immediate existing parent's real path. Write denial for `.git` is checked both on
+the requested path and again on these canonical target or parent paths, using case-insensitive
+segment comparison. Writes repeat this resolution immediately before opening the file and fail if
+existence or the canonical target changed.
 
 This repeated check narrows but cannot eliminate the filesystem TOCTOU window between final
 validation and the operating-system open/write call. The first version does not claim protection

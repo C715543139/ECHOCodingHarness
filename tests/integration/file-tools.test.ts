@@ -517,6 +517,104 @@ describe('workspace file tools', () => {
       });
     });
 
+    it('rejects write_file through an internal link to .git for existing and new targets', async () => {
+      const gitDirectory = path.join(workspaceRoot, '.GiT');
+      const originalConfig = 'protected=true\n';
+      await mkdir(gitDirectory);
+      await writeFile(path.join(gitDirectory, 'config'), originalConfig);
+      await symlink(
+        gitDirectory,
+        path.join(workspaceRoot, 'git-alias'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      const existingTarget = failed<WriteFileData>(
+        await writeFileTool.execute(
+          { path: 'git-alias/config', content: 'overwritten=true\n' },
+          createContext(workspaceRoot),
+        ),
+      );
+      const newTarget = failed<WriteFileData>(
+        await writeFileTool.execute(
+          { path: 'git-alias/new-config', content: 'created=true\n' },
+          createContext(workspaceRoot),
+        ),
+      );
+
+      expect(existingTarget.error).toMatchObject({
+        category: 'workspace_violation',
+        code: 'GIT_WRITE_DENIED',
+      });
+      expect(newTarget.error).toMatchObject({
+        category: 'workspace_violation',
+        code: 'GIT_WRITE_DENIED',
+      });
+      expect(await readFile(path.join(gitDirectory, 'config'), 'utf8')).toBe(originalConfig);
+      await expect(readFile(path.join(gitDirectory, 'new-config'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+    });
+
+    it('rejects apply_patch through an internal link to .git', async () => {
+      const gitDirectory = path.join(workspaceRoot, '.GiT');
+      const originalConfig = 'protected=true\n';
+      await mkdir(gitDirectory);
+      await writeFile(path.join(gitDirectory, 'config'), originalConfig);
+      await symlink(
+        gitDirectory,
+        path.join(workspaceRoot, 'git-alias'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      const result = failed<ApplyPatchData>(
+        await applyPatchTool.execute(
+          {
+            path: 'git-alias/config',
+            edits: [{ oldText: 'true', newText: 'false' }],
+          },
+          createContext(workspaceRoot),
+        ),
+      );
+
+      expect(result.error).toMatchObject({
+        category: 'workspace_violation',
+        code: 'GIT_WRITE_DENIED',
+      });
+      expect(await readFile(path.join(gitDirectory, 'config'), 'utf8')).toBe(originalConfig);
+    });
+
+    it('keeps write_file and apply_patch available through ordinary internal links', async () => {
+      const targetDirectory = path.join(workspaceRoot, 'linked-target');
+      await mkdir(targetDirectory);
+      await writeFile(path.join(targetDirectory, 'existing.txt'), 'before\n');
+      await symlink(
+        targetDirectory,
+        path.join(workspaceRoot, 'ordinary-alias'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      const written = completed<WriteFileData>(
+        await writeFileTool.execute(
+          { path: 'ordinary-alias/new.txt', content: 'created\n' },
+          createContext(workspaceRoot),
+        ),
+      );
+      const patched = completed<ApplyPatchData>(
+        await applyPatchTool.execute(
+          {
+            path: 'ordinary-alias/existing.txt',
+            edits: [{ oldText: 'before', newText: 'after' }],
+          },
+          createContext(workspaceRoot),
+        ),
+      );
+
+      expect(written.data.path).toBe('ordinary-alias/new.txt');
+      expect(patched.data.path).toBe('ordinary-alias/existing.txt');
+      expect(await readFile(path.join(targetDirectory, 'new.txt'), 'utf8')).toBe('created\n');
+      expect(await readFile(path.join(targetDirectory, 'existing.txt'), 'utf8')).toBe('after\n');
+    });
+
     it.runIf(process.platform === 'win32')(
       'accepts workspace-root casing changes using Windows case-insensitive semantics',
       async () => {

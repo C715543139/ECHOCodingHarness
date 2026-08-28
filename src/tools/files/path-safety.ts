@@ -25,16 +25,8 @@ export async function resolveWorkspacePath(
   const segments = validateRelativePath(inputPath, options.allowRoot);
   const relativePath = segments.join('/');
 
-  if (
-    options.write &&
-    segments.some((segment) => trimWindowsPathSuffix(segment).toLocaleLowerCase('en-US') === '.git')
-  ) {
-    throw new FileToolError(
-      'workspace_violation',
-      'GIT_WRITE_DENIED',
-      'File tools cannot write inside .git.',
-      { path: relativePath },
-    );
+  if (options.write) {
+    assertGitWriteAllowed(segments, relativePath);
   }
 
   const lexicalPath = path.join(rootPath, ...segments);
@@ -55,6 +47,9 @@ export async function resolveWorkspacePath(
     try {
       const targetPath = await realpath(lexicalPath);
       ensureInsideWorkspace(rootPath, targetPath, 'LINK_OUTSIDE_WORKSPACE');
+      if (options.write) {
+        assertCanonicalGitWriteAllowed(rootPath, targetPath, relativePath);
+      }
       return { rootPath, relativePath, absolutePath: targetPath, exists: true };
     } catch (error) {
       if (isFileSystemError(error, 'ENOENT')) {
@@ -111,6 +106,10 @@ export async function resolveWorkspacePath(
   }
 
   ensureInsideWorkspace(rootPath, parentRealPath, 'LINK_OUTSIDE_WORKSPACE');
+  const targetPath = path.join(parentRealPath, path.basename(lexicalPath));
+  if (options.write) {
+    assertCanonicalGitWriteAllowed(rootPath, targetPath, relativePath);
+  }
   const parentStats = await stat(parentRealPath);
   if (!parentStats.isDirectory()) {
     throw new FileToolError(
@@ -124,7 +123,7 @@ export async function resolveWorkspacePath(
   return {
     rootPath,
     relativePath,
-    absolutePath: path.join(parentRealPath, path.basename(lexicalPath)),
+    absolutePath: targetPath,
     exists: false,
   };
 }
@@ -259,6 +258,28 @@ function isWindowsDeviceName(segment: string): boolean {
 
 function trimWindowsPathSuffix(segment: string): string {
   return segment.replace(/[ .]+$/u, '');
+}
+
+function assertCanonicalGitWriteAllowed(
+  rootPath: string,
+  targetPath: string,
+  requestedRelativePath: string,
+): void {
+  const canonicalSegments = path.relative(rootPath, targetPath).split(/[\\/]+/u);
+  assertGitWriteAllowed(canonicalSegments, requestedRelativePath);
+}
+
+function assertGitWriteAllowed(segments: readonly string[], requestedRelativePath: string): void {
+  if (
+    segments.some((segment) => trimWindowsPathSuffix(segment).toLocaleLowerCase('en-US') === '.git')
+  ) {
+    throw new FileToolError(
+      'workspace_violation',
+      'GIT_WRITE_DENIED',
+      'File tools cannot write inside .git.',
+      { path: requestedRelativePath },
+    );
+  }
 }
 
 function workspaceViolation(code: string, message: string): FileToolError {

@@ -8,6 +8,7 @@ const demoRoot = path.join(repoRoot, 'fixtures', 'demo');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 const runs = 3;
 const timeoutMs = 180_000;
+const TURN_STATUS = /^(DONE|FAIL|LIMIT|CANCELLED)\s+(\S+)/gmu;
 
 function present(name) {
   return Boolean(process.env[name]?.trim());
@@ -53,7 +54,7 @@ async function resetFixture() {
   });
 }
 
-function analyze(stdout, stderr, secret) {
+export function analyzeDemoOutput(stdout, stderr, secret) {
   const combined = `${stdout}\n${stderr}`;
   const leak = secret.length > 0 && combined.includes(secret);
   const userPath = /[A-Za-z]:\\Users\\/u.test(combined) || /\/Users\/[^/\s]+/u.test(combined);
@@ -63,7 +64,7 @@ function analyze(stdout, stderr, secret) {
   const passingRetest = /OK\s+exit\s+0/u.test(stderr);
   const done = /^DONE\s+completed/mu.test(stderr);
   const step = /STEP\s+\d+/u.test(stderr);
-  const stop = stderr.match(/^(?:DONE|FAIL|LIMIT|CANCELLED)\s+(\S+)/mu);
+  const stop = [...stderr.matchAll(TURN_STATUS)].at(-1);
   return {
     leak,
     userPath,
@@ -73,7 +74,7 @@ function analyze(stdout, stderr, secret) {
     passingRetest,
     done,
     step,
-    stopReason: stop?.[1] ?? 'unknown',
+    stopReason: stop?.[2] ?? 'unknown',
     story:
       step && failedTest && applyPatch && passingRetest && done && !leak && !userPath && !reasoning,
   };
@@ -127,45 +128,53 @@ function runOnce(goal) {
   });
 }
 
-const envFile = process.env.ECHO_ENV_FILE ?? path.join(repoRoot, '.env.test');
-try {
-  await loadEnvFile(envFile);
-} catch {
-  // Environment may already be provided by the caller.
+function isMainModule() {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  return path.normalize(fileURLToPath(import.meta.url)) === path.normalize(path.resolve(entry));
 }
 
-if (!secretConfigured()) {
-  process.stderr.write(
-    'Demo acceptance skipped: ECHO_BASE_URL, ECHO_API_KEY, and ECHO_MODEL are required.\n',
-  );
-  process.exit(2);
+if (isMainModule()) {
+  const envFile = process.env.ECHO_ENV_FILE ?? path.join(repoRoot, '.env.test');
+  try {
+    await loadEnvFile(envFile);
+  } catch {
+    // Environment may already be provided by the caller.
+  }
+
+  if (!secretConfigured()) {
+    process.stderr.write(
+      'Demo acceptance skipped: ECHO_BASE_URL, ECHO_API_KEY, and ECHO_MODEL are required.\n',
+    );
+    process.exit(2);
+  }
+
+  const goal = (await readFile(path.join(demoRoot, 'prompt.txt'), 'utf8')).trim();
+  const secret = process.env.ECHO_API_KEY ?? '';
+  const results = [];
+
+  for (let index = 1; index <= runs; index += 1) {
+    await resetFixture();
+    const outcome = await runOnce(goal);
+    const privacy = analyzeDemoOutput(outcome.stdout, outcome.stderr, secret);
+    const stats = {
+      run: index,
+      ok: outcome.exitCode === 0 && privacy.story,
+      exitCode: outcome.exitCode,
+      durationMs: outcome.durationMs,
+      stopReason: privacy.stopReason,
+      failedTest: privacy.failedTest,
+      applyPatch: privacy.applyPatch,
+      passingRetest: privacy.passingRetest,
+      privacy: !privacy.leak && !privacy.userPath && !privacy.reasoning,
+    };
+    results.push(stats);
+    process.stdout.write(
+      `run ${String(index)}: ${stats.ok ? 'pass' : 'fail'} · ${String(stats.durationMs)}ms · exit ${String(stats.exitCode)} · stopReason ${stats.stopReason} · failTest ${String(stats.failedTest)} · apply_patch ${String(stats.applyPatch)} · retest ${String(stats.passingRetest)} · privacy ${String(stats.privacy)}\n`,
+    );
+  }
+
+  const passed = results.filter((item) => item.ok).length;
+  process.stdout.write(`demo acceptance: ${String(passed)}/${String(runs)} passed\n`);
+  process.exit(passed === runs ? 0 : 1);
 }
-
-const goal = (await readFile(path.join(demoRoot, 'prompt.txt'), 'utf8')).trim();
-const secret = process.env.ECHO_API_KEY ?? '';
-const results = [];
-
-for (let index = 1; index <= runs; index += 1) {
-  await resetFixture();
-  const outcome = await runOnce(goal);
-  const privacy = analyze(outcome.stdout, outcome.stderr, secret);
-  const stats = {
-    run: index,
-    ok: outcome.exitCode === 0 && privacy.story,
-    exitCode: outcome.exitCode,
-    durationMs: outcome.durationMs,
-    stopReason: privacy.stopReason,
-    failedTest: privacy.failedTest,
-    applyPatch: privacy.applyPatch,
-    passingRetest: privacy.passingRetest,
-    privacy: !privacy.leak && !privacy.userPath && !privacy.reasoning,
-  };
-  results.push(stats);
-  process.stdout.write(
-    `run ${String(index)}: ${stats.ok ? 'pass' : 'fail'} · ${String(stats.durationMs)}ms · exit ${String(stats.exitCode)} · stopReason ${stats.stopReason} · failTest ${String(stats.failedTest)} · apply_patch ${String(stats.applyPatch)} · retest ${String(stats.passingRetest)} · privacy ${String(stats.privacy)}\n`,
-  );
-}
-
-const passed = results.filter((item) => item.ok).length;
-process.stdout.write(`demo acceptance: ${String(passed)}/${String(runs)} passed\n`);
-process.exit(passed === runs ? 0 : 1);

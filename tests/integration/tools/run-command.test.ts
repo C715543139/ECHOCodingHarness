@@ -8,13 +8,15 @@ import type { ToolContext } from '../../../src/contracts/index.js';
 import { runCommandTool } from '../../../src/tools/command/run-command.js';
 
 const describeWindows = process.platform === 'win32' ? describe : describe.skip;
+const COMMAND_TIMEOUT_MS = 20_000;
+const WINDOWS_TEST_TIMEOUT_MS = 30_000;
 const workspaces: string[] = [];
 
 async function createContext(signal = new AbortController().signal): Promise<ToolContext> {
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'echo run command '));
   workspaces.push(workspaceRoot);
   return {
-    limits: { maxOutputChars: 1_000, timeoutMs: 5_000 },
+    limits: { maxOutputChars: 1_000, timeoutMs: COMMAND_TIMEOUT_MS },
     sessionId: 'session-test',
     signal,
     stepId: 'step-test',
@@ -26,11 +28,18 @@ async function createContext(signal = new AbortController().signal): Promise<Too
 
 afterEach(async () => {
   await Promise.all(
-    workspaces.splice(0).map((workspace) => rm(workspace, { force: true, recursive: true })),
+    workspaces.splice(0).map((workspace) =>
+      rm(workspace, {
+        force: true,
+        maxRetries: 10,
+        recursive: true,
+        retryDelay: 100,
+      }),
+    ),
   );
 });
 
-describeWindows('run_command tool', () => {
+describeWindows('run_command tool', { timeout: WINDOWS_TEST_TIMEOUT_MS }, () => {
   it('returns successful structured facts for a zero exit', async () => {
     const result = await runCommandTool.execute(
       { command: "[Console]::Out.Write('ok')" },

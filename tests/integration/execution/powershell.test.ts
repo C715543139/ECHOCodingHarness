@@ -17,6 +17,12 @@ async function makeWorkspace(): Promise<string> {
   return workspace;
 }
 
+async function makeAsciiWorkspace(): Promise<string> {
+  const workspace = await mkdtemp(join(tmpdir(), 'echo-command-ascii-'));
+  workspaces.push(workspace);
+  return workspace;
+}
+
 afterEach(async () => {
   await Promise.all(
     workspaces.splice(0).map((workspace) =>
@@ -59,6 +65,26 @@ describeWindows('executePowerShell on Windows', () => {
     expect(result.stderr).toBe('警告 信息');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
     await expect(readFile(join(workspaceRoot, '带 空格.txt'), 'utf8')).resolves.toBe('中文 内容');
+  });
+
+  it('runs Set-Content and Get-Content in an ASCII workspace', async () => {
+    const workspaceRoot = await makeAsciiWorkspace();
+    const result = await executePowerShell({
+      command:
+        "Set-Content -LiteralPath 'hello.txt' -Value 'ascii content' -NoNewline; " +
+        "[Console]::Out.Write((Get-Content -Raw -LiteralPath 'hello.txt')); " +
+        "[Console]::Error.Write('cmdlet ok')",
+      env: process.env,
+      maxOutputChars: 1_000,
+      signal: new AbortController().signal,
+      timeoutMs: 5_000,
+      workspaceRoot,
+    });
+
+    expect(result.reason).toBe('exited');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('ascii content');
+    expect(result.stderr).toBe('cmdlet ok');
   });
 
   it('keeps a non-zero exit code and separate stderr as execution facts', async () => {
@@ -178,6 +204,26 @@ describeWindows('executePowerShell on Windows', () => {
 
     expect(result.stdout).toBe('||');
     expect(result.stdout).not.toContain('secret');
+  });
+
+  it('keeps the child PSModulePath on the system modules directory', async () => {
+    const result = await executePowerShell({
+      command:
+        '$hasDocuments = [bool]($env:PSModulePath -like "*Documents\\WindowsPowerShell\\Modules*"); ' +
+        '$hasSystem = [bool]($env:PSModulePath -like "*System32\\WindowsPowerShell\\v1.0\\Modules*"); ' +
+        '$count = @($env:PSModulePath -split ";" | Where-Object { $_.Trim().Length -gt 0 }).Count; ' +
+        '[Console]::Out.Write("documents=$hasDocuments;system=$hasSystem;count=$count")',
+      env: process.env,
+      maxOutputChars: 1_000,
+      signal: new AbortController().signal,
+      timeoutMs: 5_000,
+      workspaceRoot: await makeAsciiWorkspace(),
+    });
+
+    expect(result.reason).toBe('exited');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('documents=False;system=True;count=1');
+    expect(result.stdout).not.toMatch(/[:\\/]/u);
   });
 
   it('returns a structured spawn error when the controlled executable is unavailable', async () => {

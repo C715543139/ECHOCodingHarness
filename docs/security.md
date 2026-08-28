@@ -225,7 +225,7 @@ PowerShell 不是沙箱。获准执行的程序可能自行访问工作区外文
 - 常见云服务、包仓库和版本控制令牌；
 - 由 ECHO 内部使用的授权头或临时凭据。
 
-为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。最终允许列表需在 Windows 集成测试后固化。
+为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。最终允许列表需在 Windows 集成测试后固化。
 
 ## 11. 日志、事件与脱敏
 

@@ -29,8 +29,6 @@ const CHILD_ENVIRONMENT_ALLOWLIST = new Set(
     'TEMP',
     'TMP',
     'USERPROFILE',
-    'USERNAME',
-    'COMPUTERNAME',
     'WINDIR',
   ].map((name) => name.toUpperCase()),
 );
@@ -67,6 +65,9 @@ export interface PowerShellExecutionResult {
 const UTF8_COMMAND_PREFIX =
   '$ProgressPreference = "SilentlyContinue"; ' +
   '$ConfirmPreference = "None"; ' +
+  '$echoSystemRoot = [Environment]::GetEnvironmentVariable("SystemRoot"); ' +
+  'if (-not $echoSystemRoot) { $echoSystemRoot = [Environment]::GetEnvironmentVariable("windir"); } ' +
+  'if ($echoSystemRoot) { $env:PSModulePath = [System.IO.Path]::Combine($echoSystemRoot, "System32", "WindowsPowerShell", "v1.0", "Modules"); } ' +
   '$echoUtf8 = [System.Text.UTF8Encoding]::new($false); ' +
   '$OutputEncoding = $echoUtf8; ' +
   '$echoStdOut = [System.IO.StreamWriter]::new([Console]::OpenStandardOutput(), $echoUtf8); ' +
@@ -100,10 +101,24 @@ export function sanitizeChildEnvironment(source: Readonly<NodeJS.ProcessEnv>): N
   return sanitized;
 }
 
+export function readEnvIgnoreCase(
+  env: Readonly<NodeJS.ProcessEnv>,
+  name: string,
+): string | undefined {
+  const target = name.toUpperCase();
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined && key.toUpperCase() === target && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 export function buildChildEnvironment(source: Readonly<NodeJS.ProcessEnv>): NodeJS.ProcessEnv {
   const sanitized = sanitizeChildEnvironment(source);
-  const systemRoot = sanitized.SYSTEMROOT ?? sanitized.WINDIR;
-  if (systemRoot !== undefined && systemRoot.trim().length > 0) {
+  const systemRoot =
+    readEnvIgnoreCase(sanitized, 'SYSTEMROOT') ?? readEnvIgnoreCase(sanitized, 'WINDIR');
+  if (systemRoot !== undefined) {
     sanitized.PSModulePath = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules');
   }
   return sanitized;

@@ -33,6 +33,7 @@ describe('PowerShell execution helpers', () => {
     ]);
     expect(arguments_).toHaveLength(9);
     expect(arguments_[8]).toMatch(/ProgressPreference/u);
+    expect(arguments_[8]).toMatch(/\$env:PSModulePath\s*=/u);
     expect(arguments_[8]).not.toMatch(/\[Console\]::(?:Input|Output)Encoding\s*=/u);
     expect(arguments_[8]).toMatch(/OpenStandardOutput/u);
     expect(arguments_[8]).toMatch(/Write-Output 'value with spaces'; Write-Output '--NoProfile'$/u);
@@ -64,7 +65,22 @@ describe('PowerShell execution helpers', () => {
         'AWS_SECRET_ACCESS_KEY',
         'CUSTOM_VALUE',
         'PSMODULEPATH',
+        'USERNAME',
+        'COMPUTERNAME',
       ]),
+    );
+  });
+
+  it('does not pass USERNAME or COMPUTERNAME through the child allowlist', () => {
+    const sanitized = sanitizeChildEnvironment({
+      Path: 'C:\\Windows\\System32',
+      USERNAME: 'runner',
+      COMPUTERNAME: 'box',
+      Username: 'also-runner',
+    });
+
+    expect(Object.keys(sanitized).map((key) => key.toUpperCase())).not.toEqual(
+      expect.arrayContaining(['USERNAME', 'COMPUTERNAME']),
     );
   });
 
@@ -79,6 +95,27 @@ describe('PowerShell execution helpers', () => {
     expect(env.PSModulePath).toMatch(/System32[\\/]WindowsPowerShell[\\/]v1\.0[\\/]Modules$/iu);
     expect(env.PSModulePath).not.toMatch(/Documents/u);
     expect(env.ECHO_API_KEY).toBeUndefined();
+  });
+
+  it('reads Windows Node env keys SystemRoot and windir case-insensitively', () => {
+    const fromSystemRoot = buildChildEnvironment({
+      SystemRoot: 'C:\\Windows',
+      Path: 'C:\\Windows\\System32',
+      PSModulePath: 'C:\\Users\\runner\\Documents\\WindowsPowerShell\\Modules',
+    });
+    const fromWindir = buildChildEnvironment({
+      windir: 'C:\\Windows',
+      PSModulePath: 'C:\\Users\\runner\\Documents\\WindowsPowerShell\\Modules',
+    });
+
+    expect(fromSystemRoot.PSModulePath).toMatch(
+      /System32[\\/]WindowsPowerShell[\\/]v1\.0[\\/]Modules$/iu,
+    );
+    expect(fromWindir.PSModulePath).toMatch(
+      /System32[\\/]WindowsPowerShell[\\/]v1\.0[\\/]Modules$/iu,
+    );
+    expect(fromSystemRoot.PSModulePath).not.toMatch(/Documents/u);
+    expect(fromWindir.PSModulePath).not.toMatch(/Documents/u);
   });
 
   it('keeps bounded head and tail output with an explicit truncation marker', () => {

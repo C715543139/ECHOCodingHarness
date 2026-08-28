@@ -1,0 +1,1 @@
+Fix the failing parser tests in this workspace. Do not modify any test files or anything under test/. Inspect with search_text and read_file, run npm test to observe the failure, change only src/parse-report.ts with apply_patch, then run npm test again until it passes. Use tool results as evidence and stop when the tests pass.

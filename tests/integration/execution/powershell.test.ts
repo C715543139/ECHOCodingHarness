@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -41,8 +41,10 @@ describeWindows('executePowerShell on Windows', () => {
     const workspaceRoot = await makeWorkspace();
     const result = await executePowerShell({
       command:
-        "Set-Content -LiteralPath '带 空格.txt' -Value '中文 内容' -NoNewline; " +
-        "[Console]::Out.Write((Get-Content -Raw -LiteralPath '带 空格.txt')); " +
+        '$echoCwd = [System.IO.Directory]::GetCurrentDirectory(); ' +
+        "$echoPath = [System.IO.Path]::Combine($echoCwd, '带 空格.txt'); " +
+        '[System.IO.File]::WriteAllText($echoPath, "中文 内容", $echoUtf8); ' +
+        '[Console]::Out.Write([System.IO.File]::ReadAllText($echoPath, $echoUtf8)); ' +
         "[Console]::Error.Write('警告 信息')",
       env: process.env,
       maxOutputChars: 1_000,
@@ -56,6 +58,7 @@ describeWindows('executePowerShell on Windows', () => {
     expect(result.stdout).toBe('中文 内容');
     expect(result.stderr).toBe('警告 信息');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    await expect(readFile(join(workspaceRoot, '带 空格.txt'), 'utf8')).resolves.toBe('中文 内容');
   });
 
   it('keeps a non-zero exit code and separate stderr as execution facts', async () => {

@@ -1,8 +1,8 @@
 # P0 非交互 CLI 演示
 
-> 状态：Proposed
+> 状态：Ready for recording
 >
-> 版本：0.1
+> 版本：1.0
 >
 > 最后更新：2026-08-28
 
@@ -95,3 +95,10 @@ node scripts/demo-accept.mjs
 ```
 
 若 `.env.test` 不在当前 worktree，可在不打印内容的前提下设置 `ECHO_ENV_FILE` 指向仓库外的环境文件。脚本只打印每轮 pass/fail、时长、退出码、`stopReason` 和故事节拍布尔值。
+
+## 8. 已验证基线
+
+2026-08-28 在一个受控 OpenAI-compatible 服务上连续运行 3 次，均以退出码 0 完成，耗时
+分别约为 30.5 秒、17.0 秒和 15.2 秒。三轮都包含失败测试、`apply_patch`、成功复测与
+`completed` 终态，且未发现 API Key、个人绝对路径或推理字段泄露。该结果证明当前命令与
+fixture 可用于录制；最终视频仍须按第 6 节执行人工双盲检查。

@@ -1,10 +1,10 @@
 # ECHO Harness 安全模型
 
-> 状态：Proposed
+> 状态：Accepted
 >
-> 版本：0.1
+> 版本：1.0
 >
-> 最后更新：2026-08-27
+> 最后更新：2026-08-28
 
 ## 1. 文档目的
 
@@ -225,7 +225,7 @@ PowerShell 不是沙箱。获准执行的程序可能自行访问工作区外文
 - 常见云服务、包仓库和版本控制令牌；
 - 由 ECHO 内部使用的授权头或临时凭据。
 
-为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。最终允许列表需在 Windows 集成测试后固化。
+为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。当前允许列表已在 `src/execution/powershell.ts` 固化，并由 Windows 单元与集成测试覆盖。
 
 ## 11. 日志、事件与脱敏
 
@@ -261,7 +261,9 @@ raw runtime data -> normalize -> redact -> truncate -> persist/render
 - 大输出如需临时落盘，只能进入工作区内被忽略的 ECHO 临时目录，并遵守清理与脱敏策略；
 - API 重试次数和总等待时间有界。
 
-默认阈值在性能测试与演示验证后写入配置文档。
+当前默认值为 24 个 Step、120 秒工具超时、20,000 字符工具输出上限、300 秒 Provider
+请求超时、32,000 近似 token 上下文和 4,000 输出 token 预留；配置契约见
+[contracts.md](./contracts.md)。
 
 ## 13. 取消与进程清理
 
@@ -303,9 +305,9 @@ raw runtime data -> normalize -> redact -> truncate -> persist/render
 
 后续若增加容器隔离、受限令牌、命令 AST 分析或变更快照，应通过独立 ADR 评估复杂度与收益。
 
-## 17. 安全验收条件
+## 17. 安全验收证据
 
-本文升级为 `Accepted / 1.0` 前，至少需要自动化验证：
+本文已基于以下自动化验证升级为 `Accepted / 1.0`：
 
 - `..`、绝对路径、UNC、大小写变化和链接逃逸；
 - 新建文件时的父目录逃逸；

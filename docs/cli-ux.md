@@ -1,8 +1,8 @@
 # ECHO Harness CLI 展示与交互规范
 
-> 状态：Proposed
+> 状态：Accepted
 >
-> 版本：0.1
+> 版本：1.0
 >
 > 最后更新：2026-08-28
 
@@ -369,11 +369,11 @@ CI 使用 Fake Provider 执行最小事件序列，并验证稳定输出。真�
 - 最终画面保留 `DONE` 摘要和测试证据；
 - 如终端颜色影响压缩或可读性，使用 `NO_COLOR` 录制也必须成立。
 
-## 19. 变更与接受条件
+## 19. 变更与接受证据
 
 颜色、间距和措辞属于本文管理的可演进细节。stdout/stderr 语义、无颜色行为、隐私要求、Renderer 无副作用及任务/工具成功不得混淆属于稳定契约；改变这些内容应同步审查 [contracts.md](./contracts.md)。
 
-本文在以下条件满足后从 `Proposed / 0.1` 升级为 `Accepted / 1.0`：
+本文已基于以下证据升级为 `Accepted / 1.0`：
 
 - `EventRenderer` 已实现并具有 snapshot/行为测试；
 - TTY、非 TTY、CI 和 `NO_COLOR` 行为经过验证；

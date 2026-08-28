@@ -1,8 +1,10 @@
 # ADR-0001：ECHO Harness 项目基础
 
-> 状态：Proposed
+> 状态：Accepted
 >
 > 日期：2026-08-27
+>
+> 接受日期：2026-08-28
 >
 > 决策者：项目维护者
 
@@ -197,9 +199,9 @@ Python 在快速脚本和 AI 生态方面有优势，但本项目不依赖训练
 - 需要专用 Git 写工具、MCP、LSP 或子智能体；
 - Node.js 22 在目标 Windows 环境中无法满足关键执行需求。
 
-## 7. 接受条件
+## 7. 接受证据
 
-本 ADR 在以下条件满足后从 `Proposed` 改为 `Accepted`：
+本 ADR 已基于以下证据从 `Proposed` 改为 `Accepted`：
 
 - 项目骨架与 CI 验证所选工具链；
 - OpenAI-compatible Provider 完成一次真实端到端验证；

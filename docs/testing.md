@@ -1,5 +1,11 @@
 # Testing ECHO Harness
 
+> 状态：Accepted
+>
+> 版本：1.0
+>
+> 最后更新：2026-08-28
+
 ## Automated quality gate
 
 Run `pnpm check` for formatting, linting, type checking, coverage, build, CLI/provider

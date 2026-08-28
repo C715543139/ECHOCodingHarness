@@ -1,8 +1,8 @@
 # ECHO Harness 核心契约
 
-> 状态：Proposed
+> 状态：Accepted
 >
-> 版本：0.1
+> 版本：1.0
 >
 > 最后更新：2026-08-28
 
@@ -169,7 +169,8 @@ interface ToolResultMessage {
 | `apply_patch` | 结构化补丁 | 应用结果与 diff 摘要 | 修改文件 |
 | `run_command` | 命令、参数或命令文本、超时 | 退出码、stdout、stderr、耗时 | 取决于命令 |
 
-精确 JSON Schema 在工具实现时确定，并由测试验证与模型声明一致。
+精确 JSON Schema 位于 `src/tools/` 的工具定义中，并由工具注册、输入校验和集成测试验证
+其与模型声明一致。
 
 ## 5. 安全策略契约
 
@@ -485,9 +486,9 @@ CLI 必须保证同一失败类别在交互与非交互运行中使用相同退�
 13. tool-call ID 在 Session 内必须非空且唯一，协议违规不得进入工具管线。
 14. SessionStore 故障补偿必须以已持久化事件去重，不能制造第二个工具或 Turn 终态。
 
-## 14. 接受流程
+## 14. 接受证据
 
-本文件在以下条件满足后由 `Proposed / 0.1` 升级为 `Accepted / 1.0`：
+本文已基于以下证据升级为 `Accepted / 1.0`：
 
 - 对应 TypeScript 接口已实现；
 - Fake Provider 覆盖完整 Agent Loop；

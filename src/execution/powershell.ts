@@ -65,6 +65,8 @@ export interface PowerShellExecutionResult {
 }
 
 const UTF8_COMMAND_PREFIX =
+  '$ProgressPreference = "SilentlyContinue"; ' +
+  '$ConfirmPreference = "None"; ' +
   '$echoUtf8 = [System.Text.UTF8Encoding]::new($false); ' +
   '$OutputEncoding = $echoUtf8; ' +
   '$echoStdOut = [System.IO.StreamWriter]::new([Console]::OpenStandardOutput(), $echoUtf8); ' +

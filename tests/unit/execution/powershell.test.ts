@@ -32,6 +32,7 @@ describe('PowerShell execution helpers', () => {
       '-Command',
     ]);
     expect(arguments_).toHaveLength(9);
+    expect(arguments_[8]).toMatch(/ProgressPreference/u);
     expect(arguments_[8]).not.toMatch(/\[Console\]::(?:Input|Output)Encoding\s*=/u);
     expect(arguments_[8]).toMatch(/OpenStandardOutput/u);
     expect(arguments_[8]).toMatch(/Write-Output 'value with spaces'; Write-Output '--NoProfile'$/u);

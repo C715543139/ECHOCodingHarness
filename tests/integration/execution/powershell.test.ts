@@ -114,9 +114,13 @@ describeWindows('executePowerShell on Windows', () => {
   it('times out and terminates the complete PowerShell process tree', async () => {
     const result = await executePowerShell({
       command:
-        '$child = Start-Process -PassThru -WindowStyle Hidden cmd.exe ' +
-        "-ArgumentList @('/d','/c','ping -n 30 127.0.0.1 >nul'); " +
-        '[Console]::Out.WriteLine($child.Id); [Console]::Out.Flush(); Wait-Process -Id $child.Id',
+        '$start = [System.Diagnostics.ProcessStartInfo]::new(); ' +
+        "$start.FileName = 'cmd.exe'; " +
+        "$start.Arguments = '/d /c ping -n 30 127.0.0.1 >nul'; " +
+        '$start.CreateNoWindow = $true; ' +
+        '$start.UseShellExecute = $false; ' +
+        '$child = [System.Diagnostics.Process]::Start($start); ' +
+        '[Console]::Out.WriteLine($child.Id); [Console]::Out.Flush(); $child.WaitForExit()',
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,

@@ -4,7 +4,7 @@
 >
 > 版本：0.1
 >
-> 最后更新：2026-08-27
+> 最后更新：2026-08-28
 
 ## 1. 文档目的
 
@@ -252,6 +252,10 @@ type EchoEvent =
 
 `model.tool_call` 必须保存 Provider 聚合后的完整、Provider 无关工具调用，包括调用 ID、工具名和经脱敏但尚未做语义规范化的参数。`tool.requested` 则记录进入工具管线的输入及其规范化结果；即使后续校验、审批或执行失败，也能区分“模型原始请求”与“ECHO 实际尝试执行的操作”。
 
+同一 Session 中每个 `ModelToolCall.id` 必须是非空且唯一的稳定标识。同一模型响应内重复、
+跨 Step 重用或空白 ID 均映射为不可重试的 `provider_protocol` 错误；该响应不得产生
+`tool.requested`，也不得执行任何工具。
+
 `approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
 
 ### 6.3 工具状态机
@@ -272,6 +276,10 @@ tool.requested
 ```
 
 `tool.cancelled` 可以发生在等待审批、已授权但尚未启动，或执行过程中。每个 `tool.requested` 必须恰好对应一个工具终态事件：`tool.completed`、`tool.failed`、`tool.denied` 或 `tool.cancelled`。审批事件不是工具终态。进程崩溃后的恢复逻辑如发现悬空调用，应补记 `tool.cancelled` 或恢复诊断事件，不得把它视为成功。
+
+运行中发生 SessionStore 错误时，Orchestrator 应在存储恢复后 best-effort 读取已持久化事实，
+只为没有既有终态的 `tool.requested` 补记一个 `tool.failed`，并在没有 Turn 终态时补记一个
+`turn.failed`。append 结果不明确时必须先读后判定，不能通过无条件重试制造重复终态。
 
 ### 6.4 CLI 渲染契约
 
@@ -408,7 +416,10 @@ CLI 显式参数 > 环境变量 > 项目配置 > 用户配置 > 内置默认值
 - API Key 不得写入项目配置、事件、命令输出或子进程环境；
 - 配置诊断只能显示 Key 是否存在，不显示其值或可还原片段；
 - 未知配置键应产生警告或校验错误，避免静默拼写错误；
-- 最终文件名、Schema 与默认数值待实现验证后固化。
+- 项目配置文件依次尝试 `echo.config.json` 与 `.echo-config.json`；项目配置不得提供
+  API Key。
+- 内置默认值为：`balanced`、24 个 Step、120 秒工具超时、20,000 字符工具输出上限、
+  300 秒 Provider 请求超时、32,000 近似 token 上下文与 4,000 输出 token 预留。
 
 ## 11. 错误模型
 
@@ -442,7 +453,7 @@ interface EchoError {
 
 ## 12. CLI 退出码
 
-首版暂定按稳定类别映射，精确枚举将在 CLI 实现与测试后确定并固化：
+首版按以下稳定类别映射：
 
 | 退出码 | 含义 |
 | --- | --- |
@@ -471,6 +482,8 @@ CLI 必须保证同一失败类别在交互与非交互运行中使用相同退�
 10. 核心模块不得依赖 Agent 框架或第三方托管代码执行能力。
 11. 核心模块不得依赖 CLI Renderer；渲染不得改变 Agent 状态或工具结果。
 12. 非交互输出不得依赖颜色、动画或 Unicode 才能表达状态。
+13. tool-call ID 在 Session 内必须非空且唯一，协议违规不得进入工具管线。
+14. SessionStore 故障补偿必须以已持久化事件去重，不能制造第二个工具或 Turn 终态。
 
 ## 14. 接受流程
 

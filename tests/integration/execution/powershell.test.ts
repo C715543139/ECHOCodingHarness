@@ -1,20 +1,24 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { discoverPowerShellExecutable } from '../../../src/execution/discover-powershell.js';
 import { executePowerShell } from '../../../src/execution/powershell.js';
 
 const describeWindows = process.platform === 'win32' ? describe : describe.skip;
-const COMMAND_TIMEOUT_MS = 20_000;
-const PROCESS_TREE_TIMEOUT_MS = 10_000;
-const WINDOWS_TEST_TIMEOUT_MS = 30_000;
 const workspaces: string[] = [];
 
 async function makeWorkspace(): Promise<string> {
   const workspace = await mkdtemp(join(tmpdir(), 'echo command 空格 '));
+  workspaces.push(workspace);
+  return workspace;
+}
+
+async function makeAsciiWorkspace(): Promise<string> {
+  const workspace = await mkdtemp(join(tmpdir(), 'echo-command-ascii-'));
   workspaces.push(workspace);
   return workspace;
 }
@@ -32,18 +36,26 @@ afterEach(async () => {
   );
 });
 
-describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_MS }, () => {
+describeWindows('executePowerShell on Windows', () => {
+  it('discovers the canonical WindowsPowerShell host before spawning', async () => {
+    const discovered = await discoverPowerShellExecutable();
+    expect(discovered).toMatch(/WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/iu);
+    expect(discovered).not.toMatch(/System32[\\/]powershell\.exe$/iu);
+  });
+
   it('uses a fixed cwd and preserves Chinese text and spaced arguments', async () => {
     const workspaceRoot = await makeWorkspace();
     const result = await executePowerShell({
       command:
-        "Set-Content -LiteralPath '带 空格.txt' -Value '中文 内容' -NoNewline; " +
-        "[Console]::Out.Write((Get-Content -Raw -LiteralPath '带 空格.txt')); " +
+        '$echoCwd = [System.IO.Directory]::GetCurrentDirectory(); ' +
+        "$echoPath = [System.IO.Path]::Combine($echoCwd, '带 空格.txt'); " +
+        '[System.IO.File]::WriteAllText($echoPath, "中文 内容", $echoUtf8); ' +
+        '[Console]::Out.Write([System.IO.File]::ReadAllText($echoPath, $echoUtf8)); ' +
         "[Console]::Error.Write('警告 信息')",
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot,
     });
 
@@ -52,6 +64,27 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
     expect(result.stdout).toBe('中文 内容');
     expect(result.stderr).toBe('警告 信息');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    await expect(readFile(join(workspaceRoot, '带 空格.txt'), 'utf8')).resolves.toBe('中文 内容');
+  });
+
+  it('runs Set-Content and Get-Content in an ASCII workspace', async () => {
+    const workspaceRoot = await makeAsciiWorkspace();
+    const result = await executePowerShell({
+      command:
+        "Set-Content -LiteralPath 'hello.txt' -Value 'ascii content' -NoNewline; " +
+        "[Console]::Out.Write((Get-Content -Raw -LiteralPath 'hello.txt')); " +
+        "[Console]::Error.Write('cmdlet ok')",
+      env: process.env,
+      maxOutputChars: 1_000,
+      signal: new AbortController().signal,
+      timeoutMs: 5_000,
+      workspaceRoot,
+    });
+
+    expect(result.reason).toBe('exited');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('ascii content');
+    expect(result.stderr).toBe('cmdlet ok');
   });
 
   it('keeps a non-zero exit code and separate stderr as execution facts', async () => {
@@ -60,7 +93,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -78,7 +111,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 120,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -95,7 +128,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 100,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -110,13 +143,17 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
   it('times out and terminates the complete PowerShell process tree', async () => {
     const result = await executePowerShell({
       command:
-        '$child = Start-Process -PassThru -WindowStyle Hidden cmd.exe ' +
-        "-ArgumentList @('/d','/c','ping -n 30 127.0.0.1 >nul'); " +
-        '[Console]::Out.WriteLine($child.Id); [Console]::Out.Flush(); Wait-Process -Id $child.Id',
+        '$start = [System.Diagnostics.ProcessStartInfo]::new(); ' +
+        "$start.FileName = 'cmd.exe'; " +
+        "$start.Arguments = '/d /c ping -n 30 127.0.0.1 >nul'; " +
+        '$start.CreateNoWindow = $true; ' +
+        '$start.UseShellExecute = $false; ' +
+        '$child = [System.Diagnostics.Process]::Start($start); ' +
+        '[Console]::Out.WriteLine($child.Id); [Console]::Out.Flush(); $child.WaitForExit()',
       env: process.env,
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: PROCESS_TREE_TIMEOUT_MS,
+      timeoutMs: 1_000,
       workspaceRoot: await makeWorkspace(),
     });
 
@@ -136,7 +173,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       env: process.env,
       maxOutputChars: 1_000,
       signal: controller.signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
     setTimeout(() => controller.abort(), 100);
@@ -161,12 +198,32 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       },
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 
     expect(result.stdout).toBe('||');
     expect(result.stdout).not.toContain('secret');
+  });
+
+  it('keeps the child PSModulePath on the system modules directory', async () => {
+    const result = await executePowerShell({
+      command:
+        '$hasDocuments = [bool]($env:PSModulePath -like "*Documents\\WindowsPowerShell\\Modules*"); ' +
+        '$hasSystem = [bool]($env:PSModulePath -like "*System32\\WindowsPowerShell\\v1.0\\Modules*"); ' +
+        '$count = @($env:PSModulePath -split ";" | Where-Object { $_.Trim().Length -gt 0 }).Count; ' +
+        '[Console]::Out.Write("documents=$hasDocuments;system=$hasSystem;count=$count")',
+      env: process.env,
+      maxOutputChars: 1_000,
+      signal: new AbortController().signal,
+      timeoutMs: 5_000,
+      workspaceRoot: await makeAsciiWorkspace(),
+    });
+
+    expect(result.reason).toBe('exited');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('documents=False;system=True;count=1');
+    expect(result.stdout).not.toMatch(/[:\\/]/u);
   });
 
   it('returns a structured spawn error when the controlled executable is unavailable', async () => {
@@ -176,7 +233,7 @@ describeWindows('executePowerShell on Windows', { timeout: WINDOWS_TEST_TIMEOUT_
       executable: 'echo-harness-missing-powershell.exe',
       maxOutputChars: 1_000,
       signal: new AbortController().signal,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      timeoutMs: 5_000,
       workspaceRoot: await makeWorkspace(),
     });
 

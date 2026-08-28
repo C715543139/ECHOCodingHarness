@@ -15,9 +15,6 @@ export default defineConfig({
       },
     },
     environment: 'node',
-    // Windows process integration tests exercise a shared, relatively expensive OS resource.
-    // Serial files prevent runner contention from becoming part of their behavioral contract.
-    fileParallelism: process.platform !== 'win32',
     include: ['tests/**/*.test.ts'],
   },
 });

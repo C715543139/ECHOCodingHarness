@@ -119,10 +119,10 @@ ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操
 Windows 首版以 PowerShell 为受支持 Shell，并使用等价于以下的非交互约束：
 
 ```text
-powershell -NoLogo -NoProfile -NonInteractive -Command <command>
+%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -InputFormat Text -OutputFormat Text -Command <command>
 ```
 
-实际可执行文件应从受控配置或系统发现结果确定，不从模型输入决定。子进程必须设置：
+实际可执行文件应通过受控配置或上述 Windows PowerShell 5.1 宿主路径发现，不得依赖 `PATH` 上的 `powershell.exe` 短名，也不从模型输入决定。stdin 以立即 EOF 的管道接入，避免 5.1 在重定向输入上等待 CLIXML。编码通过标准输出流设置，不调用会在无控制台会话中挂起的 `[Console]::InputEncoding` / `[Console]::OutputEncoding`。Windows PowerShell 5.1 的 `Set-Content`/`Get-Content` 在系统 ANSI 代码页无法表示工作区路径时可能阻塞，因此工作区 Unicode 路径以 .NET 文件 API 与 Win32 当前目录为准。子进程必须设置：
 
 - 工作目录为规范化后的工作区目录；
 - 显式超时；
@@ -225,7 +225,7 @@ PowerShell 不是沙箱。获准执行的程序可能自行访问工作区外文
 - 常见云服务、包仓库和版本控制令牌；
 - 由 ECHO 内部使用的授权头或临时凭据。
 
-为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。最终允许列表需在 Windows 集成测试后固化。
+为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。最终允许列表需在 Windows 集成测试后固化。
 
 ## 11. 日志、事件与脱敏
 

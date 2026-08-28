@@ -242,8 +242,8 @@ Context Projector 按优先级构建上下文：
 - 工作区根路径在启动时解析为绝对规范路径；
 - 工具输入路径相对工作区解析，并在执行前再次校验；
 - 路径比较遵循 Windows 大小写不敏感语义；
-- PowerShell 以非交互方式启动，不加载用户 Profile；
-- 子进程使用显式工作目录和净化后的环境变量；
+- PowerShell 以非交互方式启动，不加载用户 Profile；使用 `-InputFormat Text` 并立即关闭 stdin，避免无控制台会话中的 CLIXML 等待；管道重定向时关闭进度输出，避免宿主在无控制台环境下阻塞；
+- 子进程使用显式工作目录和净化后的环境变量；`PSModulePath` 按 `SystemRoot`/`WINDIR`（大小写不敏感）构造，仅指向系统 `WindowsPowerShell\v1.0\Modules`；
 - 超时或取消时终止完整进程树，而不只终止父进程；
 - stdout 与 stderr 分开采集、限长，并保留退出码和耗时。
 

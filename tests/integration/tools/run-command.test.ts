@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -107,5 +107,72 @@ describeWindows('run_command tool', () => {
         status: 'failed',
       }),
     );
+  });
+
+  it.each([
+    ['null', null],
+    ['an array', []],
+    ['a missing command', {}],
+    ['a non-string command', { command: 7 }],
+    ['a command containing NUL', { command: 'Write\0Output never' }],
+    ['a zero timeout', { command: 'Write-Output never', timeoutMs: 0 }],
+    ['a fractional timeout', { command: 'Write-Output never', timeoutMs: 1.5 }],
+    [
+      'an unsafe integer timeout',
+      { command: 'Write-Output never', timeoutMs: Number.MAX_SAFE_INTEGER + 1 },
+    ],
+    ['an explicitly undefined timeout', { command: 'Write-Output never', timeoutMs: undefined }],
+  ])('returns invalid_tool_input without throwing for %s', async (_label, input) => {
+    const result = await runCommandTool.execute(input as never, await createContext());
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          category: 'invalid_tool_input',
+          code: 'INVALID_COMMAND',
+        }),
+        status: 'failed',
+      }),
+    );
+  });
+
+  it('rejects unexpected properties without starting a process', async () => {
+    const context = await createContext();
+    const marker = join(context.workspaceRoot, 'should-not-exist.txt');
+    const result = await runCommandTool.execute(
+      {
+        command: "Set-Content -LiteralPath 'should-not-exist.txt' -Value unexpected",
+        unexpected: true,
+      } as never,
+      context,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        error: expect.objectContaining({ category: 'invalid_tool_input' }),
+        status: 'failed',
+      }),
+    );
+    await expect(access(marker)).rejects.toThrow();
+  });
+
+  it('keeps the runtime input rules aligned with the declared JSON Schema', () => {
+    expect(runCommandTool.inputSchema).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        command: {
+          minLength: 1,
+          pattern: '^(?=[\\s\\S]*\\S)[^\\u0000]*$',
+          type: 'string',
+        },
+        timeoutMs: {
+          maximum: Number.MAX_SAFE_INTEGER,
+          minimum: 1,
+          type: 'integer',
+        },
+      },
+      required: ['command'],
+      type: 'object',
+    });
   });
 });

@@ -101,10 +101,10 @@ function declaredPathViolation(
 
 function extractCommandPaths(command: string): readonly string[] {
   const candidates: string[] = [];
-  for (const match of command.matchAll(/["']([A-Za-z]:[\\/][^"']+)["']/gu)) {
+  for (const match of command.matchAll(/["']([A-Za-z]:[^"']+)["']/gu)) {
     if (match[1] !== undefined) candidates.push(match[1]);
   }
-  for (const match of command.matchAll(/(?:^|[\s(=,])((?:[A-Za-z]:[\\/]|\\\\)[^\s;|,)]+)/gu)) {
+  for (const match of command.matchAll(/(?:^|[\s(=,])((?:[A-Za-z]:|\\\\)[^\s;|,)]+)/gu)) {
     if (match[1] !== undefined) candidates.push(match[1].replace(/["']$/u, ''));
   }
   for (const match of command.matchAll(/(?:^|[\s"'(])((?:\.\.[\\/])+[^\s;|,)"']*)/gu)) {
@@ -117,10 +117,22 @@ function commandBoundaryViolation(command: string, workspaceRoot: string): strin
   if (/\\\\[?.]\\/u.test(command)) {
     return 'PowerShell device paths are forbidden.';
   }
-  if (/(?:^|[\s"'(])~(?:[\\/]|\s|$)|\$(?:HOME|PWD|PSScriptRoot)[\\/]*\.\./iu.test(command)) {
-    return 'Home aliases and dynamic parent traversal cannot prove workspace containment.';
+  if (
+    /\$\{?env:[A-Za-z_][A-Za-z0-9_]*\}?|%[A-Za-z_][A-Za-z0-9_]*%/iu.test(command) ||
+    /\$(?:HOME|PWD|PSScriptRoot)\b|\$\{(?:HOME|PWD|PSScriptRoot)\}/iu.test(command) ||
+    /(?:^|\s)Env:[A-Za-z_*][A-Za-z0-9_*]*/iu.test(command) ||
+    /\[Environment\]::GetFolderPath\s*\(/iu.test(command) ||
+    /(?:^|[\s"'(])~(?:[\\/]|\s|$)/u.test(command)
+  ) {
+    return 'Dynamic environment and home paths cannot prove workspace containment.';
+  }
+  if (/(?:^|[\\/])[^\\/\s]*~\d+(?:[\\/]|$)/u.test(command)) {
+    return 'DOS short-name paths cannot prove workspace containment.';
   }
   for (const candidate of extractCommandPaths(command)) {
+    if (/^[A-Za-z]:[^\\/]/u.test(candidate)) {
+      return 'Drive-relative paths cannot prove workspace containment.';
+    }
     if (candidate.startsWith('\\\\') || !isInsideWorkspace(candidate, workspaceRoot)) {
       return 'The command references a path outside the fixed workspace root.';
     }
@@ -128,9 +140,36 @@ function commandBoundaryViolation(command: string, workspaceRoot: string): strin
   return undefined;
 }
 
+const DELETE_COMMAND_PATTERN = /\b(?:Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
+const FILESYSTEM_WRITE_PATTERN =
+  /(?:^|[;&|])\s*(?:Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Rename-Item|Out-File|Tee-Object|Export-Clixml|Export-Csv|sc|ac|ni|cp|copy|cpi|mv|move|mi|ren|rni|tee|Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
+
+function isBroadDelete(command: string, workspaceRoot: string): boolean {
+  if (!DELETE_COMMAND_PATTERN.test(command)) return false;
+  const root = normalizedRoot(workspaceRoot);
+  const deletesWorkspaceRoot = extractCommandPaths(command).some(
+    (candidate) => path.resolve(workspaceRoot, candidate).toLocaleLowerCase('en-US') === root,
+  );
+  return (
+    deletesWorkspaceRoot ||
+    /(?:^|[\s"'])(?:\.(?:[\\/]\*?)?|\*|[A-Za-z]:[\\/]|[\\/])(?:[\s"']|$)/u.test(command) ||
+    /\$(?:PWD)\b|\b(?:Get-Location|gl|pwd)\b|\bResolve-Path\s+\.(?:\s|\)|$)/iu.test(command)
+  );
+}
+
 function classifyCommand(command: string, workspaceRoot: string): RiskClassification {
   const boundaryViolation = commandBoundaryViolation(command, workspaceRoot);
   if (boundaryViolation !== undefined) return { kind: 'hard_deny', reason: boundaryViolation };
+
+  if (
+    /(?:^|[\s"'(\\/])\.git(?=[\\/\s"')]|$)/iu.test(command) &&
+    (FILESYSTEM_WRITE_PATTERN.test(command) || /(?:^|[^>])>(?:>|[^=])/u.test(command))
+  ) {
+    return {
+      kind: 'hard_deny',
+      reason: 'Direct command writes to Git internal data are forbidden.',
+    };
+  }
 
   if (
     /(?:\$\{?env:|%)(?:ECHO_API_KEY|GITHUB_TOKEN|NPM_TOKEN|NODE_AUTH_TOKEN|OPENAI_API_KEY|AZURE_[A-Z_]*(?:KEY|TOKEN)|AWS_(?:SECRET_ACCESS_KEY|SESSION_TOKEN)|GOOGLE_APPLICATION_CREDENTIALS)(?:\}?|%)/iu.test(
@@ -168,9 +207,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     /\bgit\s+(?:reset\s+--hard|clean\s+[^\r\n]*-[^\s]*f|push\s+[^\r\n]*--force)\b/iu.test(
       command,
     ) ||
-    /\b(?:Remove-Item|rm|del|erase|rmdir|rd)\b[\s\S]*(?:\s|^)(?:\.|\.\\|\.\/|\*|\$PWD|[A-Za-z]:[\\/]|[\\/])\s*$/iu.test(
-      command,
-    )
+    isBroadDelete(command, workspaceRoot)
   ) {
     return {
       kind: 'hard_deny',
@@ -202,7 +239,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
   ) {
     return { kind: 'ask', reason: 'External network access requires approval.' };
   }
-  if (/\b(?:Remove-Item|rm|del|erase|rmdir|rd)\b/iu.test(command)) {
+  if (DELETE_COMMAND_PATTERN.test(command)) {
     return { kind: 'ask', reason: 'Deletion requires approval.' };
   }
   if (

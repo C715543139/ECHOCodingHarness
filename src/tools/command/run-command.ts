@@ -17,6 +17,63 @@ export interface RunCommandData {
   readonly stderrTruncated: boolean;
 }
 
+type RunCommandValidation =
+  Readonly<{ valid: true; input: RunCommandInput }> | Readonly<{ valid: false; message: string }>;
+
+const RUN_COMMAND_KEYS = new Set(['command', 'timeoutMs']);
+
+function validateInput(input: unknown): RunCommandValidation {
+  try {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      return { valid: false, message: 'run_command input must be an object.' };
+    }
+    const prototype = Object.getPrototypeOf(input);
+    if (prototype !== Object.prototype && prototype !== null) {
+      return { valid: false, message: 'run_command input must be a plain object.' };
+    }
+    const keys = Reflect.ownKeys(input);
+    if (
+      keys.some((key) => typeof key !== 'string' || !RUN_COMMAND_KEYS.has(key)) ||
+      !Object.hasOwn(input, 'command')
+    ) {
+      return {
+        valid: false,
+        message: 'run_command accepts only command and optional timeoutMs fields.',
+      };
+    }
+
+    const commandProperty = Object.getOwnPropertyDescriptor(input, 'command');
+    if (
+      commandProperty === undefined ||
+      !('value' in commandProperty) ||
+      typeof commandProperty.value !== 'string' ||
+      commandProperty.value.trim().length === 0 ||
+      commandProperty.value.includes('\0')
+    ) {
+      return { valid: false, message: 'run_command requires a non-empty command string.' };
+    }
+
+    if (!Object.hasOwn(input, 'timeoutMs')) {
+      return { valid: true, input: { command: commandProperty.value } };
+    }
+    const timeoutProperty = Object.getOwnPropertyDescriptor(input, 'timeoutMs');
+    if (
+      timeoutProperty === undefined ||
+      !('value' in timeoutProperty) ||
+      !Number.isSafeInteger(timeoutProperty.value) ||
+      (timeoutProperty.value as number) < 1
+    ) {
+      return { valid: false, message: 'timeoutMs must be a positive safe integer when provided.' };
+    }
+    return {
+      valid: true,
+      input: { command: commandProperty.value, timeoutMs: timeoutProperty.value as number },
+    };
+  } catch {
+    return { valid: false, message: 'run_command input could not be safely inspected.' };
+  }
+}
+
 function failed(error: EchoError, truncated = false): ToolExecution<RunCommandData> {
   return {
     status: 'failed',
@@ -120,28 +177,22 @@ export const runCommandTool: ToolDefinition<RunCommandInput, RunCommandData> = {
     type: 'object',
     additionalProperties: false,
     properties: {
-      command: { type: 'string', minLength: 1 },
-      timeoutMs: { type: 'integer', minimum: 1 },
+      command: { type: 'string', minLength: 1, pattern: '^(?=[\\s\\S]*\\S)[^\\u0000]*$' },
+      timeoutMs: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
     },
     required: ['command'],
   },
   async execute(input, context) {
-    if (typeof input.command !== 'string' || input.command.trim().length === 0) {
-      return invalidInput('run_command requires a non-empty command string.');
-    }
-    if (
-      input.timeoutMs !== undefined &&
-      (!Number.isSafeInteger(input.timeoutMs) || input.timeoutMs < 1)
-    ) {
-      return invalidInput('timeoutMs must be a positive safe integer when provided.');
-    }
+    const validation = validateInput(input);
+    if (!validation.valid) return invalidInput(validation.message);
+    const validInput = validation.input;
     const timeoutMs = Math.min(
-      input.timeoutMs ?? context.limits.timeoutMs,
+      validInput.timeoutMs ?? context.limits.timeoutMs,
       context.limits.timeoutMs,
     );
     return mapExecution(
       await executePowerShell({
-        command: input.command,
+        command: validInput.command,
         workspaceRoot: context.workspaceRoot,
         timeoutMs,
         maxOutputChars: context.limits.maxOutputChars,

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import type { PolicyDecision, SafetyMode } from '../../../src/contracts/index.js';
@@ -20,6 +22,14 @@ async function evaluateCommand(
     workspaceRoot,
     sessionApprovals,
   });
+}
+
+function approvalKeyFor(command: string): string {
+  const digest = createHash('sha256')
+    .update(`run_command\0${JSON.stringify({ command })}`)
+    .digest('hex')
+    .slice(0, 24);
+  return `approval:run_command:${digest}`;
 }
 
 describe('CentralSafetyPolicy', () => {
@@ -120,4 +130,78 @@ describe('CentralSafetyPolicy', () => {
       policy.evaluate({ ...request, normalizedInput: { path: '.git\\config' } }),
     ).resolves.toEqual(expect.objectContaining({ action: 'deny', hard: true }));
   });
+
+  it.each([
+    [
+      'a DOS short-name path outside the workspace',
+      String.raw`Set-Content -LiteralPath C:\Users\FIXTUR~1\AppData\Local\Temp\escape.txt -Value x`,
+    ],
+    [
+      'an identity-bearing file path outside the workspace',
+      String.raw`Get-Content C:\Users\fixture\outside.txt`,
+    ],
+    ['an identity-bearing path sent to output', String.raw`Write-Output C:\Users\fixture`],
+    [
+      'a drive-relative path whose location cannot be proven',
+      String.raw`Set-Content -LiteralPath C:Users\fixture\escape.txt -Value x`,
+    ],
+    [
+      'a PowerShell environment-variable path',
+      String.raw`Set-Content -LiteralPath $env:TEMP\escape.txt -Value x`,
+    ],
+    ['a PowerShell identity variable sent to output', 'Write-Output $env:USERPROFILE'],
+    ['a cmd-style environment-variable path', String.raw`Get-Content %USERPROFILE%\outside.txt`],
+    ['an environment-provider path', String.raw`Get-Content (Get-Item Env:TEMP).Value\outside.txt`],
+    [
+      'a dynamically resolved identity directory',
+      "Write-Output ([Environment]::GetFolderPath('UserProfile'))",
+    ],
+  ])('hard-denies %s in every mode even with an exact prior approval', async (_label, command) => {
+    const approvals = new Set([approvalKeyFor(command)]);
+    for (const mode of ['safe', 'balanced', 'auto'] as const) {
+      await expect(evaluateCommand(command, mode, approvals)).resolves.toEqual(
+        expect.objectContaining({ action: 'deny', hard: true }),
+      );
+    }
+  });
+
+  it('hard-denies direct run_command writes to Git internals without changing local write modes', async () => {
+    const gitWrite = String.raw`Set-Content -LiteralPath .git\config -Value x`;
+    const approval = new Set([approvalKeyFor(gitWrite)]);
+
+    await expect(evaluateCommand(gitWrite, 'auto', approval)).resolves.toEqual(
+      expect.objectContaining({ action: 'deny', hard: true }),
+    );
+    await expect(
+      evaluateCommand('Set-Content -LiteralPath (Join-Path .git config) -Value x', 'auto'),
+    ).resolves.toEqual(expect.objectContaining({ action: 'deny', hard: true }));
+    await expect(
+      evaluateCommand(String.raw`Set-Content -LiteralPath src\generated.txt -Value x`, 'auto'),
+    ).resolves.toMatchObject({ action: 'allow' });
+    await expect(
+      evaluateCommand(String.raw`Set-Content -LiteralPath src\generated.txt -Value x`, 'balanced'),
+    ).resolves.toMatchObject({ action: 'ask' });
+  });
+
+  it.each([
+    ['Remove-Item alias against dot', 'ri -Recurse -Force .'],
+    ['computed workspace root', 'Remove-Item -Recurse -Force (Get-Location)'],
+    ['quoted workspace root', "ri -Recurse -Force '.'"],
+    ['dot-slash workspace root', 'ri -Recurse -Force .\\'],
+    ['location alias', 'ri -Recurse -Force (pwd)'],
+    [
+      'the absolute workspace root',
+      String.raw`Remove-Item -Recurse -Force C:\workspace\echo-fixture`,
+    ],
+  ])(
+    'hard-denies broad deletion through %s even with an exact prior approval',
+    async (_label, command) => {
+      const approvals = new Set([approvalKeyFor(command)]);
+      for (const mode of ['safe', 'balanced', 'auto'] as const) {
+        await expect(evaluateCommand(command, mode, approvals)).resolves.toEqual(
+          expect.objectContaining({ action: 'deny', hard: true }),
+        );
+      }
+    },
+  );
 });

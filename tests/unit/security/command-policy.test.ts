@@ -184,6 +184,24 @@ describe('CentralSafetyPolicy', () => {
   });
 
   it.each([
+    ['a script block', String.raw`& { Set-Content -LiteralPath .git\config -Value x }`],
+    [
+      'a conditional block',
+      String.raw`if ($true) { Set-Content -LiteralPath .git\config -Value x }`,
+    ],
+  ])(
+    'hard-denies Git-internal writes nested in %s despite an exact approval',
+    async (_label, command) => {
+      const approvals = new Set([approvalKeyFor(command)]);
+      for (const mode of ['safe', 'balanced', 'auto'] as const) {
+        await expect(evaluateCommand(command, mode, approvals)).resolves.toEqual(
+          expect.objectContaining({ action: 'deny', hard: true }),
+        );
+      }
+    },
+  );
+
+  it.each([
     ['Remove-Item alias against dot', 'ri -Recurse -Force .'],
     ['computed workspace root', 'Remove-Item -Recurse -Force (Get-Location)'],
     ['quoted workspace root', "ri -Recurse -Force '.'"],

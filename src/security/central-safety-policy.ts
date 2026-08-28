@@ -142,7 +142,7 @@ function commandBoundaryViolation(command: string, workspaceRoot: string): strin
 
 const DELETE_COMMAND_PATTERN = /\b(?:Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
 const FILESYSTEM_WRITE_PATTERN =
-  /(?:^|[;&|])\s*(?:Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Rename-Item|Out-File|Tee-Object|Export-Clixml|Export-Csv|sc|ac|ni|cp|copy|cpi|mv|move|mi|ren|rni|tee|Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
+  /\b(?:Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Rename-Item|Out-File|Tee-Object|Export-Clixml|Export-Csv|sc|ac|ni|cp|copy|cpi|mv|move|mi|ren|rni|tee|Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
 
 function isBroadDelete(command: string, workspaceRoot: string): boolean {
   if (!DELETE_COMMAND_PATTERN.test(command)) return false;

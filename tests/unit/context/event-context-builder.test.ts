@@ -273,11 +273,11 @@ describe('EventContextBuilder', () => {
   it('keeps prior user goals when a later turn starts so resume can reconstruct chat', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history: EchoEvent[] = [
-      event('turn.started', { goal: 'remember the color blue' }, 'turn-1'),
-      event('step.started', { step: 1 }, 'turn-1'),
-      event('model.text_delta', { delta: 'I will remember blue.' }, 'turn-1'),
-      event('turn.started', { goal: 'what color did I mention?' }, 'turn-2'),
-      event('step.started', { step: 1 }, 'turn-2'),
+      event('turn.started', { goal: 'remember the color blue' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'I will remember blue.' }),
+      event('turn.started', { goal: 'what color did I mention?' }),
+      event('step.started', { step: 1 }),
     ];
 
     const projection = builder.build(history, largeBudget);
@@ -295,11 +295,11 @@ describe('EventContextBuilder', () => {
   it('keeps a repeated current goal when the previous turn used the same text', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history: EchoEvent[] = [
-      event('turn.started', { goal: 'retry' }, 'turn-1'),
-      event('step.started', { step: 1 }, 'turn-1'),
-      event('model.text_delta', { delta: 'First answer' }, 'turn-1'),
-      event('turn.started', { goal: 'retry' }, 'turn-2'),
-      event('step.started', { step: 1 }, 'turn-2'),
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'First answer' }),
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
     ];
 
     const projection = builder.build(history, largeBudget);
@@ -308,6 +308,26 @@ describe('EventContextBuilder', () => {
     expect(projection.messages).toContainEqual({
       role: 'assistant',
       content: 'First answer',
+    });
+  });
+
+  it('does not duplicate the current goal once its turn already has a user fragment', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'First answer' }),
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'Second answer' }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    const users = projection.messages.filter((message) => message.role === 'user');
+    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
+    expect(projection.messages).toContainEqual({
+      role: 'assistant',
+      content: 'Second answer',
     });
   });
 

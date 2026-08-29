@@ -447,6 +447,31 @@ describe('AgentLoop', () => {
     );
   });
 
+  it('keeps consecutive identical goals in the continued-turn projection', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'first' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'again' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+    const loop = createLoop({ provider, store });
+
+    const first = await loop.run('retry');
+    await loop.continueSession(first.sessionId, 'retry');
+
+    const users = provider.requests[1]?.messages.filter((message) => message.role === 'user') ?? [];
+    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
+  });
+
   it('does not let a failing event observer change orchestration state', async () => {
     const provider = new FakeProvider([
       {

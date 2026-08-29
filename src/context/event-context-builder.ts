@@ -140,7 +140,7 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
 }
 
 interface ConversationTurn {
-  turnId?: string;
+  turnIndex: number;
   user?: string;
   assistant: { content: string; toolCalls: { id: string; name: string; arguments: unknown }[] };
   toolMessages: { toolCallId: string; toolName: string; status: string; content: string }[];
@@ -158,14 +158,15 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
   const turns: ConversationTurn[] = [];
   let current: ConversationTurn | null = null;
   let turnUser: string | undefined;
-  let pendingTurnId: string | undefined;
+  let pendingTurnIndex = -1;
+  let nextTurnIndex = 0;
   let firstFragment = true;
 
   const startFragment = (): ConversationTurn => {
     const turn: ConversationTurn = {
+      turnIndex: pendingTurnIndex,
       assistant: { content: '', toolCalls: [] },
       toolMessages: [],
-      ...(pendingTurnId === undefined ? {} : { turnId: pendingTurnId }),
       ...(firstFragment && turnUser !== undefined ? { user: turnUser } : {}),
     };
     firstFragment = false;
@@ -180,7 +181,8 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
         }
         current = null;
         turnUser = event.payload.goal;
-        pendingTurnId = event.turnId;
+        pendingTurnIndex = nextTurnIndex;
+        nextTurnIndex += 1;
         firstFragment = true;
         break;
       }
@@ -388,12 +390,11 @@ export class EventContextBuilder implements ContextBuilder {
 
     const messages: ModelMessage[] = [...fixedMessages, ...keptMessages];
     if (goal !== undefined) {
-      const latestTurnId = [...events]
-        .reverse()
-        .find((event) => event.type === 'turn.started')?.turnId;
+      const latestTurnIndex =
+        events.reduce((count, event) => (event.type === 'turn.started' ? count + 1 : count), 0) - 1;
       const currentTurnAlreadyHasUser = turnsWithDigests
         .slice(start)
-        .some((turn) => turn.turnId === latestTurnId && (turn.user?.length ?? 0) > 0);
+        .some((turn) => turn.turnIndex === latestTurnIndex && (turn.user?.length ?? 0) > 0);
       if (!currentTurnAlreadyHasUser) {
         messages.push(goal);
       }

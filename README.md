@@ -146,6 +146,8 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
 - [Demo guide](docs/demo.md)
 - [Testing and evals](docs/testing.md)
 - [ADR-0001: project foundation](docs/decisions/0001-project-foundation.md)
+- [P1 CLI plan](docs/plans/p1-cli.md)
+- [P2 local WebUI plan](docs/plans/p2-webui.md)
 
 ## Honest limits
 

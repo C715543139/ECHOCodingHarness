@@ -3,7 +3,8 @@ import * as path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
-import { AgentLoop, type ApprovalHandler } from '../agent/index.js';
+import type { ApprovalHandler } from '../agent/index.js';
+import { EchoApplicationService } from '../application/index.js';
 import { loadRuntimeConfig, type EchoConfig, type RawConfigValues } from '../config/index.js';
 import type {
   AgentResult,
@@ -14,7 +15,7 @@ import type {
 import { EventContextBuilder } from '../context/index.js';
 import { createOpenAIClient, OpenAICompatibleProvider } from '../provider/index.js';
 import { CentralSafetyPolicy } from '../security/index.js';
-import { JsonlSessionStore, redactText } from '../session/index.js';
+import { createProviderIdentity, JsonlSessionRepository, redactText } from '../session/index.js';
 import { DEFAULT_TOOLS, ToolRegistry } from '../tools/index.js';
 
 import { DefaultEventRenderer } from './event-renderer.js';
@@ -199,9 +200,15 @@ export async function runGoal(
     unicode: options.interactive,
     verbose: options.verbose,
   };
-  const loop = new AgentLoop({
+  const secrets = secret.length === 0 ? [] : [secret];
+  const providerIdentity = createProviderIdentity(loaded.config.baseUrl);
+  const service = new EchoApplicationService({
+    repository: new JsonlSessionRepository({
+      workspaceRoot,
+      secrets,
+    }),
     provider,
-    model: loaded.config.model,
+    providerIdentity,
     tools: new ToolRegistry(DEFAULT_TOOLS),
     policy: new CentralSafetyPolicy(),
     contextBuilder: new EventContextBuilder({
@@ -209,25 +216,37 @@ export async function runGoal(
       workspaceSummary: 'Workspace: fixed current workspace. Platform: Windows PowerShell.',
       toolResultMaxChars: loaded.config.maxOutputChars,
     }),
-    sessionStore: new JsonlSessionStore({
-      workspaceRoot,
-      secrets: secret.length === 0 ? [] : [secret],
-    }),
     workspaceRoot,
-    safetyMode: loaded.config.safetyMode,
     maxSteps: loaded.config.maxSteps,
     contextBudget: loaded.config.context,
     toolLimits: {
       timeoutMs: loaded.config.timeoutMs,
       maxOutputChars: loaded.config.maxOutputChars,
     },
+    unattendedApproval: options.interactive ? 'wait' : 'deny',
     ...(options.interactive
       ? { approvalHandler: dependencies.approvalHandler ?? new InteractiveApprovalHandler() }
       : {}),
     onEvent: (event) => writeChunks(renderer.renderEvent(event, capabilities), io),
-    secrets: secret.length === 0 ? [] : [secret],
+    secrets,
   });
-  const result = await loop.run(goal, options.signal);
+  const session = await service.createSession({
+    workspaceRoot,
+    provider: providerIdentity,
+    model: {
+      value: loaded.config.model,
+      source: options.model === undefined ? 'config' : 'cli',
+    },
+    safetyMode: {
+      value: loaded.config.safetyMode,
+      source: options.safetyMode === undefined ? 'config' : 'cli',
+    },
+  });
+  const result = await service.runTurn({
+    sessionId: session.sessionId,
+    goal,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
   writeChunks(renderer.renderResult(result, capabilities), io);
   return { exitCode: toExitCode(result), result };
 }

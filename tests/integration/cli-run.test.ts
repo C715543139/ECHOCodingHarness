@@ -88,13 +88,18 @@ describe('CLI run integration', () => {
     expect(files).toHaveLength(1);
     const log = await fs.readFile(path.join(root, '.echo', 'sessions', files[0] as string), 'utf8');
     expect(log).not.toContain('test-key');
-    expect(
-      log
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as { type: string })
-        .at(-1)?.type,
-    ).toBe('turn.completed');
+    expect(log).not.toContain('https://');
+    const parsed = log
+      .trim()
+      .split('\n')
+      .map(
+        (line) => JSON.parse(line) as { type: string; payload?: { eventSchemaVersion?: number } },
+      );
+    expect(parsed.at(-1)?.type).toBe('turn.completed');
+    expect(parsed[0]).toMatchObject({
+      type: 'session.started',
+      payload: { eventSchemaVersion: 2 },
+    });
   });
 
   it('fails configuration before constructing a Provider and never prints a secret', async () => {

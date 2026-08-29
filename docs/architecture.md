@@ -81,7 +81,7 @@ User / Demo Script
      +--------------------> Model Provider -> OpenAI-compatible API
 ```
 
-P1-1A 之前，`run` 仍直接构造 Orchestrator；P1-0 已冻结上述目标边界。核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由 CLI 渲染。
+P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由 CLI 渲染。
 
 ## 5. 模块划分
 
@@ -132,7 +132,7 @@ P1-1A 之前，`run` 仍直接构造 Orchestrator；P1-0 已冻结上述目标�
 
 ### 5.5 Application service
 
-P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。实现任务为 P1-1A；配置加载与 Chat 输入适配器分别属于 P1-2A 与 P1-1B。
+P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；Chat 输入适配器属于 P1-1B。
 
 ## 6. Turn、Step 与 Agent Loop
 
@@ -312,8 +312,8 @@ ECHO 可以借鉴公开项目中通用的软件设计思想，例如显式循环
 
 P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JSONL 事件存储和
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
-artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载；尚未把
-`run` 接到应用服务，也尚未实现 Chat 输入解析。
+artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-1A 已抽出
+`ApplicationService` 与 Session 查询，并把 `run` 接到该服务；尚未实现 Chat 输入解析。
 
 当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI
@@ -322,5 +322,6 @@ artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对�
 
 已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 20,000 字符、
 32,000 近似 token 上下文（其中预留 4,000 输出 token），以及同一规范化工具调用第三次
-出现时终止。会话恢复在 P1-1A/P1-1B 落地；P0 仍只做 JSONL 终态补偿。固定失败测试故事已在一个受控 OpenAI-compatible
+出现时终止。P1-1A 已支持从事件恢复 Session 查询、Provider 身份校验和悬空 Turn 补偿；`chat`
+恢复、Slash 与粘贴适配器仍属于 P1-1B。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。

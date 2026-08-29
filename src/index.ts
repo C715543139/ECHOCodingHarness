@@ -1,5 +1,6 @@
 export { createCli, type CreateCliOptions } from './cli/create-cli.js';
 export * from './agent/index.js';
+export * from './application/index.js';
 export { DefaultEventRenderer } from './cli/event-renderer.js';
 export * from './cli/run.js';
 export * from './config/index.js';

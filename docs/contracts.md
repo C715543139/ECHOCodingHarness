@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P0 `echo-harness run` 在 P1-1A 合入前仍直接构造 Agent Loop。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。P1-2A 已使运行时执行本节配置规则。
+P1-2A 已使运行时执行本节配置规则。P1-1A 已将 `run` 接到 `ApplicationService`。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -37,7 +37,7 @@ interface ProviderIdentity {
 - 文件路径在工具边界使用相对工作区路径；
 - 绝对路径只在 Execution 内部短暂存在，不发送给模型或写入可分享材料；
 - 对模型名、Provider 名和工具名使用稳定的小写标识；
-- `EndpointFingerprint` 是不可逆的 endpoint 标识（由 scheme、host 与可选 port 派生），不得是原始 URL、凭据、userinfo 或这些值的可逆编码。生成算法由 P1-1A 实现；P0 `model.started.provider` 仍是适配器名字符串。
+- `EndpointFingerprint` 是不可逆的 endpoint 标识（由 scheme、host 与可选 port 派生），不得是原始 URL、凭据、userinfo 或这些值的可逆编码。生成算法由 P1-1A 实现为 SHA-256 十六进制摘要；P0 `model.started.provider` 仍是适配器名字符串。
 
 ## 3. Model Provider
 
@@ -411,7 +411,7 @@ interface ApplicationService {
 }
 ```
 
-`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。该接口在 P1-1A 接入 `run`；在此之前 `runGoal` 仍直接构造 `AgentLoop`。P1-2A 已实现配置加载器与 artifact-root 解析；会话优先级解析器与 Chat 输入解析属于 P1-1B。
+`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。P1-1A 已把 `run` 接到该服务；`chat`、Slash 与粘贴适配器仍属于 P1-1B。P1-2A 已实现配置加载器与 artifact-root 解析；会话优先级解析器与 Chat 输入解析属于 P1-1B。
 
 ## 8. Context Builder
 

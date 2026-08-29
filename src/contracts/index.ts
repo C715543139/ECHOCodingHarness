@@ -1,6 +1,7 @@
 export type { AgentResult, AgentStatus, AgentStopReason } from './agent.js';
 export type {
   ApplicationService,
+  ApprovalChoice,
   ApprovalRejectionReason,
   ApprovalResponseInput,
   ApprovalResponseResult,

@@ -9,7 +9,8 @@
 ## 1. 文档目的
 
 本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实 Provider 验收已与 1.0 边界对齐。P1-0 冻结的配置、应用服务与事件边界见
-[ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)
+[ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、
+[ADR-0004](./decisions/0004-workspace-echo-config.md)
 和 [contracts.md](./contracts.md) 1.2。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
@@ -36,11 +37,11 @@ ECHO 表示：
 
 ### 2.2 次级目标（P1）
 
-- 增加交互式 `chat`、固定产物配置 `config` 和单 Provider 模型目录；
+- 增加交互式 `chat`、工作区 `.echo` 配置和单 Provider 模型目录；
 - 抽出 `run`/`chat` 共用的应用服务、可恢复 Session 与 Session 查询；
 - 按冻结的分组式时间线改进 CLI 展示，不引入 TUI。
 
-P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文件为 `<artifact-root>/config/echo.config.json`。`ECHO_API_KEY` 仍是唯一秘密环境变量。
+P1 不实现 WebUI。唯一持久配置为 `<workspace>/.echo/config/echo.config.json`，与 `.echo/sessions/` 同级。不得读取产物根 `config/`、工作区根 `echo.config.json` 或 `ECHO_BASE_URL`。`ECHO_API_KEY` 仍是唯一秘密环境变量。
 
 ### 2.3 非目标（P2 或明确排除）
 
@@ -279,11 +280,11 @@ Context Projector 按优先级构建上下文：
 
 1. `echo-harness run <goal>`：在指定工作区完成单次目标；
 2. `echo-harness chat`：P1 多轮交互；通过应用服务复用同一 Agent Loop；
-3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`。
+3. `echo-harness config`：P1 唯一配置向导，写入 `<workspace>/.echo/config/echo.config.json`。
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
-P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已使模型发现独立于 `run`：CLI `--model` 只覆盖本次运行的模型名，不查询 `/models`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
+P1-2A 已使 `run` 读取产物配置文件。P1 后续将配置落点改为工作区 `.echo/config`（[ADR-0004](./decisions/0004-workspace-echo-config.md)）。P1-2B 已使模型发现独立于 `run`：CLI `--model` 只覆盖本次运行的模型名，不查询 `/models`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
 
 具体视觉语义见 [cli-ux.md](./cli-ux.md)（P0）与 [p1-cli.md](./plans/p1-cli.md) 第 5 节（P1 分组时间线）。
 
@@ -314,7 +315,7 @@ ECHO 可以借鉴公开项目中通用的软件设计思想，例如显式循环
 
 P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JSONL 事件存储和
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
-artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
+严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已抽出
 `ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据，不启动 P2。
 

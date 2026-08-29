@@ -6,7 +6,7 @@
 >
 > 最后更新：2026-08-29
 >
-> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[contracts.md](../contracts.md) 1.2
+> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[ADR-0004](../decisions/0004-workspace-echo-config.md)、[contracts.md](../contracts.md) 1.2
 
 ## 1. 目标
 
@@ -126,13 +126,14 @@ Slash 命令只解析本地终端用户在空闲提示符中的输入。模型�
 
 ### 4.1 唯一持久配置
 
-配置固定保存在构建产物根目录：
+配置固定保存在工作区 `.echo/` 下，与会话同级：
 
 ```text
-<artifact-root>/config/echo.config.json
+<workspace>/.echo/config/echo.config.json
+<workspace>/.echo/sessions/<session-id>.jsonl
 ```
 
-程序必须根据自身模块或可执行文件位置解析 `artifact-root`，不能根据 `process.cwd()` 寻找配置。开发与测试入口通过显式依赖注入获得产物根目录，避免依赖个人路径。
+`workspace` 由 `--workspace` 或启动目录决定。不得读取产物根 `config/` 或工作区根的 `echo.config.json`。`echo-harness config` 接受同样的 `--workspace`。
 
 配置优先级只保留：
 
@@ -142,7 +143,7 @@ CLI 显式参数 > echo.config.json
 
 `ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。P0 的用户配置、项目配置以及 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 来源在 P1 中移除；由于项目尚未公开发布，不建立复杂迁移层。
 
-本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义。P1-2A 已使 `loadConfig` 与 `echo-harness run` 执行该规则。`artifact-root` 与 `ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
+本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义；持久文件落点由 [ADR-0004](../decisions/0004-workspace-echo-config.md) 修正为工作区 `.echo/config`。P1-2A 已使 `loadConfig` 与 `echo-harness run` 执行该规则。`ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
 
 ### 4.2 配置入口
 

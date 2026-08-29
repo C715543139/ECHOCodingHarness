@@ -286,7 +286,7 @@ describe('ProcessModelCatalog', () => {
   it('does not write the config file when the session model changes', async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'echo-catalog-session-'));
     temporaryDirectories.push(directory);
-    const configPath = path.join(directory, 'config', 'echo.config.json');
+    const configPath = path.join(directory, '.echo', 'config', 'echo.config.json');
     await fs.mkdir(path.dirname(configPath), { recursive: true });
     const original = JSON.stringify({
       baseUrl: 'https://provider.example/v1',

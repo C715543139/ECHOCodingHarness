@@ -56,7 +56,6 @@ export interface ChatCommandDependencies {
   readonly io?: CliIo;
   readonly providerFactory?: (options: ProviderFactoryOptions) => ModelProvider;
   readonly approvalHandler?: ApprovalHandler;
-  readonly artifactRoot?: string;
   readonly input?: ChatInputPort;
   readonly stdin?: Readable;
   readonly stdout?: Writable;
@@ -132,13 +131,11 @@ export async function runChat(
 ): Promise<{ exitCode: number }> {
   const env = dependencies.env ?? process.env;
   const io = dependencies.io ?? defaultIo();
-  const artifactRoot = options.artifactRoot ?? dependencies.artifactRoot;
   const loaded = await loadHarnessRuntime({
     options,
     env,
     cwd: dependencies.cwd ?? process.cwd(),
     io,
-    artifactRoot,
     ...(dependencies.providerFactory === undefined
       ? {}
       : { providerFactory: dependencies.providerFactory }),

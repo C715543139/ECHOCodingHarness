@@ -11,7 +11,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
   {
     id: 'CFG-01',
     area: 'config',
-    requirement: 'Persistent config path is only <artifact-root>/config/echo.config.json',
+    requirement: 'Persistent config path is only <workspace>/.echo/config/echo.config.json',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
     runtimeEvidence: 'tests/unit/config/config-file.test.ts',
     runtimeTask: 'P1-2A',
@@ -19,9 +19,10 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
   {
     id: 'CFG-02',
     area: 'config',
-    requirement: 'artifact-root is resolved from the CLI module/executable, never process.cwd()',
-    contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
-    runtimeEvidence: 'tests/unit/config/artifact-root.test.ts',
+    requirement:
+      'Persistent config is loaded from the workspace .echo/config file, never cwd decoys or the CLI dist/config path',
+    contractEvidence: 'docs/decisions/0004-workspace-echo-config.md',
+    runtimeEvidence: 'tests/unit/config/runtime-config.test.ts',
     runtimeTask: 'P1-2A',
   },
   {

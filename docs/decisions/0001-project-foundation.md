@@ -210,4 +210,4 @@ Python 在快速脚本和 AI 生态方面有优势，但本项目不依赖训练
 - 实现接口与 [contracts.md](../contracts.md) 对齐；
 - 架构描述与 [architecture.md](../architecture.md) 对齐。
 
-P1 配置来源、应用服务与可恢复 Session 由 [ADR-0002](./0002-p1-config-artifact-root.md) 和 [ADR-0003](./0003-p1-application-service-session.md) 补充，不静默修改本节已接受的 P0 边界。
+P1 配置来源、应用服务与可恢复 Session 由 [ADR-0002](./0002-p1-config-artifact-root.md)、[ADR-0003](./0003-p1-application-service-session.md) 和 [ADR-0004](./0004-workspace-echo-config.md) 补充，不静默修改本节已接受的 P0 边界。

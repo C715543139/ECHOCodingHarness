@@ -69,7 +69,7 @@ function secretConfigured() {
 
 async function persistentConfigExists() {
   try {
-    await access(path.join(path.dirname(cliPath), 'config', 'echo.config.json'));
+    await access(path.join(repoRoot, '.echo', 'config', 'echo.config.json'));
     return true;
   } catch {
     return false;
@@ -162,7 +162,7 @@ if (isMainModule()) {
   }
   if (!(await persistentConfigExists())) {
     process.stderr.write(
-      'Demo acceptance skipped: run echo-harness config to write dist/config/echo.config.json.\n',
+      'Demo acceptance skipped: run echo-harness config --workspace . to write .echo/config/echo.config.json.\n',
     );
     process.exit(2);
   }

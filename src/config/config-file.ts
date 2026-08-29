@@ -10,9 +10,9 @@ export type PersistentConfigFileResult =
   | { readonly status: 'error'; readonly issue: ConfigIssue };
 
 export async function readPersistentConfigFile(
-  artifactRoot: string,
+  workspaceRoot: string,
 ): Promise<PersistentConfigFileResult> {
-  const filePath = persistentConfigPath(artifactRoot);
+  const filePath = persistentConfigPath(workspaceRoot);
   let text: string;
   try {
     text = await fs.readFile(filePath, 'utf8');

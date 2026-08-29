@@ -98,7 +98,4 @@ node scripts/demo-accept.mjs
 
 ## 8. 已验证基线
 
-2026-08-28 在一个受控 OpenAI-compatible 服务上连续运行 3 次，均以退出码 0 完成，耗时
-分别约为 30.5 秒、17.0 秒和 15.2 秒。三轮都包含失败测试、`apply_patch`、成功复测与
-`completed` 终态，且未发现 API Key、个人绝对路径或推理字段泄露。该结果证明当前命令与
-fixture 可用于录制；最终视频仍须按第 6 节执行人工双盲检查。
+2026-08-29 在本机用 `.env.test` 注入的受控 OpenAI-compatible 服务上连续运行 3 次，均以退出码 0 完成，耗时分别约为 23.3 秒、16.9 秒和 16.1 秒。三轮都包含失败测试、`apply_patch`、成功复测与 `completed` 终态，且未发现 API Key、个人绝对路径或推理字段泄露。同日 `pnpm smoke:provider`（`ECHO_RUN_PROVIDER_SMOKE=1`）也通过。该结果证明当前命令与 fixture 可用于录制；最终视频仍须按第 6 节执行人工双盲检查。密钥未写入配置文件、未进入 CI、也未出现在本记录中。

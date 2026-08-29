@@ -19,6 +19,15 @@ export function isStorageError(error: unknown): error is EchoError {
   );
 }
 
+export function isConfigurationError(error: unknown): error is EchoError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'category' in error &&
+    error.category === 'configuration'
+  );
+}
+
 export function configurationError(code: string, message: string, cause?: unknown): EchoError {
   return {
     category: 'configuration',

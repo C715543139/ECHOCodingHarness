@@ -73,12 +73,12 @@ $env:ECHO_API_KEY = '<secret>'
 The wizard asks for the OpenAI-compatible Provider URL, discover vs manual model catalog, default
 model, and safety mode. It keeps a memory draft until the final confirmation, then writes the file
 atomically. Discover mode stores only the default model; candidate IDs are fetched later with
-`GET /models`, cached in-process, and never required by `run`. Discovery failure does not block the
-configured model. `ECHO_API_KEY` is the only supported secret environment variable and is never saved.
-CLI flags such as `--model`, `--base-url`, and `--safety-mode` override the file for one `run` and
-do not query the catalog. Missing configuration makes `run` exit `2` and suggest `echo-harness config`.
-P1-2A landed the loader; P1-2B landed catalog discovery. Neither reads `ECHO_BASE_URL`, `ECHO_MODEL`,
-`ECHO_SAFETY_MODE`, or workspace config files.
+`GET /models`, cached in-process, and never required by `run`. Chat `/model` lists candidates through
+the catalog port. Discovery failure does not block the configured model. `ECHO_API_KEY` is the only
+supported secret environment variable and is never saved. CLI flags such as `--model`, `--base-url`,
+and `--safety-mode` override the file for one `run` or `chat` and do not query the catalog. Missing
+configuration makes `run`/`chat` exit `2` and suggest `echo-harness config`. The loader does not
+read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, or workspace config files.
 
 See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
 
@@ -96,6 +96,17 @@ Use `node .\dist\cli.js run --help` for the complete option list. Progress and d
 stderr as a grouped Step timeline; the final model answer goes to stdout. Exit codes distinguish
 configuration, Provider, tool, policy, limit, and cancellation failures. ASCII is used when the
 terminal is not a TTY; `--no-color` removes ANSI without changing labels or structure.
+
+## Chat
+
+```powershell
+node .\dist\cli.js chat --workspace .
+node .\dist\cli.js chat --resume <session-id> --workspace .
+```
+
+Chat reuses the same application service as `run`. Typed idle lines may run `/help`, `/status`,
+`/model`, `/model refresh`, `/safety`, and `/quit`. A bracketed paste is at most one Turn and never
+a Slash command. Ctrl+C cancels a running Turn and returns to the prompt; idle Ctrl+C exits `130`.
 
 ## Resettable demonstration
 
@@ -156,7 +167,7 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
   or files permitted to the current user.
 - The current release does not provide Web UI, MCP, multi-agent execution, or a
   general rollback system. Application-service session create/resume exists after P1-1A;
-  `chat` remains scheduled for P1-1B.
+  `echo-harness chat` is available after P1-1B.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

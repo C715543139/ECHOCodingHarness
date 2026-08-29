@@ -50,6 +50,7 @@ export type SlashFeedbackInput =
   | Readonly<{ kind: 'model'; value: string }>
   | Readonly<{ kind: 'safety'; value: string }>
   | Readonly<{ kind: 'help'; lines: readonly string[] }>
+  | Readonly<{ kind: 'info'; label: string; lines: readonly string[] }>
   | Readonly<{ kind: 'error'; label: string; message: string }>;
 
 export function workspaceDisplayName(workspaceRoot: string): string {
@@ -139,6 +140,9 @@ export function renderSlashFeedback(
   }
   if (input.kind === 'help') {
     return stderrLines(formatLabeledBlock('HELP', input.lines, options, 'cyan'));
+  }
+  if (input.kind === 'info') {
+    return stderrLines(formatLabeledBlock(input.label, input.lines, options, 'cyan'));
   }
   return stderrLines(formatLabeled(input.label, input.message, options, 'red'));
 }

@@ -61,7 +61,7 @@ CLI 显式参数 > echo.config.json
 
 ### 2.4 模型目录
 
-自动发现只允许当前 OpenAI-compatible 客户端请求 `GET {baseUrl}/models`，并只使用响应中的模型 ID。列表缓存在当前进程内。`run` 不主动发现；`chat` 仅在 `/model` 需要候选项时延迟发现。发现失败不得阻止已配置模型的实际调用。P1-2B 实现该运行时：`ProcessModelCatalog` 与 `ModelCatalogClient` 独立于 `ModelProvider.stream`，刷新失败时保留旧缓存，错误必须脱敏。
+自动发现只允许当前 OpenAI-compatible 客户端请求 `GET {baseUrl}/models`，并只使用响应中的模型 ID。列表缓存在当前进程内。`run` 不主动发现；`chat` 仅在 `/model` 需要候选项时通过可注入的模型目录端口延迟发现，不重复实现第二套发现与缓存。发现失败不得阻止已配置模型的实际调用。P1-2B 实现该运行时：`ProcessModelCatalog` 与 `ModelCatalogClient` 独立于 `ModelProvider.stream`，刷新失败时保留旧缓存，错误必须脱敏。
 
 ### 2.5 取代时点与兼容边界
 

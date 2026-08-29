@@ -18,7 +18,7 @@
 
 - `echo-harness run <goal>` 的帮助、运行进度、审批、错误和最终摘要；
 - P1-3 分组式时间线：独立 Step 标题、工具/审批/结果分组、宽度感知换行与 ASCII 降级；
-- Chat 表现层：启动摘要、状态条、`YOU` 提示符、`ECHO` 回复节奏与 `/status`（由 P1-1B 接入命令）；
+- Chat 表现层：启动摘要、状态条、`YOU` 提示符、`ECHO` 回复节奏与 `/status`（已由 P1-1B 接入命令）；
 - 显式 `--verbose` 诊断模式；
 - `EchoEvent` 到终端文本的确定性映射；
 - TTY、非 TTY、CI 和 `NO_COLOR` 环境的兼容行为；
@@ -396,5 +396,5 @@ CI 使用 Fake Provider 执行最小事件序列，并验证稳定输出。真�
 - `EventRenderer` 已实现分组式时间线，并具有 snapshot/行为测试；
 - 窄宽度、CJK、无颜色、非 TTY、审批和成功/失败摘要经过验证；
 - stdout/stderr 与退出码契约保持 P0；
-- Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，供 P1-1B 接入；
+- Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，并由 P1-1B 接到 `echo-harness chat`；
 - 文中示例与真实输出一致，不含伪造能力。

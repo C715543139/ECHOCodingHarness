@@ -52,7 +52,7 @@ P1-0 增加契约与矩阵测试。矩阵每一行同时记录 `contractEvidence
 | P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL`（已落地） |
 | P1-2B | `/models` 发现、缓存、失败不阻断已配置模型、CLI `--model` 优先于配置且不发现、手动 `/model refresh` 拒绝。证据：`tests/unit/provider/model-catalog.test.ts`、`tests/unit/provider/openai-client.test.ts`、`tests/integration/cli-run.test.ts`、`tests/integration/cli-help.test.ts` |
 | P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变。证据：`tests/unit/application/echo-application-service.test.ts`、`tests/unit/session/jsonl-session-repository.test.ts`、`tests/unit/session/endpoint-fingerprint.test.ts`、`tests/integration/cli-run.test.ts` |
-| P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn |
+| P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn、`/model` 候选校验与目录请求取消：`tests/unit/config/session-settings.test.ts`、`tests/unit/cli/parse-chat-input.test.ts`、`tests/unit/cli/chat-input-decoder.test.ts`、`tests/unit/cli/chat-input-reader.test.ts`、`tests/unit/cli/model-candidates.test.ts`、`tests/integration/cli-chat.test.ts` |
 | P1-3 | 分组时间线、窄宽度/CJK、Chat 启动摘要与状态条：`tests/unit/cli/event-renderer.test.ts`、`tests/unit/cli/render-layout.test.ts`、`tests/unit/cli/chat-view.test.ts`；非 TTY/`--no-color` 与 stdout/stderr 契约保持 |
 
 `ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<artifact-root>/config/echo.config.json` 是 P1 唯一持久配置路径。
@@ -168,7 +168,6 @@ shell environment after the check. This path is local acceptance only and is not
   time out or fail when many test files run in parallel on a loaded Windows host. Sequential
   `pnpm check` / `pnpm eval:offline` is the quality gate. Treat those as resource contention, not a
   catalog or Agent Loop defect, and do not weaken the P0 tests to hide them.
-- P1 Chat is frozen by P1-0 but not yet implemented. P1-2A added `echo-harness config` and the
-  artifact-root loader. P1-2B added in-process `/models` discovery that `run` does not invoke.
-  P1-1A added ApplicationService and session resume. Do not treat remaining
-  contract tests as proof that `echo-harness chat` exists.
+- Hosts without CSI `200~`/`201~` still submit one typed batch per Enter and cannot promise
+  multi-line paste atomicity. Chat `/model` consumes the catalog port rather than a second
+  `GET /models` implementation.

@@ -61,9 +61,9 @@ async function workspace(): Promise<string> {
 }
 
 async function writeArtifactConfig(artifactRoot: string): Promise<void> {
-  await fs.mkdir(path.join(artifactRoot, '.echo', 'config'), { recursive: true });
+  await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
   await fs.writeFile(
-    path.join(artifactRoot, '.echo', 'config', 'echo.config.json'),
+    path.join(artifactRoot, 'config', 'echo.config.json'),
     JSON.stringify({
       baseUrl: 'https://provider.example/v1',
       model: 'fake-model',
@@ -160,6 +160,7 @@ describeWindows('CLI chat cancels an in-flight PowerShell process tree', () => {
           verbose: false,
           color: false,
           interactive: false,
+          artifactRoot: root,
         },
         {
           env: { ECHO_API_KEY: 'test-key' },

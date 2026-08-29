@@ -6,7 +6,7 @@
 >
 > 最后更新：2026-08-29
 >
-> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[ADR-0004](../decisions/0004-workspace-echo-config.md)、[contracts.md](../contracts.md) 1.2
+> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[ADR-0005](../decisions/0005-restore-artifact-config.md)、[contracts.md](../contracts.md) 1.2
 
 ## 1. 目标
 
@@ -126,14 +126,13 @@ Slash 命令只解析本地终端用户在空闲提示符中的输入。模型�
 
 ### 4.1 唯一持久配置
 
-配置固定保存在工作区 `.echo/` 下，与会话同级：
+配置固定保存在构建产物根目录：
 
 ```text
-<workspace>/.echo/config/echo.config.json
-<workspace>/.echo/sessions/<session-id>.jsonl
+<artifact-root>/config/echo.config.json
 ```
 
-`workspace` 由 `--workspace` 或启动目录决定。不得读取产物根 `config/` 或工作区根的 `echo.config.json`。`echo-harness config` 接受同样的 `--workspace`。
+程序必须根据自身模块或可执行文件位置解析 `artifact-root`，不能根据 `process.cwd()` 寻找配置。开发与测试入口通过显式依赖注入获得产物根目录，避免依赖个人路径。
 
 配置优先级只保留：
 
@@ -143,7 +142,7 @@ CLI 显式参数 > echo.config.json
 
 `ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。P0 的用户配置、项目配置以及 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 来源在 P1 中移除；由于项目尚未公开发布，不建立复杂迁移层。
 
-本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义；持久文件落点由 [ADR-0004](../decisions/0004-workspace-echo-config.md) 修正为工作区 `.echo/config`。P1-2A 已使 `loadConfig` 与 `echo-harness run` 执行该规则。`ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
+本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义。[ADR-0005](../decisions/0005-restore-artifact-config.md) 恢复产物根落点，工作区 `.echo/config` 不是配置来源。P1-2A 已使 `loadConfig` 与 `echo-harness run` 执行该规则。`artifact-root` 与 `ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
 
 ### 4.2 配置入口
 
@@ -670,7 +669,7 @@ P1 负责记录未来 WebUI 所需的事实：
 ## 7. 实施顺序
 
 1. P1-0 已用 ADR-0002/ADR-0003 冻结配置来源、Chat 状态恢复、应用服务、事件版本和粘贴边界；
-2. P1-2A / P1-2B 实现持久配置和模型发现；配置落点后由 [ADR-0004](../decisions/0004-workspace-echo-config.md) 改为工作区 `.echo/config`；
+2. P1-2A / P1-2B 实现固定产物配置和模型发现；
 3. P1-1A / P1-1B 实现应用服务、Chat Session、Slash 命令、中断和恢复；
 4. 补齐会话查询、Context 摘要和 Policy Explain 事实；
 5. 按第 5 节已冻结的分组式时间线规范实现 CLI 视觉方案（P1-3）；
@@ -697,6 +696,6 @@ P1 完成必须同时满足：
 
 - Chat 使 Agent Loop 从一次调用扩展为长期状态，取消与事件恢复容易产生悬空状态；
 - Provider `/models` 并非所有 OpenAI-compatible 服务都完整实现，发现结果不能成为执行已配置模型的硬依赖；
-- 配置与会话都在工作区 `.echo/` 下，按仓库隔离且默认 gitignore；跨工作区共享同一份 Provider 配置、或把非秘密配置纳入版本控制，不在当前范围；
+- 固定产物配置便于演示，但不适合只读安装目录或多用户系统；这是当前项目主动接受的简化边界；
 - CLI 美化可能破坏管道和快照，所有视觉改动必须保留非交互契约；
 - 若 P1 未先稳定事件与应用服务，P2 会被迫复制 CLI 逻辑或返工 Session 存储。

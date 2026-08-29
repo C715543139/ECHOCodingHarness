@@ -1,14 +1,18 @@
 # ADR-0004：工作区 `.echo/config` 持久配置
 
-> 状态：Accepted
+> 状态：Superseded
 >
 > 日期：2026-08-29
 >
 > 接受日期：2026-08-29
 >
+> 取代日期：2026-08-29
+>
 > 决策者：项目维护者
 >
 > 部分取代：[ADR-0002](./0002-p1-config-artifact-root.md) 第 2.1 节的持久文件落点
+>
+> 已被取代：[ADR-0005](./0005-restore-artifact-config.md) 恢复产物根 `config/echo.config.json`
 
 ## 1. 背景
 

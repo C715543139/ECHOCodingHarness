@@ -42,8 +42,8 @@ pnpm vitest run tests/integration/file-tools.test.ts tests/integration/tools/run
 | JSONL append/read and pre-persistence redaction | `tests/unit/session/jsonl-session-store.test.ts`; demo-loop eval rereads `.echo/sessions/*.jsonl` |
 | Cancel, timeout, repeated calls, duplicate tool-call IDs | Agent Loop unit tests, `run_command` integration timeout/cancel; loop-guards eval |
 | Temporary workspace isolation | file/command integration tests and evals create `os.tmpdir()` workspaces and delete them |
-| P1-0 frozen contracts, config errors, exit codes, paste/slash, config path | `tests/unit/contracts/p1-baseline.test.ts`, `tests/unit/contracts/doc-consistency.test.ts`; each `P1_TEST_MATRIX` row has `contractEvidence` (this freeze) and `runtimeEvidence` (later task or existing P0 tests) |
-| P1-2A workspace `.echo/config` loader and config wizard | `tests/unit/config/**`, `tests/unit/cli/config-wizard.test.ts`, `tests/integration/cli-run.test.ts`; matrix CFG-* rows now point at runtime tests |
+| P1-0 frozen contracts, config errors, exit codes, paste/slash, artifact-root | `tests/unit/contracts/p1-baseline.test.ts`, `tests/unit/contracts/doc-consistency.test.ts`; each `P1_TEST_MATRIX` row has `contractEvidence` (this freeze) and `runtimeEvidence` (later task or existing P0 tests) |
+| P1-2A artifact-root loader and config wizard | `tests/unit/config/**`, `tests/unit/cli/config-wizard.test.ts`, `tests/integration/cli-run.test.ts`; matrix CFG-* rows now point at runtime tests |
 | P1-2B `/models` catalog, in-process cache, and fail-open configured model | `tests/unit/provider/model-catalog.test.ts`, `tests/unit/provider/openai-client.test.ts`, `tests/unit/provider/fake-provider.test.ts`, `tests/integration/cli-run.test.ts`; matrix MDL-* rows |
 | P1-1B Chat resume, slash, Ctrl+C, paste, and default catalog port | `tests/integration/cli-chat.test.ts`, `tests/unit/cli/parse-chat-input.test.ts`, `tests/unit/cli/chat-input-decoder.test.ts`, `tests/unit/cli/session-id.test.ts`, `tests/unit/config/session-settings.test.ts`; matrix APP-03/CHAT-* rows |
 | Chat interrupt of an in-flight `run_command` PowerShell tree | `tests/integration/cli-chat-cancel-command.test.ts` |
@@ -53,13 +53,13 @@ P1-0 增加契约与矩阵测试。矩阵每一行同时记录 `contractEvidence
 
 | Runtime task | Additional automated evidence |
 | --- | --- |
-| P1-2A | 工作区 `.echo/config` 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL`（已落地） |
+| P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/工作区 `.echo/config`/`ECHO_BASE_URL`（已落地） |
 | P1-2B | `/models` 发现、缓存、失败不阻断已配置模型、CLI `--model` 优先于配置且不发现、手动 `/model refresh` 拒绝。证据：`tests/unit/provider/model-catalog.test.ts`、`tests/unit/provider/openai-client.test.ts`、`tests/integration/cli-run.test.ts`、`tests/integration/cli-help.test.ts` |
 | P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变。证据：`tests/unit/application/echo-application-service.test.ts`、`tests/unit/session/jsonl-session-repository.test.ts`、`tests/unit/session/endpoint-fingerprint.test.ts`、`tests/integration/cli-run.test.ts` |
 | P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn、`/model` 候选校验与目录请求取消：`tests/unit/config/session-settings.test.ts`、`tests/unit/cli/parse-chat-input.test.ts`、`tests/unit/cli/chat-input-decoder.test.ts`、`tests/unit/cli/chat-input-reader.test.ts`、`tests/unit/cli/model-candidates.test.ts`、`tests/unit/cli/session-id.test.ts`、`tests/integration/cli-chat.test.ts`。SESSION 短 ID 恢复与先前用户目标进入投影由 `tests/unit/cli/session-id.test.ts`、`tests/unit/context/event-context-builder.test.ts` 与 Chat 集成测试覆盖 |
 | P1-3 | 分组时间线、组间空行、用户拒绝只渲染一次 `DENIED`、窄宽度/CJK、Chat 启动摘要与状态条间距：`tests/unit/cli/event-renderer.test.ts`、`tests/unit/cli/render-layout.test.ts`、`tests/unit/cli/chat-view.test.ts`；Slash/`/status` 空行由 `tests/integration/cli-chat.test.ts` 回归；非 TTY/`--no-color` 与 stdout/stderr 契约保持 |
 
-`ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<workspace>/.echo/config/echo.config.json` 是 P1 唯一持久配置路径。
+`ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<artifact-root>/config/echo.config.json` 是 P1 唯一持久配置路径。
 
 The D2-3 suite still covers:
 
@@ -101,9 +101,9 @@ CLI demo fixtures under `fixtures/demo/**`, `scripts/demo-*`, and `docs/demo.md`
 D3-1 and are not required for this gate.
 
 `pnpm smoke:artifact` starts the built `dist/cli.js` from a different working directory that
-contains decoy `echo.config.json` and `config/echo.config.json` files, and asserts the process
-reads `<cwd>/.echo/config/echo.config.json` (or fails closed when that file is missing). It must not
-echo `ECHO_API_KEY` or follow the cwd decoy model.
+contains decoy `echo.config.json` and `.echo/config/echo.config.json` files, and asserts the
+process still reads `<artifact-root>/config/echo.config.json` (or fails closed when that file is
+missing). It must not echo `ECHO_API_KEY` or follow cwd / workspace `.echo/config` decoys.
 
 ## Secret and dual-blind scans
 
@@ -156,7 +156,7 @@ pnpm smoke:provider
 
 Those script environment variables are local-acceptance inputs for `scripts/smoke-provider.mjs`.
 They are not `echo-harness` configuration sources. `echo-harness run` reads
-`<workspace>/.echo/config/echo.config.json` plus `ECHO_API_KEY` only.
+`<artifact-root>/config/echo.config.json` plus `ECHO_API_KEY` only.
 
 The script requires all three Provider settings, disables retries, limits output, applies a
 60-second abort timeout, and never prints the key or model response. Remove the API key from the

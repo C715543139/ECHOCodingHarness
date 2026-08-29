@@ -1,7 +1,7 @@
 import { CONFIG_ERROR_CODES } from '../contracts/config.js';
 import type { ConfigIssue } from '../contracts/config.js';
 
-import { isAbsoluteWorkspaceRoot } from './artifact-root.js';
+import { isAbsoluteArtifactRoot } from './artifact-root.js';
 import { checkConfig } from './check-config.js';
 import { readPersistentConfigFile } from './config-file.js';
 import {
@@ -12,17 +12,18 @@ import {
 } from './load-config.js';
 
 export interface RuntimeConfigInput {
-  readonly workspaceRoot: string;
+  readonly artifactRoot: string;
   readonly env?: Record<string, string | undefined>;
   readonly overrides?: RawConfigValues;
 }
 
-function workspaceRootIssues(workspaceRoot: string): ConfigIssue[] | undefined {
-  if (!isAbsoluteWorkspaceRoot(workspaceRoot)) {
+function artifactRootIssues(artifactRoot: string): ConfigIssue[] | undefined {
+  if (!isAbsoluteArtifactRoot(artifactRoot)) {
     return [
       {
-        code: CONFIG_ERROR_CODES.workspaceRoot,
-        message: 'workspace root must be an absolute path, not a cwd-relative lookup.',
+        code: CONFIG_ERROR_CODES.artifactRoot,
+        message:
+          'artifact-root must be an absolute path derived from the CLI entry, not process.cwd().',
       },
     ];
   }
@@ -30,12 +31,12 @@ function workspaceRootIssues(workspaceRoot: string): ConfigIssue[] | undefined {
 }
 
 export async function loadRuntimeConfig(input: RuntimeConfigInput): Promise<ConfigLoadResult> {
-  const rootIssues = workspaceRootIssues(input.workspaceRoot);
+  const rootIssues = artifactRootIssues(input.artifactRoot);
   if (rootIssues !== undefined) {
     return { ok: false, issues: rootIssues };
   }
 
-  const file = await readPersistentConfigFile(input.workspaceRoot);
+  const file = await readPersistentConfigFile(input.artifactRoot);
   if (file.status === 'missing') {
     return { ok: false, issues: missingConfigIssues() };
   }

@@ -20,16 +20,16 @@ afterEach(async () => {
 });
 
 async function writeConfig(artifactRoot: string, values: Record<string, unknown>): Promise<void> {
-  await fs.mkdir(path.join(artifactRoot, '.echo', 'config'), { recursive: true });
+  await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
   await fs.writeFile(
-    path.join(artifactRoot, '.echo', 'config', 'echo.config.json'),
+    path.join(artifactRoot, 'config', 'echo.config.json'),
     JSON.stringify(values),
     'utf8',
   );
 }
 
 describe('loadRuntimeConfig', () => {
-  it('loads the workspace .echo config even when cwd has a decoy config and env overrides', async () => {
+  it('loads the artifact-root file even when cwd has a decoy config and env overrides', async () => {
     const artifactRoot = await makeTempDir();
     const cwd = await makeTempDir();
     await writeConfig(artifactRoot, {
@@ -47,12 +47,23 @@ describe('loadRuntimeConfig', () => {
       }),
       'utf8',
     );
+    await fs.mkdir(path.join(cwd, '.echo', 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(cwd, '.echo', 'config', 'echo.config.json'),
+      JSON.stringify({
+        baseUrl: 'https://echo.example/v1',
+        model: 'workspace-echo-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'auto',
+      }),
+      'utf8',
+    );
 
     const original = process.cwd();
     try {
       process.chdir(cwd);
       const loaded = await loadRuntimeConfig({
-        workspaceRoot: artifactRoot,
+        artifactRoot,
         env: {
           ECHO_API_KEY: 'key',
           ECHO_BASE_URL: 'https://env.example/v1',
@@ -75,7 +86,7 @@ describe('loadRuntimeConfig', () => {
   it('returns CONFIG_MISSING without creating a file', async () => {
     const artifactRoot = await makeTempDir();
     const loaded = await loadRuntimeConfig({
-      workspaceRoot: artifactRoot,
+      artifactRoot,
       env: { ECHO_API_KEY: 'key' },
     });
     expect(loaded.ok).toBe(false);
@@ -84,16 +95,16 @@ describe('loadRuntimeConfig', () => {
     }
     expect(loaded.issues[0]?.code).toBe(CONFIG_ERROR_CODES.missingFile);
     await expect(
-      fs.stat(path.join(artifactRoot, '.echo', 'config', 'echo.config.json')),
+      fs.stat(path.join(artifactRoot, 'config', 'echo.config.json')),
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('rejects a relative workspace root instead of using process.cwd()', async () => {
-    const loaded = await loadRuntimeConfig({ workspaceRoot: 'relative-root' });
+  it('rejects a relative artifact-root instead of using process.cwd()', async () => {
+    const loaded = await loadRuntimeConfig({ artifactRoot: 'relative-root' });
     expect(loaded.ok).toBe(false);
     if (loaded.ok) {
       return;
     }
-    expect(loaded.issues[0]?.code).toBe(CONFIG_ERROR_CODES.workspaceRoot);
+    expect(loaded.issues[0]?.code).toBe(CONFIG_ERROR_CODES.artifactRoot);
   });
 });

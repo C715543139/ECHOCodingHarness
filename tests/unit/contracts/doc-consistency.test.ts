@@ -19,6 +19,7 @@ describe('P1 documentation freeze', () => {
       adr2: await readDoc('docs/decisions/0002-p1-config-artifact-root.md'),
       adr3: await readDoc('docs/decisions/0003-p1-application-service-session.md'),
       adr4: await readDoc('docs/decisions/0004-workspace-echo-config.md'),
+      adr5: await readDoc('docs/decisions/0005-restore-artifact-config.md'),
       contracts: await readDoc('docs/contracts.md'),
       architecture: await readDoc('docs/architecture.md'),
       testing: await readDoc('docs/testing.md'),
@@ -26,19 +27,28 @@ describe('P1 documentation freeze', () => {
       plan: await readDoc('docs/plans/p1-cli.md'),
     };
 
-    expect(files.adr2).toContain('artifact-root');
-    expect(files.adr2).toContain('ECHO_API_KEY');
     for (const text of [
-      files.adr4,
+      files.adr2,
+      files.adr3,
+      files.adr5,
       files.contracts,
       files.architecture,
       files.testing,
       files.readme,
       files.plan,
     ]) {
-      expect(text).toContain('.echo/config/echo.config.json');
+      expect(text).toContain('artifact-root');
       expect(text).toContain('ECHO_API_KEY');
+      expect(text).toContain('config/echo.config.json');
     }
+
+    expect(files.adr4).toContain('Superseded');
+    expect(files.adr5).toContain('ADR-0004');
+    expect(files.plan).toContain('ADR-0005');
+    expect(files.architecture).toContain('ADR-0005');
+    expect(files.contracts).not.toContain(
+      '唯一持久配置文件为 `<workspace>/.echo/config/echo.config.json`',
+    );
 
     expect(files.contracts).toContain('CLI 显式参数 > echo.config.json');
     expect(files.contracts).not.toContain('CLI 显式参数 > echo.config.json > 内置默认值');
@@ -59,11 +69,9 @@ describe('P1 documentation freeze', () => {
 
     expect(files.architecture).toContain('Application service');
     expect(files.architecture).toContain('P1-2A');
-    expect(files.architecture).not.toContain('后续将配置落点');
-    expect(files.plan).not.toContain('实现固定产物配置');
     expect(files.plan).toContain('ADR-0002');
     expect(files.plan).toContain('ADR-0003');
-    expect(files.plan).toContain('ADR-0004');
+    expect(files.plan).toContain('ADR-0005');
     expect(files.testing).toContain('P1-0');
     expect(files.readme).toContain('P1-2A');
     expect(files.readme).toContain('P1-2B');

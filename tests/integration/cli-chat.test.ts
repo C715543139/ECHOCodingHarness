@@ -33,9 +33,9 @@ async function writeArtifactConfig(
   artifactRoot: string,
   catalog: 'discover' | 'manual' = 'manual',
 ): Promise<void> {
-  await fs.mkdir(path.join(artifactRoot, '.echo', 'config'), { recursive: true });
+  await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
   await fs.writeFile(
-    path.join(artifactRoot, '.echo', 'config', 'echo.config.json'),
+    path.join(artifactRoot, 'config', 'echo.config.json'),
     JSON.stringify({
       baseUrl: 'https://provider.example/v1',
       model: 'fake-model',
@@ -126,6 +126,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: true,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -189,6 +190,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -253,6 +255,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -275,6 +278,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -343,6 +347,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -378,6 +383,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -389,23 +395,34 @@ describe('CLI chat integration', () => {
     expect(idle.exitCode).toBe(130);
 
     const missingConfig = output();
-    const emptyRoot = await workspace();
     const noConfig = await runChat(
       {
-        workspace: emptyRoot,
+        workspace: root,
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
         io: missingConfig.io,
-        cwd: emptyRoot,
+        cwd: root,
       },
     );
     expect(noConfig.exitCode).toBe(2);
     expect(missingConfig.stderr()).toContain('echo-harness config');
 
+    await fs.mkdir(path.join(root, 'missing-artifact', 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(root, 'missing-artifact', 'config', 'echo.config.json'),
+      JSON.stringify({
+        baseUrl: 'https://provider.example/v1',
+        model: 'fake-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'balanced',
+      }),
+      'utf8',
+    );
     const resumeMissing = output();
     const missingSession = await runChat(
       {
@@ -414,6 +431,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -443,6 +461,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -475,6 +494,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -524,6 +544,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -563,6 +584,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -630,6 +652,7 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: false,
+        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },

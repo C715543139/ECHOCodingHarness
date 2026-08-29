@@ -30,6 +30,7 @@ export interface RunGoalDependencies {
   readonly io?: CliIo;
   readonly providerFactory?: (options: ProviderFactoryOptions) => ModelProvider;
   readonly approvalHandler?: ApprovalHandler;
+  readonly artifactRoot?: string;
 }
 
 export interface RunGoalOutcome {
@@ -87,11 +88,13 @@ export async function runGoal(
 ): Promise<RunGoalOutcome> {
   const env = dependencies.env ?? process.env;
   const io = dependencies.io ?? defaultIo();
+  const artifactRoot = options.artifactRoot ?? dependencies.artifactRoot;
   const loaded = await loadHarnessRuntime({
     options,
     env,
     cwd: dependencies.cwd ?? process.cwd(),
     io,
+    artifactRoot,
     ...(dependencies.providerFactory === undefined
       ? {}
       : { providerFactory: dependencies.providerFactory }),

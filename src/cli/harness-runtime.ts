@@ -47,6 +47,7 @@ export interface HarnessCliOptions {
   readonly color: boolean;
   readonly interactive: boolean;
   readonly signal?: AbortSignal;
+  readonly artifactRoot?: string;
 }
 
 export interface ProviderFactoryOptions {
@@ -127,6 +128,7 @@ export async function loadHarnessRuntime(input: {
   readonly env: Record<string, string | undefined>;
   readonly cwd: string;
   readonly io: CliIo;
+  readonly artifactRoot: string | undefined;
   readonly providerFactory?: (options: ProviderFactoryOptions) => ModelProvider;
 }): Promise<LoadedHarnessRuntime | { exitCode: number }> {
   const secret = input.env['ECHO_API_KEY'] ?? '';
@@ -142,8 +144,15 @@ export async function loadHarnessRuntime(input: {
     );
   }
 
+  if (input.artifactRoot === undefined) {
+    return failConfiguration(
+      input.io,
+      'configuration · artifact-root is missing. The CLI must resolve it from its entry module.',
+    );
+  }
+
   const loaded = await loadRuntimeConfig({
-    workspaceRoot,
+    artifactRoot: input.artifactRoot,
     env: input.env,
     overrides: cliOverrides(input.options),
   });

@@ -226,6 +226,144 @@ describe('DefaultEventRenderer', () => {
     ).toBe('ECHO       | I will inspect the parser.\n');
   });
 
+  it('inserts one blank line between complete groups, not inside a tool group', () => {
+    const renderer = new DefaultEventRenderer();
+    renderer.renderEvent(event('step.started', { step: 2 }), plain);
+    renderer.renderEvent(event('model.text_delta', { delta: 'Checking the script.' }), plain);
+    renderer.renderEvent(
+      event('model.tool_call', {
+        call: { id: 'call-1', name: 'run_command', arguments: { command: 'python test.py' } },
+      }),
+      plain,
+    );
+    expect(
+      join(renderer.renderEvent(event('model.completed', { finishReason: 'tool_calls' }), plain)),
+    ).toBe('ECHO       | Checking the script.\n');
+
+    const firstTool = join(
+      renderer.renderEvent(
+        event('tool.requested', {
+          call: { id: 'call-1', name: 'run_command', arguments: { command: 'python test.py' } },
+          normalizedInput: { command: 'python test.py' },
+        }),
+        plain,
+      ),
+    );
+    expect(firstTool.startsWith('\n')).toBe(true);
+    expect(firstTool).toBe('\nTOOL       | run_command\nCOMMAND    | python test.py\n');
+
+    const approval = join(
+      renderer.renderEvent(
+        event('approval.requested', {
+          toolCallId: 'call-1',
+          reason: 'unclassified script',
+          approvalKey: 'approval:test',
+        }),
+        plain,
+      ),
+    );
+    expect(approval.startsWith('\n')).toBe(false);
+    expect(approval).toContain('APPROVAL   | Required');
+
+    const approved = join(
+      renderer.renderEvent(
+        event('approval.granted', {
+          toolCallId: 'call-1',
+          approvalKey: 'approval:test',
+          scope: 'once',
+        }),
+        plain,
+      ),
+    );
+    expect(approved).toBe('APPROVED   | once\n');
+
+    const result = join(
+      renderer.renderEvent(
+        event('tool.completed', {
+          result: {
+            toolCallId: 'call-1',
+            toolName: 'run_command',
+            status: 'completed',
+            summary: 'Command completed.',
+            metadata: { exitCode: 0, durationMs: 268, stdout: '', stderr: '' },
+          },
+          durationMs: 268,
+        }),
+        plain,
+      ),
+    );
+    expect(result.startsWith('\n')).toBe(false);
+    expect(result).toContain('RESULT     | OK | exit 0 | 268 ms');
+
+    const secondTool = join(
+      renderer.renderEvent(
+        event('tool.requested', {
+          call: { id: 'call-2', name: 'run_command', arguments: { command: 'python test.py 2' } },
+          normalizedInput: { command: 'python test.py 2' },
+        }),
+        plain,
+      ),
+    );
+    expect(secondTool.startsWith('\n')).toBe(true);
+    expect(secondTool).toContain('TOOL       | run_command');
+  });
+
+  it('renders a user denial once when approval.denied is followed by tool.denied', () => {
+    const renderer = new DefaultEventRenderer();
+    requestCommand(renderer, 'call-deny', 'python test.py');
+    const approvalDenied = join(
+      renderer.renderEvent(
+        event('approval.denied', {
+          toolCallId: 'call-deny',
+          reason: 'The user denied this operation.',
+        }),
+        plain,
+      ),
+    );
+    const toolDenied = join(
+      renderer.renderEvent(
+        event('tool.denied', {
+          result: {
+            toolCallId: 'call-deny',
+            toolName: 'run_command',
+            status: 'denied',
+            summary: 'The user denied this operation.',
+          },
+          hard: false,
+        }),
+        plain,
+      ),
+    );
+    expect(approvalDenied).toBe('DENIED     | The user denied this operation.\n');
+    expect(toolDenied).toBe('');
+    expect(`${approvalDenied}${toolDenied}`.match(/DENIED\s+\|/gu)).toHaveLength(1);
+
+    const failed = join(
+      renderer
+        .renderResult(
+          {
+            sessionId: completed.sessionId,
+            turnId: completed.turnId,
+            status: 'failed',
+            stopReason: 'policy_denied',
+            steps: 1,
+            toolCalls: 1,
+            error: {
+              category: 'policy_denied',
+              code: 'policy_denied',
+              message: 'The user denied this operation.',
+              retryable: false,
+            },
+          },
+          plain,
+        )
+        .slice(1),
+    );
+    expect(failed).toContain('One or more operations were denied.');
+    expect(failed).toContain('The user denied this operation.');
+    expect(failed).not.toContain('policy_denied | The user denied this operation.');
+  });
+
   it('does not print intermediate text or reasoning-only progress on the final-text path', () => {
     const renderer = new DefaultEventRenderer();
     renderer.renderEvent(event('step.started', { step: 2 }), plain);

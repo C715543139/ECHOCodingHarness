@@ -294,6 +294,8 @@ describe('CLI chat integration', () => {
     expect(resumed.exitCode).toBe(0);
     expect(captured.stderr()).toContain('ECHO Harness · resumed session');
     expect(captured.stderr()).toContain('Session status');
+    expect(captured.stderr()).toMatch(/\n-- Session status /u);
+    expect(captured.stderr()).toMatch(/API KEY\s+\|\s+configured\n\n/u);
     expect(captured.stderr()).toContain('cli');
     expect(provider.requests[1]?.model).toBe('resume-model');
     expect(provider.requests[1]?.messages).toEqual(

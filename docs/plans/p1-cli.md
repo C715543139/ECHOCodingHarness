@@ -237,6 +237,7 @@ TTY 且支持 Unicode 时，Step 使用独立标题：
 - 每个 Step 标题前恰好一个空行，使连续 Turn/Step 可以快速扫描；
 - Step 标题与第一条事件之间不再插入空行；
 - 同一工具的请求、审批和结果连续显示，不被无关空行拆散；
+- 完整视觉分组之间恰好一个空行：`ECHO` 进度与后续工具组之间、相邻工具组之间；
 - 最终结果前恰好一个空行，并使用独立标题与摘要块；
 - 模型最终答复与 stderr 进度保持既有 stdout/stderr 边界，不用空行改变数据通道语义。
 
@@ -262,6 +263,20 @@ RESULT     | OK | exit 0 | 668 ms
 
 工具摘要根据类型使用稳定字段名，例如 `COMMAND`、`PATH`、`QUERY` 或 `TARGET`。工具终态必须与请求处于同一分组中：成功或普通失败使用 `RESULT`，策略拒绝使用 `DENIED`，取消使用 `CANCELLED`。默认模式不单独渲染没有新增信息的 `tool.authorized`。
 
+相邻完整分组之间恰好一个空行，例如 `ECHO` 进度之后的第一个工具，以及同一 Step 内的下一个工具：
+
+```text
+ECHO       │ Checking the script.
+
+TOOL       │ run_command
+COMMAND    │ python test.py
+RESULT     │ OK · exit 0 · 268 ms
+
+TOOL       │ run_command
+COMMAND    │ python test.py 2
+RESULT     │ OK · exit 0 · 200 ms
+```
+
 ### 5.3 审批块
 
 审批属于当前工具，不作为顶格的独立事件流。默认布局为：
@@ -280,6 +295,7 @@ RESULT     │ OK · exit 0 · 668 ms
 - `Risk`、`Scope` 和输入提示使用悬挂缩进，与正文起点对齐；
 - 选择顺序与键位在同一行表达，默认拒绝语义保持不变；
 - 用户输入后追加 `APPROVED` 或 `DENIED`，不原地擦除历史输出；
+- 用户拒绝时 `approval.denied` 与随后同因的 `tool.denied` 只输出一次 `DENIED`；
 - 已由会话授权且无需再次询问的工具不输出冗余批准信息；
 - 非交互模式继续沿用 P0 的确定性拒绝/授权规则，不伪造交互输入。
 
@@ -367,7 +383,7 @@ Type /help for commands · Ctrl+C cancels a running turn
 
 #### 5.7.2 提示符状态条
 
-每次进入空闲输入状态时，先显示一行低亮度状态，再显示输入提示符：
+每次进入空闲输入状态时，先空一行，再显示一行低亮度状态，再显示输入提示符。上一段 Slash 反馈、Turn 摘要或启动摘要与状态条之间恰好一个空行；状态条与 `YOU` 提示符之间不再空行。
 
 ```text
 ECHOCodingHarness · deepseek-chat · balanced
@@ -393,6 +409,7 @@ YOU › _
 
 - Unicode TTY 使用 `YOU ›`，ASCII 降级使用 `YOU >`；
 - 用户输入行直接保留为终端会话记录，提交后不重复渲染第二份 `YOU` 消息；
+- 提交后与 Slash 反馈或 Step 时间线之间恰好一个空行；
 - Enter 提交非空输入；空输入不创建 Turn，也不重复打印状态条；
 - 多行粘贴的识别方式已由 [ADR-0003](../decisions/0003-p1-application-service-session.md) 冻结为 bracketed paste；一次粘贴不得被拆成多个 Turn，也不得触发 Slash 命令，并必须由 PTY 或输入适配器测试覆盖；
 - Chat 输入只在 Agent 空闲时生效，运行中由 `Ctrl+C` 负责取消当前 Turn；
@@ -426,9 +443,11 @@ YOU › _
 
 ```text
 YOU input
+  -> blank line
   -> Step timeline
   -> ECHO final response
   -> Turn summary
+  -> blank line
   -> status strip and next YOU prompt
 ```
 
@@ -467,6 +486,8 @@ YOU › _
 低频信息统一由 `/status` 展示：
 
 ```text
+YOU › /status
+
 ── Session status ──────────────────────────────────────
 WORKSPACE   │ ECHOCodingHarness
 SESSION     │ a13f09c2
@@ -478,6 +499,9 @@ CONTEXT     │ ~18,400 / 28,000 tokens · 66%
 LAST TURN   │ completed · 5 steps · 7 tools
 LAST CHECK  │ pnpm test · exit 0
 API KEY     │ configured
+
+ECHOCodingHarness · deepseek-reasoner · auto
+YOU › _
 ```
 
 模型和安全模式在值后显示 `cli`、`session` 或 `config` 来源。API Key 只显示 `configured` 或 `missing`；Provider 默认显示通用类型，只有安全且确有诊断需要时才显示经过脱敏的 host。

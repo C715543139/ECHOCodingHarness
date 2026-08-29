@@ -74,8 +74,10 @@ describe('Chat presentation', () => {
         plain,
       ),
     );
+    expect(idle.startsWith('\n')).toBe(true);
     expect(idle).toContain('ECHOCodingHarness | deepseek-chat | balanced | context 78%');
     expect(idle).toContain('YOU > ');
+    expect(idle.endsWith('YOU > ')).toBe(true);
     expect(renderYouPrompt({ ...plain, unicode: true }).text).toBe('YOU › ');
   });
 
@@ -95,7 +97,9 @@ describe('Chat presentation', () => {
     expect(strip).toContain('\u001B[');
 
     const model = join(renderSlashFeedback({ kind: 'model', value: 'deepseek-reasoner' }, plain));
-    expect(model).toBe('MODEL      | deepseek-reasoner\n           | Applies to the next turn.\n');
+    expect(model).toBe(
+      '\nMODEL      | deepseek-reasoner\n           | Applies to the next turn.\n',
+    );
     expect(model).not.toContain('Step');
     expect(join(renderSlashFeedback({ kind: 'safety', value: 'auto' }, plain))).toContain(
       'SAFETY     | auto',
@@ -134,6 +138,7 @@ describe('Chat presentation', () => {
         plain,
       ),
     );
+    expect(text.startsWith('\n')).toBe(true);
     expect(text).toContain('-- Session status ');
     expect(text).toContain('MODEL      | deepseek-reasoner | session');
     expect(text).toContain('SAFETY     | auto | session');

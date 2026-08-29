@@ -154,6 +154,8 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 
 - 每个 Step 使用独立标题；标题前恰好一个空行，标题与第一条事件之间不再空行；
 - 同一工具的请求、审批和结果连续显示；
+- 完整视觉分组之间恰好一个空行：`ECHO` 进度与后续工具组之间、相邻工具组之间；
+- Chat：提交后与 Slash/Step 结果之间恰好一个空行；Slash 反馈或 Turn 摘要与下一条状态条之间恰好一个空行；状态条与 `YOU` 提示符之间不再空行；
 - 长内容在正文列换行并对齐；CJK 按终端显示宽度计列，ANSI 不计入宽度；
 - 终端过窄时改为堆叠布局，不丢弃截断标记、相对路径或脱敏结果；
 - 默认不显示墙钟时间；完成事件可以显示耗时、退出码和截断状态；
@@ -176,12 +178,12 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 | `tool.requested` | `TOOL` 与 `COMMAND` / `PATH` / `QUERY` / `TARGET` |
 | `approval.requested` | 挂在当前工具下的 `APPROVAL` 块 |
 | `approval.granted` | `APPROVED` 与授权范围 |
-| `approval.denied` | `DENIED` |
+| `approval.denied` | `DENIED`；随后同因的 `tool.denied` 不再重复该行 |
 | `tool.authorized` | 默认隐藏；`--verbose` 可显示策略允许及授权来源 |
 | `tool.started` | 默认隐藏 |
 | `tool.completed` | 同一分组中的 `RESULT` |
 | `tool.failed` | `RESULT` 中的 `FAIL` |
-| `tool.denied` | `DENIED` 与策略原因 |
+| `tool.denied` | `DENIED` 与策略原因；用户拒绝已由 `approval.denied` 展示时省略 |
 | `tool.cancelled` | `CANCELLED` 与取消阶段 |
 | `limit.reached` | `LIMIT` 与具体限制 |
 | `turn.completed` | `run`：stdout 最终文本，stderr `Run completed` 摘要；Chat：stderr `ECHO` 回复与 `Turn completed` |
@@ -259,7 +261,7 @@ APPROVAL   | Required
            | Approve [y] once / [s] session / [n] deny
 ```
 
-非交互模式不得等待不可见输入；遇到 `ask` 默认拒绝并返回稳定退出码。hard deny 只显示原因，不提供允许选项。交互模式把选择提示留在同一行，用户输入后追加 `APPROVED` 或 `DENIED`，不原地擦除。
+非交互模式不得等待不可见输入；遇到 `ask` 默认拒绝并返回稳定退出码。hard deny 只显示原因，不提供允许选项。交互模式把选择提示留在同一行，用户输入后追加 `APPROVED` 或 `DENIED`，不原地擦除。用户拒绝时 `approval.denied` 与随后的 `tool.denied` 只渲染一次 `DENIED`。
 输入读取器必须在等待输入前把同一条选择提示写入 stderr；即使终端 readline 重绘当前行，也不得用空 query 清除 Renderer 已显示的选项。审批输入只用于当前待决工具，不得进入 Chat 用户消息。
 
 ## 12. 错误与恢复提示
@@ -396,7 +398,9 @@ CI 使用 Fake Provider 执行最小事件序列，并验证稳定输出。真�
 本文已基于以下证据升级为 `Accepted / 1.2`：
 
 - `EventRenderer` 已实现分组式时间线，并具有 snapshot/行为测试；
+- 完整视觉分组之间空行、用户拒绝只渲染一次 `DENIED` 已由渲染器测试覆盖；
 - 窄宽度、CJK、无颜色、非 TTY、审批和成功/失败摘要经过验证；
 - stdout/stderr 与退出码契约保持 P0；
 - Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，并由 P1-1B 接到 `echo-harness chat`；
+- Chat 提交后与 Slash/Step 结果之间、Slash 反馈或 Turn 摘要与下一条状态条之间各空一行；
 - 文中示例与真实输出一致，不含伪造能力。

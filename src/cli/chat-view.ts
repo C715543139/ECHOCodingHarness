@@ -113,7 +113,10 @@ export function renderIdlePrompt(
   input: StatusStripInput,
   capabilities: RenderCapabilities,
 ): readonly RenderChunk[] {
-  return [...renderStatusStrip(input, capabilities), renderYouPrompt(capabilities)];
+  return precedeChatBlock([
+    ...renderStatusStrip(input, capabilities),
+    renderYouPrompt(capabilities),
+  ]);
 }
 
 export function renderChatEcho(
@@ -129,22 +132,28 @@ export function renderSlashFeedback(
 ): readonly RenderChunk[] {
   const options = layoutOptions(capabilities);
   if (input.kind === 'model') {
-    return stderrLines(
-      formatLabeledBlock('MODEL', [input.value, 'Applies to the next turn.'], options, 'cyan'),
+    return precedeChatBlock(
+      stderrLines(
+        formatLabeledBlock('MODEL', [input.value, 'Applies to the next turn.'], options, 'cyan'),
+      ),
     );
   }
   if (input.kind === 'safety') {
-    return stderrLines(
-      formatLabeledBlock('SAFETY', [input.value, 'Applies to the next turn.'], options, 'yellow'),
+    return precedeChatBlock(
+      stderrLines(
+        formatLabeledBlock('SAFETY', [input.value, 'Applies to the next turn.'], options, 'yellow'),
+      ),
     );
   }
   if (input.kind === 'help') {
-    return stderrLines(formatLabeledBlock('HELP', input.lines, options, 'cyan'));
+    return precedeChatBlock(stderrLines(formatLabeledBlock('HELP', input.lines, options, 'cyan')));
   }
   if (input.kind === 'info') {
-    return stderrLines(formatLabeledBlock(input.label, input.lines, options, 'cyan'));
+    return precedeChatBlock(
+      stderrLines(formatLabeledBlock(input.label, input.lines, options, 'cyan')),
+    );
   }
-  return stderrLines(formatLabeled(input.label, input.message, options, 'red'));
+  return precedeChatBlock(stderrLines(formatLabeled(input.label, input.message, options, 'red')));
 }
 
 export function renderSessionStatus(
@@ -195,7 +204,11 @@ export function renderSessionStatus(
     );
   }
   lines.push(...formatLabeled('API KEY', input.apiKey, options));
-  return stderrLines(lines);
+  return precedeChatBlock(stderrLines(lines));
+}
+
+function precedeChatBlock(chunks: readonly RenderChunk[]): readonly RenderChunk[] {
+  return [{ channel: 'stderr', text: '\n' }, ...chunks];
 }
 
 function formatCount(value: number): string {

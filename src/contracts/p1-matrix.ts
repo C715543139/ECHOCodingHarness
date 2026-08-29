@@ -1,6 +1,6 @@
 export interface P1MatrixRow {
   readonly id: string;
-  readonly area: 'config' | 'events' | 'application' | 'chat' | 'exit' | 'p0-guard';
+  readonly area: 'config' | 'events' | 'application' | 'chat' | 'exit' | 'p0-guard' | 'cli';
   readonly requirement: string;
   readonly contractEvidence: string;
   readonly runtimeEvidence: string;
@@ -133,5 +133,14 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
     runtimeEvidence: 'tests/unit/config/runtime-config.test.ts',
     runtimeTask: 'P1-2A',
+  },
+  {
+    id: 'CLI-01',
+    area: 'cli',
+    requirement:
+      'Grouped Step timeline, width-aware wrap, and Chat prompt surfaces keep stdout/stderr and exit codes stable',
+    contractEvidence: 'docs/plans/p1-cli.md',
+    runtimeEvidence: 'tests/unit/cli/event-renderer.test.ts',
+    runtimeTask: 'P1-3',
   },
 ] as const;

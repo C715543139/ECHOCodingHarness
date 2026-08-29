@@ -305,6 +305,7 @@ interface RenderCapabilities {
   color: boolean;
   unicode: boolean;
   verbose: boolean;
+  columns?: number;
 }
 
 type OutputChannel = "stdout" | "stderr";
@@ -327,7 +328,7 @@ interface EventRenderer {
 }
 ```
 
-`interactive`、`color` 与 `unicode` 来自启动时的终端能力检测；`verbose` 默认是 `false`，只由显式 CLI `--verbose` 启用。详细模式只能增加经过脱敏且受输出上限约束的诊断信息，不能隐式打开颜色、泄露原始数据或改变 Agent 行为。
+`interactive`、`color` 与 `unicode` 来自启动时的终端能力检测；`verbose` 默认是 `false`，只由显式 CLI `--verbose` 启用。`columns` 是可选的可见列预算，缺省按 80 列换行；它只影响表现层换行与窄终端堆叠，不得改变事件顺序、Agent 行为或 stdout/stderr 通道。详细模式只能增加经过脱敏且受输出上限约束的诊断信息，不能隐式打开颜色、泄露原始数据或改变 Agent 行为。
 
 渲染器必须满足：
 
@@ -341,7 +342,7 @@ interface EventRenderer {
 - 工具成功与 Turn 完成必须使用不同语义，不能由人类文本猜测状态；
 - 截断、拒绝、取消和限制必须明确显示，不能省略为普通成功。
 
-颜色、标签、间距和完整示例见 [cli-ux.md](./cli-ux.md)。未来 UI 必须消费 `EchoEvent`，不得解析 CLI 文本。
+颜色、标签、间距和完整示例见 [cli-ux.md](./cli-ux.md) 与 [p1-cli.md](./plans/p1-cli.md) 第 5 节。未来 UI 必须消费 `EchoEvent`，不得解析 CLI 文本。
 
 ## 7. 会话存储
 

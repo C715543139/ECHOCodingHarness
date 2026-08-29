@@ -54,12 +54,12 @@ node .\dist\cli.js run $goal --workspace .\fixtures\demo --safety-mode balanced 
 
 固定故事必须在同一连续 Turn 中出现：
 
-1. **检查**：`STEP` 后出现 `search_text` / `read_file`，路径为相对路径，例如 `src/parse-report.ts`。
-2. **失败测试**：`TOOL run_command npm test` 后为 `FAIL exit 1`，并带测试摘要（例如 `1 test failed`）。`exit 1` 只表示验证命令失败，不是 Turn 完成。
+1. **检查**：`Step` 标题后出现 `search_text` / `read_file`，路径为相对路径，例如 `src/parse-report.ts`。
+2. **失败测试**：`TOOL` `run_command` 与 `COMMAND` `npm test` 后为 `RESULT` `FAIL | exit 1`，并带测试摘要（例如 `1 test failed`）。`exit 1` 只表示验证命令失败，不是 Turn 完成。
 3. **定位**：从失败摘要和 `read_file` 结果看到 `total: passed` 未计入失败数。
-4. **apply_patch**：`TOOL apply_patch src/parse-report.ts` 后为 `OK`、相对路径、`+N -M` 与有界 diff。
-5. **复测成功**：再次 `npm test` 为 `OK exit 0` 与通过摘要。
-6. **结束**：stdout 为模型最终答复；stderr 为 `DONE completed`，含 `stopReason`、Step 数、工具次数、变更文件数、`Verification: npm test · exit 0`。进程退出码为 0。
+4. **apply_patch**：`TOOL` `apply_patch` 与 `TARGET` `src/parse-report.ts` 后为 `RESULT` `OK`、相对路径、`+N -M` 与有界 diff。
+5. **复测成功**：再次 `npm test` 为 `RESULT` `OK | exit 0` 与通过摘要。
+6. **结束**：stdout 为模型最终答复；stderr 为 `Run completed`，含 `STEPS`、`TOOLS`、`CHANGES` 与 `VERIFIED | npm test | exit 0`。进程退出码为 0。
 
 真实输出不得为匹配本文而伪造 Step 数、测试数量或成功结果。
 
@@ -67,7 +67,7 @@ node .\dist\cli.js run $goal --workspace .\fixtures\demo --safety-mode balanced 
 
 不要解析人类可读终端文本作为 Agent 状态。定位失败使用结构化事实：
 
-- CLI：`FAIL   exit 1 · <duration>` 与下一行测试摘要。
+- CLI：`RESULT | FAIL | exit 1 | <duration>` 与下一行测试摘要。
 - 工具元数据：`run_command` 的 `exitCode`、`durationMs`、截断标记。
 - 测试证据：Node test runner 的 `# fail` / `# pass` 行。
 - 代码：`src/parse-report.ts` 中 `total: passed` 应为 `total: passed + failed`。
@@ -75,7 +75,7 @@ node .\dist\cli.js run $goal --workspace .\fixtures\demo --safety-mode balanced 
 
 ## 6. CLI 应展示与不得展示
 
-应能区分：模型文本（`ECHO`）、工具请求（`TOOL`）、审批（`APPROVAL`）、结果（`OK`/`FAIL`）、错误、`STEP`、文件变更、测试摘要。应展示相对路径、结构化结果、diff、退出码和 `stopReason`。
+应能区分：模型文本（`ECHO`）、工具请求（`TOOL`）、审批（`APPROVAL`）、结果（`RESULT` 中的 `OK`/`FAIL`）、错误、独立 `Step` 标题、文件变更、测试摘要。应展示相对路径、结构化结果、diff、退出码和 `Run completed` / `REASON`。
 
 不得展示：推理原文、绝对用户路径、账号或 API Key。非 TTY 或 `--no-color` 时不得含 ANSI。进度在 stderr，最终答复在 stdout。
 

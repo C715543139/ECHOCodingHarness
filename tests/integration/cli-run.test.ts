@@ -82,8 +82,8 @@ describe('CLI run integration', () => {
     expect(outcome.exitCode).toBe(0);
     expect(outcome.result).toMatchObject({ status: 'completed', finalText: 'task complete' });
     expect(captured.stdout()).toBe('task complete\n');
-    expect(captured.stderr()).toContain('ECHO   do the task');
-    expect(captured.stderr()).toContain('DONE   completed');
+    expect(captured.stderr()).toContain('ECHO       | do the task');
+    expect(captured.stderr()).toContain('Run completed');
     const files = await fs.readdir(path.join(root, '.echo', 'sessions'));
     expect(files).toHaveLength(1);
     const log = await fs.readFile(path.join(root, '.echo', 'sessions', files[0] as string), 'utf8');

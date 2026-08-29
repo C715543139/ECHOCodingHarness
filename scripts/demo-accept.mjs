@@ -8,7 +8,35 @@ const demoRoot = path.join(repoRoot, 'fixtures', 'demo');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 const runs = 3;
 const timeoutMs = 180_000;
-const TURN_STATUS = /^(DONE|FAIL|LIMIT|CANCELLED)\s+(\S+)/gmu;
+const TURN_TITLE = /^-- Run (completed|failed|cancelled|limited)/gmu;
+const REASON = /^REASON\s+[|│]\s+(\S+)/gmu;
+
+export function analyzeDemoOutput(stdout, stderr, secret) {
+  const combined = `${stdout}\n${stderr}`;
+  const leak = secret.length > 0 && combined.includes(secret);
+  const userPath = /[A-Za-z]:\\Users\\/u.test(combined) || /\/Users\/[^/\s]+/u.test(combined);
+  const reasoning = /\b(?:reasoning|analysis)\s*[:=]\s*\S/iu.test(combined);
+  const failedTest = /FAIL\s*[|·].*exit\s+[1-9]/u.test(stderr) || /\d+ tests? failed/u.test(stderr);
+  const applyPatch = /TOOL\s+[|│]\s+apply_patch/u.test(stderr);
+  const passingRetest = /OK\s*[|·].*exit\s+0/u.test(stderr);
+  const done = /Run completed/u.test(stderr);
+  const step = /Step\s+\d+/u.test(stderr);
+  const reason = [...stderr.matchAll(REASON)].at(-1)?.[1];
+  const title = [...stderr.matchAll(TURN_TITLE)].at(-1)?.[1];
+  return {
+    leak,
+    userPath,
+    reasoning,
+    failedTest,
+    applyPatch,
+    passingRetest,
+    done,
+    step,
+    stopReason: reason ?? (title === 'completed' ? 'completed' : (title ?? 'unknown')),
+    story:
+      step && failedTest && applyPatch && passingRetest && done && !leak && !userPath && !reasoning,
+  };
+}
 
 function present(name) {
   return Boolean(process.env[name]?.trim());
@@ -61,32 +89,6 @@ async function resetFixture() {
       else reject(new Error(`demo reset failed with exit ${String(code)}`));
     });
   });
-}
-
-export function analyzeDemoOutput(stdout, stderr, secret) {
-  const combined = `${stdout}\n${stderr}`;
-  const leak = secret.length > 0 && combined.includes(secret);
-  const userPath = /[A-Za-z]:\\Users\\/u.test(combined) || /\/Users\/[^/\s]+/u.test(combined);
-  const reasoning = /\b(?:reasoning|analysis)\s*[:=]\s*\S/iu.test(combined);
-  const failedTest = /FAIL\s+exit\s+[1-9]/u.test(stderr) || /\d+ tests? failed/u.test(stderr);
-  const applyPatch = /TOOL\s+apply_patch/u.test(stderr);
-  const passingRetest = /OK\s+exit\s+0/u.test(stderr);
-  const done = /^DONE\s+completed/mu.test(stderr);
-  const step = /STEP\s+\d+/u.test(stderr);
-  const stop = [...stderr.matchAll(TURN_STATUS)].at(-1);
-  return {
-    leak,
-    userPath,
-    reasoning,
-    failedTest,
-    applyPatch,
-    passingRetest,
-    done,
-    step,
-    stopReason: stop?.[2] ?? 'unknown',
-    story:
-      step && failedTest && applyPatch && passingRetest && done && !leak && !userPath && !reasoning,
-  };
 }
 
 function runOnce(goal) {

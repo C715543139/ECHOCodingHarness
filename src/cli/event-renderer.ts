@@ -8,25 +8,31 @@ import type {
 } from '../contracts/index.js';
 import { redactText, type RedactionOptions } from '../session/index.js';
 
-const COLORS = {
-  blue: '\u001B[34m',
-  cyan: '\u001B[36m',
-  green: '\u001B[32m',
-  red: '\u001B[31m',
-  yellow: '\u001B[33m',
-  reset: '\u001B[0m',
-} as const;
+import {
+  colorStatus,
+  formatLabeled,
+  formatLabeledBlock,
+  formatRuleTitle,
+  layoutOptions,
+  stderrLines,
+  stderrOpenLine,
+  valueJoin,
+  type LabelColor,
+  type LayoutOptions,
+} from './render-layout.js';
+
+export type RenderSurface = 'run' | 'chat';
 
 const MAX_DIFF_LINES = 16;
 const MAX_DIFF_CHARS = 1_200;
 
-type LabelColor = Exclude<keyof typeof COLORS, 'reset'>;
 type ToolMetadata = Readonly<Record<string, string | number | boolean | null>>;
 
 interface RequestedTool {
-  readonly name: string;
   readonly summary: string;
 }
+
+export const APPROVAL_CHOICES = 'Approve [y] once / [s] session / [n] deny';
 
 function compact(value: string, maximum = 240): string {
   const oneLine = [...value.replace(/\s+/gu, ' ')]
@@ -37,42 +43,6 @@ function compact(value: string, maximum = 240): string {
     .join('')
     .trim();
   return oneLine.length <= maximum ? oneLine : `${oneLine.slice(0, maximum - 3)}...`;
-}
-
-function label(name: string, color: LabelColor, capabilities: RenderCapabilities): string {
-  const padded = name.padEnd(7, ' ');
-  return capabilities.color ? `${COLORS[color]}${padded}${COLORS.reset}` : padded;
-}
-
-function line(
-  name: string,
-  color: LabelColor,
-  message: string,
-  capabilities: RenderCapabilities,
-): RenderChunk {
-  return { channel: 'stderr', text: `${label(name, color, capabilities)}${message}\n` };
-}
-
-function detail(text: string): RenderChunk {
-  return { channel: 'stderr', text: `  ${text}\n` };
-}
-
-function inputSummary(name: string, input: unknown): string {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return '';
-  const record = input as Readonly<Record<string, unknown>>;
-  if (name === 'run_command' && typeof record['command'] === 'string') {
-    return compact(record['command']);
-  }
-  if (typeof record['path'] === 'string') {
-    if (name === 'search_text' && typeof record['query'] === 'string') {
-      return `${JSON.stringify(compact(record['query'], 80))} in ${record['path'] || '.'}`;
-    }
-    return compact(record['path'] || '.');
-  }
-  if (name === 'search_text' && typeof record['query'] === 'string') {
-    return JSON.stringify(compact(record['query'], 120));
-  }
-  return '';
 }
 
 function plural(value: number, singular: string, pluralForm = `${singular}s`): string {
@@ -94,10 +64,10 @@ function metaBoolean(metadata: ToolMetadata | undefined, key: string): boolean {
 }
 
 export function formatDuration(durationMs: number): string {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return '0ms';
-  if (durationMs < 1_000) return `${String(Math.round(durationMs))}ms`;
+  if (!Number.isFinite(durationMs) || durationMs < 0) return '0 ms';
+  if (durationMs < 1_000) return `${String(Math.round(durationMs))} ms`;
   const seconds = durationMs / 1_000;
-  return `${seconds.toFixed(seconds >= 10 ? 0 : 1)}s`;
+  return `${seconds.toFixed(seconds >= 10 ? 0 : 1)} s`;
 }
 
 export function extractTestEvidence(stdout: string, stderr: string): string | undefined {
@@ -161,11 +131,39 @@ function commandExitFailed(result: ToolResultMessage<'completed'>): boolean {
   return exitCode !== undefined && exitCode !== 0;
 }
 
+function toolField(name: string, input: unknown): { field: string; summary: string } | undefined {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+  const record = input as Readonly<Record<string, unknown>>;
+  if (name === 'run_command' && typeof record['command'] === 'string') {
+    return { field: 'COMMAND', summary: compact(record['command']) };
+  }
+  if (name === 'search_text') {
+    const query = typeof record['query'] === 'string' ? compact(record['query'], 80) : undefined;
+    const searchPath = typeof record['path'] === 'string' ? record['path'] || '.' : undefined;
+    if (query !== undefined && searchPath !== undefined) {
+      return { field: 'QUERY', summary: `${JSON.stringify(query)} in ${searchPath}` };
+    }
+    if (query !== undefined)
+      return { field: 'QUERY', summary: JSON.stringify(compact(query, 120)) };
+  }
+  if (typeof record['path'] === 'string') {
+    const field = name === 'apply_patch' ? 'TARGET' : 'PATH';
+    return { field, summary: compact(record['path'] || '.') };
+  }
+  return undefined;
+}
+
+function nestedField(name: string, value: string): string {
+  return `${name.padEnd(7, ' ')}${value}`;
+}
+
 export class DefaultEventRenderer implements EventRenderer {
   private readonly redaction: RedactionOptions;
+  private readonly surface: RenderSurface;
   private readonly requestedTools = new Map<string, RequestedTool>();
   private readonly changedFiles = new Set<string>();
-  private lastVerification: { command: string; exitCode: number } | undefined;
+  private lastVerification: { command: string; exitCode: number; durationMs?: number } | undefined;
+  private lastDenialDetail: string | undefined;
   private textBuffer = '';
   private stepToolCalls = 0;
   private flushedProgress = false;
@@ -174,8 +172,9 @@ export class DefaultEventRenderer implements EventRenderer {
   private hadDenial = false;
   private hadLimit = false;
 
-  constructor(redaction: RedactionOptions = {}) {
+  constructor(redaction: RedactionOptions = {}, surface: RenderSurface = 'run') {
     this.redaction = redaction;
+    this.surface = surface;
   }
 
   private sanitize(text: string): string {
@@ -188,6 +187,28 @@ export class DefaultEventRenderer implements EventRenderer {
     this.flushedProgress = false;
   }
 
+  private emit(
+    label: string,
+    body: string,
+    capabilities: RenderCapabilities,
+    color?: LabelColor,
+  ): readonly RenderChunk[] {
+    return stderrLines(formatLabeled(label, body, layoutOptions(capabilities), color));
+  }
+
+  private emitBlock(
+    label: string,
+    lines: readonly string[],
+    capabilities: RenderCapabilities,
+    color?: LabelColor,
+  ): readonly RenderChunk[] {
+    return stderrLines(formatLabeledBlock(label, lines, layoutOptions(capabilities), color));
+  }
+
+  private join(capabilities: RenderCapabilities, parts: readonly string[]): string {
+    return parts.filter((part) => part.length > 0).join(valueJoin(capabilities.unicode));
+  }
+
   private flushProgress(capabilities: RenderCapabilities): readonly RenderChunk[] {
     if (this.flushedProgress) return [];
     const text = compact(this.sanitize(this.textBuffer));
@@ -195,53 +216,63 @@ export class DefaultEventRenderer implements EventRenderer {
     this.flushedProgress = true;
     if (isUnhelpfulProgress(text) || text === this.lastProgressText) return [];
     this.lastProgressText = text;
-    return [line('ECHO', 'cyan', text, capabilities)];
+    return this.emit('ECHO', text, capabilities, 'cyan');
   }
 
   renderEvent(event: EchoEvent, capabilities: RenderCapabilities): readonly RenderChunk[] {
     switch (event.type) {
       case 'session.started':
         return capabilities.verbose
-          ? [
-              line(
-                'ECHO',
-                'cyan',
-                `session ${event.sessionId.slice(0, 12)} · safety ${event.payload.safetyMode}`,
-                capabilities,
-              ),
-            ]
+          ? this.emit(
+              'SESSION',
+              this.join(capabilities, [
+                event.sessionId.slice(0, 12),
+                `safety ${event.payload.safetyMode}`,
+              ]),
+              capabilities,
+              'cyan',
+            )
           : [];
       case 'session.resumed':
       case 'model.changed':
       case 'safety.changed':
-        // P1 events are frozen on EchoEvent; P1-3 owns visible rendering.
         return [];
       case 'turn.started':
-        return [line('ECHO', 'cyan', compact(this.sanitize(event.payload.goal)), capabilities)];
-      case 'step.started':
+        return this.emit('ECHO', compact(this.sanitize(event.payload.goal)), capabilities, 'cyan');
+      case 'step.started': {
         this.resetStep();
-        return [line('STEP', 'blue', String(event.payload.step), capabilities)];
+        const options = layoutOptions(capabilities);
+        return [
+          { channel: 'stderr', text: '\n' },
+          ...stderrLines([
+            formatRuleTitle(`Step ${String(event.payload.step)}`, options, 'blueBold'),
+          ]),
+        ];
+      }
       case 'context.projected':
         return capabilities.verbose
-          ? [
-              line(
-                'CONTEXT',
-                'blue',
-                `${String(event.payload.approximateTokens)} approx tokens · ${String(event.payload.omittedEventCount)} omitted events · ${String(event.payload.truncationCount)} truncations`,
-                capabilities,
-              ),
-            ]
+          ? this.emit(
+              'CONTEXT',
+              this.join(capabilities, [
+                `${String(event.payload.approximateTokens)} approx tokens`,
+                `${String(event.payload.omittedEventCount)} omitted events`,
+                `${String(event.payload.truncationCount)} truncations`,
+              ]),
+              capabilities,
+              'blue',
+            )
           : [];
       case 'model.started':
         return capabilities.verbose
-          ? [
-              line(
-                'MODEL',
-                'blue',
-                `${compact(event.payload.provider)} · ${compact(event.payload.model)}`,
-                capabilities,
-              ),
-            ]
+          ? this.emit(
+              'MODEL',
+              this.join(capabilities, [
+                compact(event.payload.provider),
+                compact(event.payload.model),
+              ]),
+              capabilities,
+              'blue',
+            )
           : [];
       case 'model.text_delta':
         this.textBuffer += event.payload.delta;
@@ -249,7 +280,12 @@ export class DefaultEventRenderer implements EventRenderer {
       case 'model.tool_call':
         this.stepToolCalls += 1;
         return capabilities.verbose
-          ? [line('MODEL', 'blue', `requested ${compact(event.payload.call.name)}`, capabilities)]
+          ? this.emit(
+              'MODEL',
+              `requested ${compact(event.payload.call.name)}`,
+              capabilities,
+              'blue',
+            )
           : [];
       case 'model.completed': {
         const chunks: RenderChunk[] = [];
@@ -264,63 +300,48 @@ export class DefaultEventRenderer implements EventRenderer {
             : `${String(event.payload.outputTokens)} output`,
         ].filter((item): item is string => item !== undefined);
         chunks.push(
-          line(
+          ...this.emit(
             'MODEL',
-            'blue',
-            `${event.payload.finishReason}${usage.length === 0 ? '' : ` · ${usage.join(' · ')}`}`,
+            this.join(capabilities, [event.payload.finishReason, ...usage]),
             capabilities,
+            'blue',
           ),
         );
         return chunks;
       }
       case 'model.failed':
-        return [
-          line(
-            event.payload.error.retryable ? 'WARN' : 'FAIL',
-            event.payload.error.retryable ? 'yellow' : 'red',
-            `${event.payload.error.category} · ${compact(this.sanitize(event.payload.error.message))}`,
-            capabilities,
-          ),
-        ];
+        return this.emit(
+          event.payload.error.retryable ? 'WARN' : 'FAIL',
+          this.join(capabilities, [
+            event.payload.error.category,
+            compact(this.sanitize(event.payload.error.message)),
+          ]),
+          capabilities,
+          event.payload.error.retryable ? 'yellow' : 'red',
+        );
       case 'tool.requested': {
         const chunks: RenderChunk[] = [...this.flushProgress(capabilities)];
-        const summary = inputSummary(event.payload.call.name, event.payload.normalizedInput);
+        const field = toolField(event.payload.call.name, event.payload.normalizedInput);
         this.requestedTools.set(event.payload.call.id, {
-          name: event.payload.call.name,
-          summary,
+          summary: field?.summary ?? '',
         });
-        chunks.push(
-          line(
-            'TOOL',
-            'cyan',
-            `${compact(event.payload.call.name)}${summary.length === 0 ? '' : `   ${this.sanitize(summary)}`}`,
-            capabilities,
-          ),
-        );
+        chunks.push(...this.emit('TOOL', compact(event.payload.call.name), capabilities, 'cyan'));
+        if (field !== undefined && field.summary.length > 0) {
+          chunks.push(...this.emit(field.field, this.sanitize(field.summary), capabilities));
+        }
         return chunks;
       }
-      case 'approval.requested': {
-        const requested = this.requestedTools.get(event.payload.toolCallId);
-        const toolName = requested?.name ?? 'operation';
-        const target =
-          requested === undefined || requested.summary.length === 0 ? undefined : requested.summary;
-        const targetLabel = toolName === 'run_command' ? 'Command' : 'Target';
-        const lines = [
-          `${compact(this.sanitize(toolName))} requires confirmation`,
-          ...(target === undefined ? [] : [`  ${targetLabel}: ${compact(this.sanitize(target))}`]),
-          `  Risk: ${compact(this.sanitize(event.payload.reason))}`,
-          '  Scope: this operation / equivalent operations in this session',
-        ];
-        return [line('APPROVAL', 'yellow', lines.join('\n'), capabilities)];
-      }
+      case 'approval.requested':
+        return this.renderApproval(event.payload.reason, capabilities);
       case 'approval.granted':
-        return [line('APPROVAL', 'green', `granted for ${event.payload.scope}`, capabilities)];
+        return this.emit('APPROVED', event.payload.scope, capabilities, 'green');
       case 'approval.denied':
         this.hadDenial = true;
-        return [line('DENIED', 'red', compact(this.sanitize(event.payload.reason)), capabilities)];
+        this.lastDenialDetail = compact(this.sanitize(event.payload.reason));
+        return this.emit('DENIED', this.lastDenialDetail, capabilities, 'red');
       case 'tool.authorized':
         return capabilities.verbose
-          ? [line('TOOL', 'cyan', `authorized by ${event.payload.source}`, capabilities)]
+          ? this.emit('TOOL', `authorized by ${event.payload.source}`, capabilities, 'cyan')
           : [];
       case 'tool.started':
         return [];
@@ -328,44 +349,43 @@ export class DefaultEventRenderer implements EventRenderer {
         return this.renderCompleted(event.payload.result, event.payload.durationMs, capabilities);
       case 'tool.failed': {
         const category = metaString(event.payload.result.metadata, 'category');
-        return [
-          line(
-            'FAIL',
-            'red',
-            `${category === undefined ? '' : `${category} · `}${compact(this.sanitize(event.payload.result.summary))}`,
-            capabilities,
-          ),
-        ];
+        return this.emit(
+          'RESULT',
+          this.join(capabilities, [
+            colorStatus('FAIL', capabilities.color),
+            ...(category === undefined ? [] : [category]),
+            compact(this.sanitize(event.payload.result.summary)),
+          ]),
+          capabilities,
+          'red',
+        );
       }
-      case 'tool.denied':
+      case 'tool.denied': {
         this.hadDenial = true;
-        return [
-          line(
-            'DENIED',
-            'red',
-            `${event.payload.hard ? 'hard deny · ' : ''}${compact(this.sanitize(event.payload.result.summary))}`,
-            capabilities,
-          ),
-        ];
+        const summary = compact(this.sanitize(event.payload.result.summary));
+        this.lastDenialDetail = summary;
+        const headline = event.payload.hard ? 'Hard policy' : summary;
+        const extra = event.payload.hard && summary.length > 0 ? [summary] : [];
+        return this.emitBlock('DENIED', [headline, ...extra], capabilities, 'red');
+      }
       case 'tool.cancelled':
-        return [
-          line(
-            'CANCELLED',
-            'yellow',
-            `${event.payload.phase} · ${compact(this.sanitize(event.payload.result.summary))}`,
-            capabilities,
-          ),
-        ];
+        return this.emit(
+          'CANCELLED',
+          this.join(capabilities, [
+            event.payload.phase,
+            compact(this.sanitize(event.payload.result.summary)),
+          ]),
+          capabilities,
+          'yellow',
+        );
       case 'limit.reached':
         this.hadLimit = true;
-        return [
-          line(
-            'LIMIT',
-            'yellow',
-            `${event.payload.kind} · limit ${String(event.payload.limit)}`,
-            capabilities,
-          ),
-        ];
+        return this.emit(
+          'LIMIT',
+          this.join(capabilities, [event.payload.kind, `limit ${String(event.payload.limit)}`]),
+          capabilities,
+          'yellow',
+        );
       case 'turn.completed':
       case 'turn.failed':
       case 'turn.cancelled':
@@ -375,41 +395,168 @@ export class DefaultEventRenderer implements EventRenderer {
 
   renderResult(result: AgentResult, capabilities: RenderCapabilities): readonly RenderChunk[] {
     const chunks: RenderChunk[] = [];
+    const options = layoutOptions(capabilities);
     if (result.status === 'completed' && result.finalText !== undefined) {
       const finalText = this.sanitize(result.finalText);
-      chunks.push({
-        channel: 'stdout',
-        text: finalText.endsWith('\n') ? finalText : `${finalText}\n`,
-      });
+      if (this.surface === 'chat') {
+        chunks.push(
+          { channel: 'stderr', text: '\n' },
+          ...this.emit('ECHO', finalText.trimEnd(), capabilities, 'cyan'),
+        );
+      } else {
+        chunks.push({
+          channel: 'stdout',
+          text: finalText.endsWith('\n') ? finalText : `${finalText}\n`,
+        });
+      }
     }
 
-    const statusLabel =
-      result.status === 'completed'
-        ? ('DONE' as const)
-        : result.status === 'cancelled'
-          ? ('CANCELLED' as const)
-          : result.status === 'limited'
-            ? ('LIMIT' as const)
-            : ('FAIL' as const);
-    const statusColor: LabelColor =
-      statusLabel === 'DONE' ? 'green' : statusLabel === 'FAIL' ? 'red' : 'yellow';
-    const changes =
-      this.changedFiles.size === 0
-        ? 'no file changes'
-        : plural(this.changedFiles.size, 'file changed', 'files changed');
-    let summary = `${label(statusLabel, statusColor, capabilities)}${result.stopReason}\n  ${plural(result.steps, 'step')} · ${plural(result.toolCalls, 'tool call')} · ${changes}\n`;
-    if (this.lastVerification !== undefined) {
-      summary += `  Verification: ${this.sanitize(this.lastVerification.command)} · exit ${String(this.lastVerification.exitCode)}\n`;
-    }
-    if (this.hadDenial) summary += '  one or more operations were denied\n';
-    if (this.hadLimit) summary += '  a step, repetition, or budget limit was reached\n';
-    if (this.hadTruncation) summary += '  one or more outputs were truncated\n';
-    if (result.error !== undefined) {
-      summary += `  ${result.error.category}: ${compact(this.sanitize(result.error.message))}\n`;
-      if (capabilities.verbose) summary += `  code: ${compact(result.error.code)}\n`;
-    }
-    chunks.push({ channel: 'stderr', text: summary });
+    chunks.push({ channel: 'stderr', text: '\n' });
+    chunks.push(
+      ...stderrLines([
+        formatRuleTitle(this.resultTitle(result), options, this.resultColor(result)),
+      ]),
+    );
+    chunks.push(...this.resultRows(result, capabilities, options));
     return chunks;
+  }
+
+  private resultTitle(result: AgentResult): string {
+    const kind = this.surface === 'chat' ? 'Turn' : 'Run';
+    if (result.status === 'completed') return `${kind} completed`;
+    if (result.status === 'cancelled') return `${kind} cancelled`;
+    if (result.status === 'limited') return `${kind} limited`;
+    return `${kind} failed`;
+  }
+
+  private resultColor(result: AgentResult): LabelColor {
+    if (result.status === 'completed') return 'green';
+    if (result.status === 'failed') return 'red';
+    return 'yellow';
+  }
+
+  private resultRows(
+    result: AgentResult,
+    capabilities: RenderCapabilities,
+    options: LayoutOptions,
+  ): readonly RenderChunk[] {
+    const rows: string[] = [];
+    if (result.status !== 'completed') {
+      rows.push(...formatLabeled('REASON', result.stopReason, options, 'red'));
+    }
+    rows.push(...formatLabeled('STEPS', String(result.steps), options));
+    rows.push(...formatLabeled('TOOLS', String(result.toolCalls), options));
+    rows.push(
+      ...formatLabeled(
+        'CHANGES',
+        this.changedFiles.size === 0 ? 'none' : plural(this.changedFiles.size, 'file', 'files'),
+        options,
+      ),
+    );
+    rows.push(...this.verificationRows(result, capabilities, options));
+    if (this.hadDenial) {
+      rows.push(
+        ...formatLabeledBlock(
+          'DETAIL',
+          [
+            'One or more operations were denied.',
+            ...(this.lastDenialDetail === undefined ? [] : [this.lastDenialDetail]),
+          ],
+          options,
+        ),
+      );
+    }
+    if (this.hadLimit) {
+      rows.push(
+        ...formatLabeled('DETAIL', 'A step, repetition, or budget limit was reached.', options),
+      );
+    }
+    if (this.hadTruncation) {
+      rows.push(...formatLabeled('DETAIL', 'One or more outputs were truncated.', options));
+    }
+    if (result.error !== undefined) {
+      rows.push(
+        ...formatLabeled(
+          'DETAIL',
+          `${result.error.category}${valueJoin(options.unicode)}${compact(this.sanitize(result.error.message))}`,
+          options,
+        ),
+      );
+      if (capabilities.verbose) {
+        rows.push(
+          ...formatLabeled(
+            'DETAIL',
+            `code${valueJoin(options.unicode)}${compact(result.error.code)}`,
+            options,
+          ),
+        );
+      }
+    }
+    return stderrLines(rows);
+  }
+
+  private verificationRows(
+    result: AgentResult,
+    capabilities: RenderCapabilities,
+    options: LayoutOptions,
+  ): readonly string[] {
+    const verified =
+      result.status === 'completed' &&
+      this.lastVerification !== undefined &&
+      this.lastVerification.exitCode === 0;
+    if (verified && this.lastVerification !== undefined) {
+      return formatLabeled(
+        'VERIFIED',
+        this.verificationText(this.lastVerification, capabilities),
+        options,
+        'green',
+      );
+    }
+    if (this.lastVerification !== undefined) {
+      return formatLabeled(
+        'LAST CHECK',
+        this.verificationText(this.lastVerification, capabilities),
+        options,
+      );
+    }
+    return formatLabeled('NOT VERIFIED', '', options, 'yellow');
+  }
+
+  private verificationText(
+    verification: { command: string; exitCode: number; durationMs?: number },
+    capabilities: RenderCapabilities,
+  ): string {
+    const parts = [
+      this.sanitize(verification.command),
+      `exit ${String(verification.exitCode)}`,
+      ...(verification.durationMs === undefined ? [] : [formatDuration(verification.durationMs)]),
+    ];
+    return this.join(capabilities, parts);
+  }
+
+  private renderApproval(reason: string, capabilities: RenderCapabilities): readonly RenderChunk[] {
+    const options = layoutOptions(capabilities);
+    const marker = capabilities.unicode ? '›' : '>';
+    const risk = nestedField('Risk', compact(this.sanitize(reason)));
+    const scope = nestedField('Scope', 'once or equivalent operations in this session');
+    const prompt = `${APPROVAL_CHOICES} ${marker} `;
+    const lines = capabilities.interactive
+      ? formatLabeledBlock(
+          'APPROVAL',
+          ['Required', risk, scope, prompt.trimEnd()],
+          options,
+          'yellow',
+        )
+      : formatLabeledBlock(
+          'APPROVAL',
+          ['Required', risk, scope, APPROVAL_CHOICES],
+          options,
+          'yellow',
+        );
+    if (!capabilities.interactive) return stderrLines(lines);
+    const closed = lines.slice(0, -1);
+    const last = lines.at(-1) ?? prompt;
+    return [...stderrLines(closed), stderrOpenLine(`${last} `)];
   }
 
   private renderCompleted(
@@ -426,8 +573,9 @@ export class DefaultEventRenderer implements EventRenderer {
       this.changedFiles.add(pathValue);
     }
     const exitCode = metaNumber(result.metadata, 'exitCode');
+    const elapsed = metaNumber(result.metadata, 'durationMs') ?? durationMs;
     if (result.toolName === 'run_command' && exitCode !== undefined && requested !== undefined) {
-      this.lastVerification = { command: requested.summary, exitCode };
+      this.lastVerification = { command: requested.summary, exitCode, durationMs: elapsed };
     }
     if (result.truncated === true) this.hadTruncation = true;
 
@@ -442,8 +590,11 @@ export class DefaultEventRenderer implements EventRenderer {
       const message =
         totalLines === undefined
           ? compact(this.sanitize(result.summary))
-          : `${plural(totalLines, 'line')} read`;
-      return this.okChunks(message, result.truncated === true, capabilities);
+          : this.join(capabilities, [
+              colorStatus('OK', capabilities.color),
+              `${plural(totalLines, 'line')} read`,
+            ]);
+      return this.resultChunks(message, result.truncated === true, capabilities);
     }
     if (result.toolName === 'search_text') {
       const matches = metaNumber(result.metadata, 'totalMatches') ?? 0;
@@ -452,30 +603,32 @@ export class DefaultEventRenderer implements EventRenderer {
         omitted > 0
           ? `${plural(matches, 'match', 'matches')} (${String(omitted)} omitted)`
           : plural(matches, 'match', 'matches');
-      return this.okChunks(message, result.truncated === true || omitted > 0, capabilities);
+      return this.resultChunks(message, result.truncated === true || omitted > 0, capabilities);
     }
     if (result.toolName === 'list_files') {
       const entries = metaNumber(result.metadata, 'totalEntries') ?? 0;
-      return this.okChunks(
+      return this.resultChunks(
         plural(entries, 'entry', 'entries'),
         result.truncated === true,
         capabilities,
       );
     }
-    return this.okChunks(
+    return this.resultChunks(
       compact(this.sanitize(result.summary)),
       result.truncated === true,
       capabilities,
     );
   }
 
-  private okChunks(
+  private resultChunks(
     message: string,
     truncated: boolean,
     capabilities: RenderCapabilities,
   ): readonly RenderChunk[] {
-    const chunks: RenderChunk[] = [line('OK', 'green', message, capabilities)];
-    if (truncated) chunks.push(line('WARN', 'yellow', 'tool output was truncated', capabilities));
+    const chunks: RenderChunk[] = [...this.emit('RESULT', message, capabilities, 'green')];
+    if (truncated) {
+      chunks.push(...this.emit('WARN', 'tool output was truncated', capabilities, 'yellow'));
+    }
     return chunks;
   }
 
@@ -494,29 +647,36 @@ export class DefaultEventRenderer implements EventRenderer {
       metaBoolean(result.metadata, 'stdoutTruncated') ||
       metaBoolean(result.metadata, 'stderrTruncated');
     if (truncated) this.hadTruncation = true;
-    const status = failed ? ('FAIL' as const) : ('OK' as const);
-    const color: LabelColor = failed ? 'red' : 'green';
-    const headline =
-      exitCode === undefined
-        ? compact(this.sanitize(result.summary))
-        : `exit ${String(exitCode)} · ${formatDuration(elapsed)}`;
-    const chunks: RenderChunk[] = [line(status, color, headline, capabilities)];
+    const status = failed ? 'FAIL' : 'OK';
+    const headline = this.join(capabilities, [
+      colorStatus(status, capabilities.color),
+      ...(exitCode === undefined
+        ? [compact(this.sanitize(result.summary))]
+        : [`exit ${String(exitCode)}`]),
+      formatDuration(elapsed),
+    ]);
+    const extra: string[] = [];
     const evidence = extractTestEvidence(stdout, stderr);
-    if (evidence !== undefined) chunks.push(detail(this.sanitize(evidence)));
+    if (evidence !== undefined) extra.push(this.sanitize(evidence));
     else if (failed) {
       const stderrLine = compact(this.sanitize(stderr), 160);
-      if (stderrLine.length > 0) chunks.push(detail(`stderr: ${stderrLine}`));
+      if (stderrLine.length > 0) extra.push(`stderr: ${stderrLine}`);
     }
+    const chunks: RenderChunk[] = [
+      ...this.emitBlock('RESULT', [headline, ...extra], capabilities, failed ? 'red' : 'green'),
+    ];
     if (truncated) {
       const original =
         (metaNumber(result.metadata, 'stdoutOriginalChars') ?? 0) +
         (metaNumber(result.metadata, 'stderrOriginalChars') ?? 0);
       chunks.push(
-        line(
+        ...this.emit(
           'WARN',
-          'yellow',
-          `output truncated: yes${original > 0 ? ` · original ${String(original)} chars` : ''}`,
+          original > 0
+            ? `output truncated: yes${valueJoin(capabilities.unicode)}original ${String(original)} chars`
+            : 'output truncated: yes',
           capabilities,
+          'yellow',
         ),
       );
     }
@@ -527,30 +687,35 @@ export class DefaultEventRenderer implements EventRenderer {
     result: ToolResultMessage<'completed'>,
     capabilities: RenderCapabilities,
   ): readonly RenderChunk[] {
-    const relativePath = this.sanitize(metaString(result.metadata, 'path') ?? result.summary);
     const additions = metaNumber(result.metadata, 'additions') ?? 0;
     const deletions = metaNumber(result.metadata, 'deletions') ?? 0;
-    const chunks: RenderChunk[] = [
-      line(
-        'OK',
-        'green',
-        `${compact(relativePath)} · +${String(additions)} -${String(deletions)}`,
-        capabilities,
-      ),
-    ];
+    const headline = this.join(capabilities, [
+      colorStatus('OK', capabilities.color),
+      '1 file changed',
+      `+${String(additions)} -${String(deletions)}`,
+    ]);
+    const extra: string[] = [];
     const diff = metaString(result.metadata, 'diff');
     if (diff !== undefined && diff.length > 0) {
-      for (const diffLine of displayDiff(
-        this.sanitize(diff),
-        metaNumber(result.metadata, 'omittedDiffChars'),
-      )) {
-        chunks.push(detail(diffLine));
-      }
+      extra.push(
+        ...displayDiff(this.sanitize(diff), metaNumber(result.metadata, 'omittedDiffChars')),
+      );
     }
+    const chunks: RenderChunk[] = [
+      ...this.emitBlock('RESULT', [headline, ...extra], capabilities, 'green'),
+    ];
     if (result.truncated === true || (metaNumber(result.metadata, 'omittedDiffChars') ?? 0) > 0) {
       this.hadTruncation = true;
-      chunks.push(line('WARN', 'yellow', 'diff truncated', capabilities));
+      chunks.push(...this.emit('WARN', 'diff truncated', capabilities, 'yellow'));
     }
     return chunks;
   }
+}
+
+export function formatDiagnostic(
+  label: 'FAIL' | 'WARN',
+  message: string,
+  capabilities: RenderCapabilities,
+): string {
+  return `${formatLabeled(label, message, layoutOptions(capabilities), label === 'FAIL' ? 'red' : 'yellow').join('\n')}\n`;
 }

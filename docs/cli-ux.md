@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-28
+> 最后更新：2026-08-29
 
 ## 1. 文档目的
 
@@ -14,9 +14,11 @@
 
 ## 2. 范围与非目标
 
-### 2.1 P0 范围
+### 2.1 当前范围
 
 - `echo-harness run <goal>` 的帮助、运行进度、审批、错误和最终摘要；
+- P1-3 分组式时间线：独立 Step 标题、工具/审批/结果分组、宽度感知换行与 ASCII 降级；
+- Chat 表现层：启动摘要、状态条、`YOU` 提示符、`ECHO` 回复节奏与 `/status`（由 P1-1B 接入命令）；
 - 显式 `--verbose` 诊断模式；
 - `EchoEvent` 到终端文本的确定性映射；
 - TTY、非 TTY、CI 和 `NO_COLOR` 环境的兼容行为；
@@ -27,12 +29,12 @@
 
 - 不设计 React/Web 页面；
 - 不承诺 `chat` 或机器可读输出模式进入 P0；
-- 不展示模型内部推理或隐藏思维过程；
+- 不实现 Spinner、原地刷新、折叠式 TUI 或底部状态栏；
 - 不展示模型内部推理或隐藏思维过程；
 - 不用动画、图标数量或主题复杂度衡量产品质量；
 - 不让 CLI 文案参与 Agent 状态判断。
 
-P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准；P1-3 之前本文仍描述当前 `run` 渲染器。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。
+P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。本文描述 P1-3 落地后的当前 `run`/`chat` 渲染器；stdout/stderr、退出码与追加式输出仍保持 P0 契约。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。
 
 ## 3. 设计原则
 
@@ -120,73 +122,78 @@ Renderer 在启动时确定能力，不在每个事件中重复探测：
 | CI | 关闭 | 关闭 | 使用 ASCII 优先文本 |
 | 设置 `NO_COLOR` | 强制关闭 | 不受影响 | 不受影响 |
 
-Windows Terminal 和传统控制台都必须能读懂输出。P0 使用英文 ASCII 状态标签，不依赖 emoji 或特殊字体。
+Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用英文；Unicode 分隔符只在 TTY 且能力允许时启用，非 TTY 使用结构相同的 ASCII 版本。不依赖 emoji 或特殊字体。
 
-`RenderCapabilities.verbose` 只由用户显式传入 `--verbose` 时启用，默认值为 `false`；TTY、CI 或环境探测不得自动打开它。详细模式可以增加 Session 短 ID、模型请求完成、用量、上下文预算、裁剪和错误 code 等脱敏诊断，但不得输出推理字段、原始请求、密钥、完整异常对象，也不得覆盖 `NO_COLOR`、输出上限或其他安全规则。
+`RenderCapabilities.verbose` 只由用户显式传入 `--verbose` 时启用，默认值为 `false`；TTY、CI 或环境探测不得自动打开它。详细模式可以增加 Session 短 ID、模型请求完成、用量、上下文预算、裁剪和错误 code 等脱敏诊断，但不得输出推理字段、原始请求、密钥、完整异常对象，也不得覆盖 `NO_COLOR`、输出上限或其他安全规则。可选的 `columns` 只影响换行与窄终端堆叠，不改变事件顺序或 stdout/stderr 通道。
 
 ## 7. 视觉语言
 
 ### 7.1 稳定标签
 
+普通事件使用 10 字符标签列，标签后始终输出一个空格和显式分隔符（Unicode `│` / ASCII `|`）。不得只靠 `padEnd()` 制造间隔。
+
 | 标签 | 含义 | 建议颜色（TTY） |
 | --- | --- | --- |
-| `ECHO` | 产品标题或面向用户的模型内容 | 青色或默认色 |
-| `STEP` | 新的 Agent Step | 蓝色 |
-| `TOOL` | 工具请求或开始执行 | 青色 |
+| `ECHO` | 目标摘要或面向用户的模型内容 | 青色 |
+| Step 标题 | 独立 Step 边界，不再使用并列的 `STEP` 标签行 | 蓝色加粗 |
+| `TOOL` | 工具名 | 青色 |
+| `COMMAND` / `PATH` / `QUERY` / `TARGET` | 工具摘要字段 | 默认前景色 |
 | `APPROVAL` | 等待用户决策 | 黄色 |
-| `OK` | 单个操作成功 | 绿色 |
+| `APPROVED` | 用户或会话已授权 | 绿色 |
+| `RESULT` | 工具终态；成功词为 `OK`，失败词为 `FAIL` | 绿 / 红 |
 | `WARN` | 可继续的异常或截断 | 黄色 |
 | `DENIED` | 策略或用户拒绝 | 红色 |
-| `FAIL` | 单个操作失败 | 红色 |
+| `FAIL` | 不可恢复的模型或配置失败 | 红色 |
 | `LIMIT` | 达到步数、重复或预算限制 | 黄色 |
-| `DONE` | Turn 正常完成 | 绿色 |
 | `CANCELLED` | 用户或上层取消 | 黄色 |
+| `VERIFIED` / `LAST CHECK` / `NOT VERIFIED` | 验证证据；失败 Turn 不得使用 `VERIFIED` | 绿 / 默认 / 黄 |
 
-颜色只能增强辨识度，标签本身必须完整表达语义。不得把 `tool.completed` 直接渲染为 `DONE`，也不得仅凭命令输出中的文字推断测试通过。
+颜色只作用于标签、标题或状态词，不染整行正文。颜色只能增强辨识度，标签本身必须完整表达语义。不得把 `tool.completed` 渲染成 Turn 完成，也不得仅凭命令输出中的文字推断测试通过。
 
 ### 7.2 默认布局
 
-- 标签左对齐并保持稳定宽度；
-- 子信息缩进两个空格；
-- 默认不显示墙钟时间；
-- 完成事件可以显示稳定的耗时、退出码和截断状态；
-- 路径相对工作区显示，并使用适合当前平台的可读分隔符；
-- 相邻重复信息合并，避免每个 token 或参数增量产生一行。
+- 每个 Step 使用独立标题；标题前恰好一个空行，标题与第一条事件之间不再空行；
+- 同一工具的请求、审批和结果连续显示；
+- 长内容在正文列换行并对齐；CJK 按终端显示宽度计列，ANSI 不计入宽度；
+- 终端过窄时改为堆叠布局，不丢弃截断标记、相对路径或脱敏结果；
+- 默认不显示墙钟时间；完成事件可以显示耗时、退出码和截断状态；
+- 路径相对工作区显示；`--no-color` 只移除 ANSI，不删除状态词、缩进或分隔符。
 
 ## 8. 事件映射
 
 | 领域事件 | 默认渲染 |
 | --- | --- |
-| `session.started` | 默认隐藏；`--verbose` 可显示随机 Session 短 ID 和相对工作区标识 |
-| `turn.started` | 一次简短的 ECHO 标题与目标摘要 |
-| `step.started` | `STEP <n>` |
+| `session.started` | 默认隐藏；`--verbose` 可显示 Session 短 ID |
+| `session.resumed` / `model.changed` / `safety.changed` | `run` 默认无输出；Chat 启动摘要与 Slash 反馈由 Chat 表现层渲染 |
+| `turn.started` | `ECHO` 目标摘要 |
+| `step.started` | `── Step <n> ──` 或 ASCII `-- Step <n> --` |
 | `context.projected` | 默认隐藏；详细模式可显示预算与裁剪摘要 |
 | `model.started` | 默认不单独输出 |
 | `model.text_delta` | 按 Step 缓冲普通 assistant 内容；不得接收或渲染推理字段 |
 | `model.tool_call` | 默认隐藏；`--verbose` 可显示模型提出了哪个工具，但不回显未校验的完整参数 |
 | `model.completed` | 默认隐藏；`--verbose` 可显示 finishReason 与已提供的 usage |
-| `model.failed` | 可重试时显示 `WARN` 与重试摘要；不可恢复时显示 `FAIL`，最终退出仍由 Turn 终态决定 |
-| `tool.requested` | 校验并规范化后显示 `TOOL` 与脱敏输入摘要 |
-| `approval.requested` | 显示 `APPROVAL`、风险原因、影响范围和选项 |
-| `approval.granted` | 显示授权范围，不重复完整参数 |
-| `approval.denied` | 显示用户拒绝原因或默认拒绝来源 |
+| `model.failed` | 可重试时显示 `WARN`；不可恢复时显示 `FAIL`，最终退出仍由 Turn 终态决定 |
+| `tool.requested` | `TOOL` 与 `COMMAND` / `PATH` / `QUERY` / `TARGET` |
+| `approval.requested` | 挂在当前工具下的 `APPROVAL` 块 |
+| `approval.granted` | `APPROVED` 与授权范围 |
+| `approval.denied` | `DENIED` |
 | `tool.authorized` | 默认隐藏；`--verbose` 可显示策略允许及授权来源 |
-| `tool.started` | 仅在执行时间足够长或没有前置 `TOOL` 行时显示 |
-| `tool.completed` | 显示 `OK`、结构化摘要、耗时及关键元数据 |
-| `tool.failed` | 显示 `FAIL`、错误类别和可采取动作 |
-| `tool.denied` | 显示 `DENIED` 与策略原因 |
-| `tool.cancelled` | 显示 `CANCELLED` 与取消阶段 |
-| `limit.reached` | 显示 `LIMIT` 与具体限制 |
-| `turn.completed` | stdout 输出最终文本，stderr 输出固定摘要 |
-| `turn.failed` | stderr 输出失败摘要，stdout 默认无伪成功文本 |
-| `turn.cancelled` | stderr 输出取消摘要与已完成操作数量 |
+| `tool.started` | 默认隐藏 |
+| `tool.completed` | 同一分组中的 `RESULT` |
+| `tool.failed` | `RESULT` 中的 `FAIL` |
+| `tool.denied` | `DENIED` 与策略原因 |
+| `tool.cancelled` | `CANCELLED` 与取消阶段 |
+| `limit.reached` | `LIMIT` 与具体限制 |
+| `turn.completed` | `run`：stdout 最终文本，stderr `Run completed` 摘要；Chat：stderr `ECHO` 回复与 `Turn completed` |
+| `turn.failed` | stderr `Run failed` / `Turn failed`，含 `REASON`；不得使用 `VERIFIED` |
+| `turn.cancelled` | stderr 取消摘要 |
 
 高频增量事件应在内存中聚合，不逐 token 产生日志行。JSONL Session Event Store 仍保存契约要求的脱敏事件。
 
 Provider 只能把普通 assistant content 转换为 `model.text_delta`；provider-specific reasoning、analysis 或思维字段不得进入该事件。一个 Step 聚合结束后：
 
 - 若包含工具调用，合格的中间 assistant 文本可以作为 `ECHO` 进度说明写入 stderr，不得进入 stdout；
-- 若不包含工具调用并形成最终答复，聚合文本由 `turn.completed` 路径写入 stdout；
+- 若不包含工具调用并形成最终答复，`run` 的聚合文本由 `turn.completed` 路径写入 stdout；
 - 空白、重复或只描述内部推理的中间文本不显示；
 - Renderer 不自行判断文本是不是最终答复，以 Orchestrator 产生的 Step/Turn 事件为准。
 
@@ -195,11 +202,13 @@ Provider 只能把普通 assistant content 转换为 `model.text_delta`；provid
 ### 9.1 文件工具
 
 ```text
-TOOL   read_file     src/parser.ts
-OK     84 lines read
+TOOL       | read_file
+PATH       | src/parser.ts
+RESULT     | OK | 84 lines read
 
-TOOL   apply_patch   src/parser.ts
-OK     1 file changed · +4 -2
+TOOL       | apply_patch
+TARGET     | src/parser.ts
+RESULT     | OK | 1 file changed | +4 -2
 ```
 
 - 只显示相对路径；
@@ -210,9 +219,10 @@ OK     1 file changed · +4 -2
 ### 9.2 命令工具
 
 ```text
-TOOL   run_command   pnpm test
-FAIL   exit 1 · 2.4s
-  stderr: 1 test failed (output truncated: no)
+TOOL       | run_command
+COMMAND    | pnpm test
+RESULT     | FAIL | exit 1 | 2.4 s
+           | 1 test failed
 ```
 
 - 显示经过脱敏的命令摘要，不展示隐式 Shell 包装细节；
@@ -242,21 +252,21 @@ FAIL   exit 1 · 2.4s
 示例：
 
 ```text
-APPROVAL  run_command requires confirmation
-  Command: pnpm install
-  Risk: dependency and lockfile changes
-  Scope: this operation / equivalent operations in this session
+APPROVAL   | Required
+           | Risk   dependency and lockfile changes
+           | Scope  once or equivalent operations in this session
+           | Approve [y] once / [s] session / [n] deny
 ```
 
-非交互模式不得等待不可见输入；遇到 `ask` 默认拒绝并返回稳定退出码。hard deny 只显示原因，不提供允许选项。
+非交互模式不得等待不可见输入；遇到 `ask` 默认拒绝并返回稳定退出码。hard deny 只显示原因，不提供允许选项。交互模式把选择提示留在同一行，用户输入后追加 `APPROVED` 或 `DENIED`，不原地擦除。
 
 ## 12. 错误与恢复提示
 
 错误展示回答两个问题：发生了什么、下一步可以做什么。
 
 ```text
-FAIL   provider_auth · authentication failed
-  Check whether ECHO_API_KEY is configured for the selected endpoint.
+FAIL       | provider_auth | authentication failed
+           | Check whether ECHO_API_KEY is configured for the selected endpoint.
 ```
 
 - 不显示原始异常对象、授权头或完整堆栈；
@@ -266,54 +276,57 @@ FAIL   provider_auth · authentication failed
 
 ## 13. 最终摘要
 
-最终摘要固定包含：
+最终摘要与最后一个 Step 分离，并优先回答整体状态、原因与验证证据：
 
-- Turn 状态；
-- stopReason；
-- Step 数；
-- 工具调用数；
-- 变更文件数量或无变更；
-- 最后一次验证命令及其退出码（若存在）；
+- 独立标题：`Run completed` / `Run failed` / `Run cancelled` / `Run limited`（Chat 使用 `Turn ...`）；
+- `STEPS`、`TOOLS`、`CHANGES`；
+- 成功且最后一次检查退出码为 0 时使用 `VERIFIED`；失败或取消时若有检查使用 `LAST CHECK`；没有检查时使用 `NOT VERIFIED`；
 - 截断、拒绝或限制提示（若存在）。
 
 示例：
 
 ```text
-DONE   completed
-  4 steps · 4 tool calls · 1 file changed
-  Verification: pnpm test · exit 0
+-- Run completed -----------------------------------------
+STEPS      | 4
+TOOLS      | 4
+CHANGES    | 1 file
+VERIFIED   | pnpm test | exit 0 | 4.8 s
 ```
 
-最终摘要只能陈述事件可证明的事实。“completed”表示 Orchestrator 正常完成，不代替测试或人工验收证明任务正确。
+最终摘要只能陈述事件可证明的事实。标题中的 completed 表示 Orchestrator 正常完成，不代替测试或人工验收证明任务正确。
 
 ## 14. 完整演示示例
 
 ```text
-ECHO   Fix the failing parser tests without modifying tests.
+ECHO       | Fix the failing parser tests without modifying tests.
 
-STEP   1
-TOOL   search_text   "parseReport" in src/
-OK     3 matches in 2 files
+-- Step 1 ------------------------------------------------
+TOOL       | search_text
+QUERY      | "parseReport" in src
+RESULT     | 3 matches
 
-TOOL   read_file     src/parser.ts
-OK     84 lines read
+-- Step 2 ------------------------------------------------
+TOOL       | run_command
+COMMAND    | pnpm test
+RESULT     | FAIL | exit 1 | 2.4 s
+           | 1 test failed
 
-STEP   2
-TOOL   run_command   pnpm test
-FAIL   exit 1 · 2.4s
-  1 test failed
+-- Step 3 ------------------------------------------------
+TOOL       | apply_patch
+TARGET     | src/parser.ts
+RESULT     | OK | 1 file changed | +4 -2
 
-STEP   3
-TOOL   apply_patch   src/parser.ts
-OK     1 file changed · +4 -2
+-- Step 4 ------------------------------------------------
+TOOL       | run_command
+COMMAND    | pnpm test
+RESULT     | OK | exit 0 | 2.1 s
+           | 12 tests passed
 
-TOOL   run_command   pnpm test
-OK     exit 0 · 2.1s
-  12 tests passed
-
-DONE   completed
-  3 steps · 5 tool calls · 1 file changed
-  Verification: pnpm test · exit 0
+-- Run completed -----------------------------------------
+STEPS      | 4
+TOOLS      | 5
+CHANGES    | 1 file
+VERIFIED   | pnpm test | exit 0 | 2.1 s
 ```
 
 真实实现不得为了匹配示例而伪造 Step 数、测试数量或结果。
@@ -344,10 +357,12 @@ Renderer 必须消费已脱敏事件，同时在最终输出前执行防御性�
 - 每种终态事件至少一个渲染用例；
 - stdout 与 stderr 路由；
 - TTY、有色、无色、非 TTY 和 `NO_COLOR`；
+- 窄终端堆叠布局、CJK 与 ANSI 可见宽度；
+- Chat 启动摘要、状态条、`YOU` 提示符和 Slash 反馈；
 - 相对路径与敏感路径脱敏；
 - diff、命令输出和错误截断；
 - 审批允许、拒绝与 hard deny；
-- 最终摘要不混淆工具成功与任务完成；
+- 最终摘要不混淆工具成功、验证成功与任务完成；
 - 同一输入产生确定性文本。
 
 ### 17.2 CLI 集成测试
@@ -369,17 +384,17 @@ CI 使用 Fake Provider 执行最小事件序列，并验证稳定输出。真�
 - 使用默认文本渲染，不为视频维护第二套输出；
 - 只展示对理解闭环必要的事件；
 - 失败测试、补丁和复测成功应在同一连续会话中出现；
-- 最终画面保留 `DONE` 摘要和测试证据；
+- 最终画面保留 `Run completed` 摘要和测试证据；
 - 如终端颜色影响压缩或可读性，使用 `NO_COLOR` 录制也必须成立。
 
 ## 19. 变更与接受证据
 
 颜色、间距和措辞属于本文管理的可演进细节。stdout/stderr 语义、无颜色行为、隐私要求、Renderer 无副作用及任务/工具成功不得混淆属于稳定契约；改变这些内容应同步审查 [contracts.md](./contracts.md)。
 
-本文已基于以下证据升级为 `Accepted / 1.0`：
+本文已基于以下证据升级为 `Accepted / 1.1`：
 
-- `EventRenderer` 已实现并具有 snapshot/行为测试；
-- TTY、非 TTY、CI 和 `NO_COLOR` 行为经过验证；
-- stdout/stderr 与退出码契约一致；
-- 固定 demo 连续运行成功且录屏可读；
+- `EventRenderer` 已实现分组式时间线，并具有 snapshot/行为测试；
+- 窄宽度、CJK、无颜色、非 TTY、审批和成功/失败摘要经过验证；
+- stdout/stderr 与退出码契约保持 P0；
+- Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，供 P1-1B 接入；
 - 文中示例与真实输出一致，不含伪造能力。

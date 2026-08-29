@@ -1,158 +1,117 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_BASE_URL,
   DEFAULT_MAX_STEPS,
   DEFAULT_SAFETY_MODE,
   ENV_KEYS,
   loadConfig,
   type ConfigInput,
-  type RawConfigValues,
 } from '../../../src/config/index.js';
+import { CONFIG_ERROR_CODES } from '../../../src/contracts/config.js';
+
+const fileConfig = {
+  baseUrl: 'https://provider.example/v1',
+  model: 'file-model',
+  modelCatalog: { source: 'discover' as const },
+  safetyMode: 'safe' as const,
+};
 
 function makeInput(overrides: Partial<ConfigInput> = {}): ConfigInput {
   return {
     env: {},
+    fileConfig,
     ...overrides,
   };
 }
 
-function rawConfig(values: Record<string, unknown>): RawConfigValues {
-  return values as RawConfigValues;
-}
-
 describe('loadConfig', () => {
-  it('applies built-in defaults when nothing is configured', () => {
-    const { config, warnings } = loadConfig(makeInput());
-
-    expect(warnings).toEqual([]);
-    expect(config.baseUrl).toBe(DEFAULT_BASE_URL);
-    expect(config.model).toBe('');
-    expect(config.safetyMode).toBe(DEFAULT_SAFETY_MODE);
-    expect(config.safetyMode).toBe('balanced');
-    expect(config.maxSteps).toBe(DEFAULT_MAX_STEPS);
-    expect(config.apiKeyPresent).toBe(false);
+  it('fails closed when the persistent file is missing', () => {
+    const result = loadConfig({ env: {} });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.issues[0]?.code).toBe(CONFIG_ERROR_CODES.missingFile);
+    expect(result.issues[0]?.message).toContain('echo-harness config');
   });
 
-  it('reads base URL, model, and safety mode from environment variables', () => {
-    const { config } = loadConfig(
+  it('merges CLI explicit args over the persistent file and ignores removed env sources', () => {
+    const result = loadConfig(
       makeInput({
         env: {
-          [ENV_KEYS.baseUrl]: 'https://example.internal/v1',
-          [ENV_KEYS.model]: 'test-model',
-          [ENV_KEYS.safetyMode]: 'safe',
+          ECHO_BASE_URL: 'https://env.example/v1',
+          ECHO_MODEL: 'env-model',
+          ECHO_SAFETY_MODE: 'auto',
           [ENV_KEYS.apiKey]: 'secret-value',
+        },
+        overrides: { model: 'cli-model', safetyMode: 'balanced' },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.model).toBe('cli-model');
+    expect(result.config.baseUrl).toBe('https://provider.example/v1');
+    expect(result.config.safetyMode).toBe('balanced');
+    expect(result.config.apiKeyPresent).toBe(true);
+  });
+
+  it('does not treat built-in field defaults as a configuration source', () => {
+    const result = loadConfig(
+      makeInput({
+        fileConfig: {
+          baseUrl: 'https://provider.example/v1',
+          model: 'file-model',
+          modelCatalog: { source: 'discover' },
         },
       }),
     );
-
-    expect(config.baseUrl).toBe('https://example.internal/v1');
-    expect(config.model).toBe('test-model');
-    expect(config.safetyMode).toBe('safe');
-    expect(config.apiKeyPresent).toBe(true);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.safetyMode).toBe(DEFAULT_SAFETY_MODE);
+    expect(result.config.maxSteps).toBe(DEFAULT_MAX_STEPS);
   });
 
   it('detects an API key that is only whitespace', () => {
-    const { config } = loadConfig(makeInput({ env: { [ENV_KEYS.apiKey]: '   ' } }));
-    expect(config.apiKeyPresent).toBe(false);
+    const result = loadConfig(makeInput({ env: { [ENV_KEYS.apiKey]: '   ' } }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.apiKeyPresent).toBe(false);
   });
 
-  it('resolves values by precedence cli > env > project > user', () => {
-    const { config } = loadConfig(
+  it('fails closed on invalid numeric fields instead of ignoring them', () => {
+    const result = loadConfig(
       makeInput({
-        env: { [ENV_KEYS.model]: 'env-model', [ENV_KEYS.safetyMode]: 'safe' },
-        projectConfig: { model: 'project-model', safetyMode: 'auto' },
-        userConfig: { model: 'user-model', safetyMode: 'safe' },
-        overrides: { model: 'cli-model' },
+        fileConfig: { ...fileConfig, maxSteps: -3 },
       }),
     );
-
-    expect(config.model).toBe('cli-model');
-    expect(config.safetyMode).toBe('safe');
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.issues.some((issue) => issue.path === 'maxSteps')).toBe(true);
   });
 
-  it('falls back to the project config when env and cli are silent', () => {
-    const { config } = loadConfig(
+  it('accepts a valid context budget from the persistent file', () => {
+    const result = loadConfig(
       makeInput({
-        projectConfig: { model: 'project-model', baseUrl: 'https://project.example/v1' },
-        userConfig: { model: 'user-model' },
+        fileConfig: {
+          ...fileConfig,
+          context: { maxApproxTokens: 16_000, reservedOutputTokens: 2_000 },
+        },
       }),
     );
-
-    expect(config.model).toBe('project-model');
-    expect(config.baseUrl).toBe('https://project.example/v1');
-  });
-
-  it('normalizes safety mode case and trims surrounding whitespace', () => {
-    const { config } = loadConfig(makeInput({ env: { [ENV_KEYS.safetyMode]: '  AUTO ' } }));
-    expect(config.safetyMode).toBe('auto');
-  });
-
-  it('rejects an unknown safety mode with a warning and keeps the default', () => {
-    const { config, warnings } = loadConfig(makeInput({ env: { [ENV_KEYS.safetyMode]: 'yolo' } }));
-
-    expect(config.safetyMode).toBe('balanced');
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]?.source).toBe('env');
-    expect(warnings[0]?.message).toContain('safetyMode');
-  });
-
-  it('ignores invalid numeric fields with a warning instead of crashing', () => {
-    const { config, warnings } = loadConfig(
-      makeInput({ projectConfig: { maxSteps: -3, timeoutMs: 'fast' } }),
-    );
-
-    expect(config.maxSteps).toBe(DEFAULT_MAX_STEPS);
-    expect(config.timeoutMs).toBe(120_000);
-    const messages = warnings.map((warning) => warning.message);
-    expect(messages.some((message) => message.includes('maxSteps'))).toBe(true);
-    expect(messages.some((message) => message.includes('timeoutMs'))).toBe(true);
-  });
-
-  it('warns about unknown configuration keys from every file source', () => {
-    const { warnings } = loadConfig(
-      makeInput({
-        projectConfig: rawConfig({ model: 'm', typoKey: 1 }),
-        userConfig: rawConfig({ otherTypo: true }),
-        overrides: rawConfig({ cliTypo: 'x' }),
-      }),
-    );
-
-    const messages = warnings.map((warning) => warning.message);
-    expect(messages.some((message) => message.includes('typoKey'))).toBe(true);
-    expect(messages.some((message) => message.includes('otherTypo'))).toBe(true);
-    expect(messages.some((message) => message.includes('cliTypo'))).toBe(true);
-  });
-
-  it('reports an unknown key preserved by the config file loader', () => {
-    const { warnings } = loadConfig(
-      makeInput({ projectConfig: { model: 'm', misspelledModel: 'other' } }),
-    );
-
-    expect(warnings).toContainEqual({
-      source: 'project',
-      message:
-        'Unknown configuration key "misspelledModel" in project configuration was ignored; check for typos.',
-    });
-  });
-
-  it('accepts a valid context budget from config files', () => {
-    const { config } = loadConfig(
-      makeInput({
-        projectConfig: { context: { maxApproxTokens: 16_000, reservedOutputTokens: 2_000 } },
-      }),
-    );
-
-    expect(config.context.maxApproxTokens).toBe(16_000);
-    expect(config.context.reservedOutputTokens).toBe(2_000);
-  });
-
-  it('warns when a context budget is incomplete', () => {
-    const { config, warnings } = loadConfig(
-      makeInput({ projectConfig: { context: { maxApproxTokens: 16_000 } } }),
-    );
-
-    expect(config.context.maxApproxTokens).toBe(32_000);
-    expect(warnings.some((warning) => warning.message.includes('context'))).toBe(true);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.context.maxApproxTokens).toBe(16_000);
+    expect(result.config.context.reservedOutputTokens).toBe(2_000);
   });
 });

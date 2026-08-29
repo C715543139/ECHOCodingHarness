@@ -1,10 +1,12 @@
 # P1 CLI 完善计划
 
-> 状态：Proposed
+> 状态：Frozen
 >
-> 版本：0.4
+> 版本：0.5
 >
 > 最后更新：2026-08-29
+>
+> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[contracts.md](../contracts.md) 1.1
 
 ## 1. 目标
 
@@ -42,7 +44,7 @@ echo-harness chat --resume <session-id> [--workspace <path>]
 - `--resume` 恢复同一工作区中的已有 Session；
 - 每个 Turn 继续使用 P0 的 Agent Loop、Context Projector、工具注册表、安全策略和 JSONL 事件存储；
 - Provider 在 Chat 进程中固定，Chat 内不支持更换 URL 或 API Key；
-- 恢复时若当前 Provider 与会话创建时的 Provider 不一致，应拒绝静默发送历史上下文，并给出可操作的配置错误。事件只需保存不可逆的 Provider 标识，不保存凭据。
+- 恢复时若当前 Provider 与会话创建时的 Provider 不一致，应拒绝静默发送历史上下文，并给出可操作的配置错误。事件只保存 `ProviderIdentity`（含不可逆 `EndpointFingerprint`），不保存凭据或原始 URL。
 
 ### 3.2 Slash 命令
 
@@ -140,7 +142,7 @@ CLI 显式参数 > echo.config.json
 
 `ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。P0 的用户配置、项目配置以及 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 来源在 P1 中移除；由于项目尚未公开发布，不建立复杂迁移层。
 
-本规划落地时，新的配置 ADR 将明确取代 [公共契约](../contracts.md) 第 10 节当前定义的配置来源与优先级；同一实现任务必须同步更新 `contracts.md`、`architecture.md`、`testing.md`、README 和相关测试。在这些契约及操作文档更新合入前，P0 规则仍是当前有效事实，不能只依据本规划改变运行时行为。
+本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义。P1-0 已同步 `contracts.md`、`architecture.md`、`testing.md`、README 和可编译测试矩阵。P1-2A 之前，P0 `loadConfig` 仍是当前 `run` 的运行时事实，不能只依据本规划改变加载器。`artifact-root` 与 `ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
 
 ### 4.2 配置入口
 
@@ -392,7 +394,7 @@ YOU › _
 - Unicode TTY 使用 `YOU ›`，ASCII 降级使用 `YOU >`；
 - 用户输入行直接保留为终端会话记录，提交后不重复渲染第二份 `YOU` 消息；
 - Enter 提交非空输入；空输入不创建 Turn，也不重复打印状态条；
-- 多行粘贴的识别方式必须在实现 ADR 或接口设计中冻结，使用 bracketed paste 或等价的显式边界机制；无论采用哪种机制，一次粘贴不得被拆成多个 Turn，并必须由 PTY 或输入适配器测试覆盖；
+- 多行粘贴的识别方式已由 [ADR-0003](../decisions/0003-p1-application-service-session.md) 冻结为 bracketed paste；一次粘贴不得被拆成多个 Turn，也不得触发 Slash 命令，并必须由 PTY 或输入适配器测试覆盖；
 - Chat 输入只在 Agent 空闲时生效，运行中由 `Ctrl+C` 负责取消当前 Turn；
 - Chat 输入与审批输入使用不同标签，避免把审批选择误认为模型消息。
 
@@ -616,7 +618,7 @@ Agent Loop ------> Session repository
 
 ### 6.1 应用服务
 
-`run` 和 `chat` 通过同一应用服务创建、恢复、执行和取消 Turn。CLI 参数解析、readline 和渲染器不得持有 Agent 决策逻辑。
+`run` 和 `chat` 通过同一应用服务创建、恢复、执行和取消 Turn。审批响应必须绑定 `turnId`、`toolCallId` 与 `approvalKey`，并区分 accepted 与 duplicate/expired/not_pending。CLI 参数解析、readline 和渲染器不得持有 Agent 决策逻辑。
 
 ### 6.2 会话运行时状态
 
@@ -642,13 +644,12 @@ P1 负责记录未来 WebUI 所需的事实：
 
 ## 7. 实施顺序
 
-1. 用新 ADR 冻结配置来源、Chat 状态恢复和 P2 应用服务边界；
-2. 更新公共契约、事件版本与迁移/兼容策略；
-3. 实现固定产物配置和模型发现；
-4. 实现 Chat Session、Slash 命令、中断和恢复；
-5. 补齐会话查询、Context 摘要和 Policy Explain 事实；
-6. 按第 5 节已冻结的分组式时间线规范实现 CLI 视觉方案；
-7. 运行完整质量门、离线 Eval、演示 smoke 和受控真实 Provider 验收。
+1. P1-0 已用 ADR-0002/ADR-0003 冻结配置来源、Chat 状态恢复、应用服务、事件版本和粘贴边界；
+2. P1-2A / P1-2B 实现固定产物配置和模型发现；
+3. P1-1A / P1-1B 实现应用服务、Chat Session、Slash 命令、中断和恢复；
+4. 补齐会话查询、Context 摘要和 Policy Explain 事实；
+5. 按第 5 节已冻结的分组式时间线规范实现 CLI 视觉方案（P1-3）；
+6. 运行完整质量门、离线 Eval、演示 smoke 和受控真实 Provider 验收。
 
 ## 8. 验收标准
 

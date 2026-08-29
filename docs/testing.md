@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-28
+> 最后更新：2026-08-29
 
 ## Automated quality gate
 
@@ -41,6 +41,20 @@ pnpm vitest run tests/integration/file-tools.test.ts tests/integration/tools/run
 | JSONL append/read and pre-persistence redaction | `tests/unit/session/jsonl-session-store.test.ts`; demo-loop eval rereads `.echo/sessions/*.jsonl` |
 | Cancel, timeout, repeated calls, duplicate tool-call IDs | Agent Loop unit tests, `run_command` integration timeout/cancel; loop-guards eval |
 | Temporary workspace isolation | file/command integration tests and evals create `os.tmpdir()` workspaces and delete them |
+| P1-0 frozen contracts, config errors, exit codes, paste/slash, artifact-root | `tests/unit/contracts/p1-baseline.test.ts`, `tests/unit/contracts/doc-consistency.test.ts`; each `P1_TEST_MATRIX` row has `contractEvidence` (this freeze) and `runtimeEvidence` (later task or existing P0 tests) |
+| P0 config merge guard until P1-2A | `tests/unit/config/load-config.test.ts` still asserts `cli > env > project > user > defaults` |
+
+P1-0 只增加契约与矩阵测试，不改变 `run` 行为。矩阵每一行同时记录 `contractEvidence` 与 `runtimeEvidence`；后续任务必须在同一分支把对应行的 `runtimeEvidence` 从 `pending:<task>` 换成真实运行时测试：
+
+| Runtime task | Additional automated evidence |
+| --- | --- |
+| P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL` |
+| P1-2B | `/models` 发现、缓存、失败不阻断已配置模型 |
+| P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变 |
+| P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn |
+| P1-3 | 分组时间线渲染；非 TTY/`--no-color` 契约保持 |
+
+`ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<artifact-root>/config/echo.config.json` 是 P1 唯一持久配置路径。
 
 The D2-3 suite still covers:
 
@@ -144,3 +158,5 @@ shell environment after the check. This path is local acceptance only and is not
   this branch proves the equivalent loop with Fake Provider evals.
 - Dual-blind automation is an aid. Final submission still needs a human pass over Git metadata,
   screenshots, and local paths.
+- P1 Chat, config wizard, and session resume are frozen by P1-0 but not yet implemented. Do not
+  treat the contract tests as proof that `echo-harness chat` exists.

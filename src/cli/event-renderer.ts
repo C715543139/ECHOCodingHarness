@@ -211,6 +211,11 @@ export class DefaultEventRenderer implements EventRenderer {
               ),
             ]
           : [];
+      case 'session.resumed':
+      case 'model.changed':
+      case 'safety.changed':
+        // P1 events are frozen on EchoEvent; P1-3 owns visible rendering.
+        return [];
       case 'turn.started':
         return [line('ECHO', 'cyan', compact(this.sanitize(event.payload.goal)), capabilities)];
       case 'step.started':

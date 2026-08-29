@@ -1,6 +1,15 @@
 import type { AgentResult } from './agent.js';
+import type { P1ConfigSource } from './config.js';
 import type { EchoError } from './errors.js';
-import type { EventId, SessionId, StepId, ToolCallId, TurnId } from './identifiers.js';
+import type {
+  EndpointFingerprint,
+  EventId,
+  ProviderIdentity,
+  SessionId,
+  StepId,
+  ToolCallId,
+  TurnId,
+} from './identifiers.js';
 import type { ModelFinishReason, ModelToolCall } from './model.js';
 import type { SafetyMode } from './safety.js';
 import type { ToolResultMessage } from './tools.js';
@@ -17,15 +26,36 @@ export interface EventEnvelope<TType extends string, TPayload> {
 }
 
 export interface EchoEventPayloads {
-  readonly 'session.started': Readonly<{ workspace: string; safetyMode: SafetyMode }>;
+  readonly 'session.started': Readonly<{
+    workspace: string;
+    safetyMode: SafetyMode;
+    eventSchemaVersion?: number;
+    provider?: ProviderIdentity;
+    model?: string;
+  }>;
+  readonly 'session.resumed': Readonly<{
+    eventSchemaVersion: number;
+    provider: ProviderIdentity;
+    model: string;
+    safetyMode: SafetyMode;
+    turnCount: number;
+  }>;
   readonly 'turn.started': Readonly<{ goal: string }>;
   readonly 'step.started': Readonly<{ step: number }>;
   readonly 'context.projected': Readonly<{
     approximateTokens: number;
     omittedEventCount: number;
     truncationCount: number;
+    projectionVersion?: string;
+    maxApproxTokens?: number;
+    reservedOutputTokens?: number;
+    truncationReasons?: readonly string[];
   }>;
-  readonly 'model.started': Readonly<{ provider: string; model: string }>;
+  readonly 'model.started': Readonly<{
+    provider: string;
+    model: string;
+    endpointFingerprint?: EndpointFingerprint;
+  }>;
   readonly 'model.text_delta': Readonly<{ delta: string }>;
   readonly 'model.tool_call': Readonly<{ call: ModelToolCall }>;
   readonly 'model.completed': Readonly<{
@@ -34,6 +64,16 @@ export interface EchoEventPayloads {
     outputTokens?: number;
   }>;
   readonly 'model.failed': Readonly<{ error: EchoError; attempt?: number }>;
+  readonly 'model.changed': Readonly<{
+    model: string;
+    previousModel?: string;
+    source: P1ConfigSource | 'slash';
+  }>;
+  readonly 'safety.changed': Readonly<{
+    safetyMode: SafetyMode;
+    previousSafetyMode?: SafetyMode;
+    source: P1ConfigSource | 'slash';
+  }>;
   readonly 'tool.requested': Readonly<{
     call: ModelToolCall;
     normalizedInput: unknown;
@@ -42,6 +82,7 @@ export interface EchoEventPayloads {
     toolCallId: ToolCallId;
     reason: string;
     approvalKey: string;
+    policyRuleId?: string;
   }>;
   readonly 'approval.granted': Readonly<{
     toolCallId: ToolCallId;
@@ -65,6 +106,7 @@ export interface EchoEventPayloads {
   readonly 'tool.denied': Readonly<{
     result: ToolResultMessage<'denied'>;
     hard: boolean;
+    policyRuleId?: string;
   }>;
   readonly 'tool.cancelled': Readonly<{
     result: ToolResultMessage<'cancelled'>;

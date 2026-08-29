@@ -2,15 +2,15 @@
 
 > 状态：Accepted
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-28
+> 最后更新：2026-08-29
 
 ## 1. 文档目的
 
-本文定义 ECHO Harness 各核心模块之间的稳定边界。D1-2 对应的可编译共享类型位于
-`src/contracts/`；本文仍是语义与不变量的权威来源。实现阶段可以在同步文档、测试和集成方后
-细化字段，但不得在各模块内建立相互竞争的私有契约。
+本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
+
+P0 `echo-harness run` 在 P1-2A / P1-1A 合入前仍执行已验收的 P0 装配与配置合并。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -24,12 +24,20 @@ type TurnId = string;
 type StepId = string;
 type ToolCallId = string;
 type EventId = string;
+type EndpointFingerprint = string & { readonly brand: "EndpointFingerprint" };
+
+interface ProviderIdentity {
+  kind: "openai-compatible";
+  name: "openai-compatible";
+  endpointFingerprint: EndpointFingerprint;
+}
 ```
 
 - 时间统一存储为 ISO 8601 UTC 字符串；
 - 文件路径在工具边界使用相对工作区路径；
 - 绝对路径只在 Execution 内部短暂存在，不发送给模型或写入可分享材料；
-- 对模型名、Provider 名和工具名使用稳定的小写标识。
+- 对模型名、Provider 名和工具名使用稳定的小写标识；
+- `EndpointFingerprint` 是不可逆的 endpoint 标识（由 scheme、host 与可选 port 派生），不得是原始 URL、凭据、userinfo 或这些值的可逆编码。生成算法由 P1-1A 实现；P0 `model.started.provider` 仍是适配器名字符串。
 
 ## 3. Model Provider
 
@@ -227,6 +235,7 @@ interface EventEnvelope<TType extends string, TPayload> {
 ```ts
 type EchoEvent =
   | EventEnvelope<"session.started", SessionStarted>
+  | EventEnvelope<"session.resumed", SessionResumed>
   | EventEnvelope<"turn.started", TurnStarted>
   | EventEnvelope<"step.started", StepStarted>
   | EventEnvelope<"context.projected", ContextProjected>
@@ -235,6 +244,8 @@ type EchoEvent =
   | EventEnvelope<"model.tool_call", ModelToolCallCompleted>
   | EventEnvelope<"model.completed", ModelCompleted>
   | EventEnvelope<"model.failed", OperationFailed>
+  | EventEnvelope<"model.changed", ModelChanged>
+  | EventEnvelope<"safety.changed", SafetyChanged>
   | EventEnvelope<"tool.requested", ToolRequested>
   | EventEnvelope<"approval.requested", ApprovalRequested>
   | EventEnvelope<"approval.granted", ApprovalGranted>
@@ -258,6 +269,10 @@ type EchoEvent =
 `tool.requested`，也不得执行任何工具。
 
 `approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
+
+P0 事件模式版本为 `1`（缺省视为 1）。P1 事件模式版本为 `2`：必须能记录 Session/Turn/Step 标识与时间、模型与安全模式变化、Context 投影版本/预算/估算量/裁剪原因摘要、工具请求、策略 rule ID、审批、执行终态、命令耗时/退出码/截断，以及 Turn 终态与可引用验证结果。`session.resumed`、`model.changed` 和 `safety.changed` 属于版本 2。恢复时遇到未知事件类型必须失败，不得丢弃后继续。现有 payload 的新增字段在版本 2 中可选，P0 写入方可省略。P0 `EventRenderer` 对尚未实现视觉的新事件保持无输出，不得改变 stdout/stderr 契约。
+
+`session.started.provider`（可选）与 `session.resumed.provider` 必须是 `ProviderIdentity`，不得使用任意 `string` 或原始 endpoint URL。`model.started.provider` 保持 P0 适配器名；版本 2 可附加可选 `endpointFingerprint`。
 
 ### 6.3 工具状态机
 
@@ -335,13 +350,68 @@ interface SessionStore {
   append(event: EchoEvent): Promise<void>;
   read(sessionId: SessionId): AsyncIterable<EchoEvent>;
 }
+
+interface CreateSessionRecordInput {
+  workspaceRoot: string;
+  provider: ProviderIdentity;
+  model: string;
+  safetyMode: SafetyMode;
+  eventSchemaVersion: number;
+}
+
+interface ResumeSessionRecordInput {
+  workspaceRoot: string;
+  sessionId: SessionId;
+  provider: ProviderIdentity;
+}
+
+interface SessionRepository extends SessionStore {
+  create(input: CreateSessionRecordInput): Promise<SessionSummary>;
+  resume(input: ResumeSessionRecordInput): Promise<SessionQueryView>;
+  list(workspaceRoot: string): Promise<readonly SessionSummary[]>;
+  readAll(sessionId: SessionId): Promise<readonly EchoEvent[]>;
+  getQueryView(sessionId: SessionId): Promise<SessionQueryView>;
+}
 ```
 
 - 首版实现为 `.echo/sessions/*.jsonl`；
 - `append` 必须保持事件顺序并避免部分 JSON 行；
 - SessionStore 不负责上下文取舍；
+- `SessionRepository` 是 P1 查询与恢复边界：必须支持创建、列出、读取、恢复以及按 Turn/Step 整理事件。P2 必须调用该接口，不得解析 JSONL 文本细节或 CLI 输出；
 - 文件默认不纳入 Git；
-- 持久化失败必须可观测，但不得因此泄露未脱敏原始数据。
+- 持久化失败必须可观测，但不得因此泄露未脱敏原始数据；
+- 恢复只从事件事实重建对话、当前模型与安全模式。损坏、不完整、跨工作区、Provider 不一致或不兼容版本必须安全失败。
+
+### 7.1 应用服务
+
+```ts
+interface ApprovalResponseInput {
+  sessionId: SessionId;
+  turnId: TurnId;
+  toolCallId: ToolCallId;
+  approvalKey: string;
+  choice: "deny" | "once" | "session";
+}
+
+type ApprovalResponseResult =
+  | { outcome: "accepted"; choice: "deny" | "once" | "session" }
+  | { outcome: "rejected"; reason: "duplicate" | "expired" | "not_pending" };
+
+interface ApplicationService {
+  createSession(input: CreateSessionInput): Promise<SessionRuntimeState>;
+  resumeSession(input: ResumeSessionInput): Promise<SessionRuntimeState>;
+  listSessions(workspaceRoot: string): Promise<readonly SessionSummary[]>;
+  getSession(sessionId: SessionId): Promise<SessionQueryView>;
+  runTurn(input: RunTurnInput): Promise<AgentResult>;
+  cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void>;
+  respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult>;
+  setSessionModel(sessionId: SessionId, modelId: string): Promise<SessionRuntimeState>;
+  setSessionSafetyMode(sessionId: SessionId, mode: SafetyMode): Promise<SessionRuntimeState>;
+  getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState>;
+}
+```
+
+`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。该接口在 P1-1A 接入 `run`；在此之前 `runGoal` 仍直接构造 `AgentLoop`。P1-0 只冻结这些类型，不实现配置加载器、artifact-root 解析、会话优先级解析器或 Chat 输入解析。
 
 ## 8. Context Builder
 
@@ -398,29 +468,35 @@ interface AgentResult {
 
 ## 10. 配置契约
 
-配置来源按优先级合并：
+P1 普通配置优先级（[ADR-0002](./decisions/0002-p1-config-artifact-root.md)，自 P1-2A 起由运行时执行）：
 
 ```text
-CLI 显式参数 > 环境变量 > 项目配置 > 用户配置 > 内置默认值
+CLI 显式参数 > echo.config.json
 ```
 
-首版至少支持：
+字段缺省（如未写出的 `safetyMode` 使用 `balanced`）是结构默认值，不是第三配置来源，也不进入 `cli | session | config` 来源诊断。`cli | session | config` 只描述会话内模型与安全模式的有效值来源。
 
-| 目的 | 推荐环境变量 | 是否敏感 |
+唯一持久配置文件为 `<artifact-root>/config/echo.config.json`。`artifact-root` 根据 CLI 模块或可执行文件位置解析，不得使用 `process.cwd()`。`ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。
+
+| 目的 | P1 来源 | 是否敏感 |
 | --- | --- | --- |
-| API 地址 | `ECHO_BASE_URL` | 否 |
+| API 地址 | 配置文件 `baseUrl` 或 CLI `--base-url` | 否 |
 | API Key | `ECHO_API_KEY` | 是 |
-| 模型名 | `ECHO_MODEL` | 否 |
-| 工作区 | CLI 参数或当前目录 | 否 |
-| 安全模式 | `ECHO_SAFETY_MODE` | 否 |
+| 模型名 | 配置文件 `model` 或 CLI `--model` | 否 |
+| 工作区 | CLI `--workspace` 或当前目录 | 否 |
+| 安全模式 | 配置文件 `safetyMode` 或 CLI `--safety-mode` | 否 |
+| 模型目录 | 配置文件 `modelCatalog` | 否 |
 
-- API Key 不得写入项目配置、事件、命令输出或子进程环境；
+P0 运行时（P1-2A 之前）仍按已验收规则合并：`CLI 显式参数 > 环境变量 > 项目配置 > 用户配置 > 内置默认值`，并仍识别 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 以及工作区/用户目录中的 `echo.config.json` 与 `.echo-config.json`。该行为由 `tests/unit/config/load-config.test.ts` 锁定，直到 P1-2A 删除这些来源。P1 不迁移旧文件。
+
+- API Key 不得写入配置文件、事件、命令输出或子进程环境；
 - 配置诊断只能显示 Key 是否存在，不显示其值或可还原片段；
-- 未知配置键应产生警告或校验错误，避免静默拼写错误；
-- 项目配置文件依次尝试 `echo.config.json` 与 `.echo-config.json`；项目配置不得提供
-  API Key。
-- 内置默认值为：`balanced`、24 个 Step、120 秒工具超时、20,000 字符工具输出上限、
-  300 秒 Provider 请求超时、32,000 近似 token 上下文与 4,000 输出 token 预留。
+- 未知键、`apiKey` 和 URL 内嵌凭据必须产生配置错误并拒绝加载，不得静默忽略；
+- 缺少配置文件时 `run`/`chat` 使用退出码 `2`，提示执行 `echo-harness config`，不得自动创建含真实 Provider 信息的文件；
+- 手动模型目录必须包含唯一非空模型 ID，且默认模型位于列表中；自动发现模式不持久化完整列表；
+- 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、20,000 字符工具输出上限、
+  300 秒 Provider 请求超时、32,000 近似 token 上下文与 4,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源。
+- 稳定配置错误码见 `CONFIG_ERROR_CODES`：`CONFIG_MISSING`、`CONFIG_UNKNOWN_KEY`、`CONFIG_CREDENTIAL_FORBIDDEN`、`CONFIG_PROVIDER_MISMATCH`、`CONFIG_SESSION_INCOMPATIBLE` 等。
 
 ## 11. 错误模型
 
@@ -467,7 +543,7 @@ interface EchoError {
 | `6` | 达到步数或重复调用限制 |
 | `130` | 用户取消 |
 
-CLI 必须保证同一失败类别在交互与非交互运行中使用相同退出码。
+CLI 必须保证同一失败类别在交互与非交互运行中使用相同退出码。缺少或非法配置（含 P1 配置文件缺失、Session 无法恢复、Provider 不匹配）映射为 `2`。Chat 空闲 `Ctrl+C` 为 `130`；`/quit` 为 `0`。可编译映射为 `CLI_EXIT_CODES` 与 `exitCodeForAgentResult`。
 
 ## 13. 跨模块强制不变量
 
@@ -485,14 +561,17 @@ CLI 必须保证同一失败类别在交互与非交互运行中使用相同退�
 12. 非交互输出不得依赖颜色、动画或 Unicode 才能表达状态。
 13. tool-call ID 在 Session 内必须非空且唯一，协议违规不得进入工具管线。
 14. SessionStore 故障补偿必须以已持久化事件去重，不能制造第二个工具或 Turn 终态。
+15. `run` 与 `chat` 必须共享 `ApplicationService`；CLI 与未来 UI 不得复制 Agent 控制流。
+16. 普通配置不得再引入工作区/用户文件或除 `ECHO_API_KEY` 以外的秘密环境变量作为正式来源。
+17. Slash 命令只解析空闲提示符中的 `typed` 输入；bracketed paste 的一次粘贴最多成为一个用户 Turn，且不得触发 Slash。
 
 ## 14. 接受证据
 
-本文已基于以下证据升级为 `Accepted / 1.0`：
+P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider Agent Loop、六个工具、安全与事件不变量、CLI 退出码。
 
-- 对应 TypeScript 接口已实现；
-- Fake Provider 覆盖完整 Agent Loop；
-- 六个基础工具通过契约测试；
-- 安全和事件不变量有自动化测试；
-- CLI 退出码与真实行为一致；
-- 文档中的临时字段和默认值已清理。
+1.1 由 P1-0 冻结，证据为：
+
+- [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md)；
+- `src/contracts/` 中的 P1 类型、事件版本、`CONFIG_ERROR_CODES`、`CLI_EXIT_CODES` 与 `ApplicationService`；
+- `P1_TEST_MATRIX`（每行含 `contractEvidence` 与 `runtimeEvidence`）以及 `tests/unit/contracts/p1-baseline.test.ts`、`tests/unit/contracts/doc-consistency.test.ts`；
+- P0 `loadConfig` 与 `run` 行为测试仍然全绿，配置加载器未被提前改写。

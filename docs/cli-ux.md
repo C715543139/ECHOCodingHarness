@@ -34,7 +34,7 @@
 - 不用动画、图标数量或主题复杂度衡量产品质量；
 - 不让 CLI 文案参与 Agent 状态判断。
 
-P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。本文描述 P1-3 落地后的当前 `run`/`chat` 渲染器；stdout/stderr、退出码与追加式输出仍保持 P0 契约。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。
+P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。本文描述 P1-3 落地后的当前 `run`/`chat` 渲染器；stdout/stderr、退出码与追加式输出仍保持 P0 契约。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。P1-2B 增加模型目录发现，同样不改变 `run` 渲染。
 
 ## 3. 设计原则
 
@@ -100,7 +100,7 @@ stderr 承载执行过程和诊断：
 `echo-harness run <goal>` 支持以下 P0 参数：
 
 - `--workspace <path>`：固定工作区，默认当前目录；
-- `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；
+- `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；`--model` 只作用于本次 `run`，不查询 `/models`；
 - `--safety-mode <safe|balanced|auto>`：覆盖安全模式；
 - `--max-steps <count>`：覆盖 Step 上限；
 - `--verbose`：增加脱敏且有界的诊断；

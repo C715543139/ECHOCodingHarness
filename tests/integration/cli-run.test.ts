@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +101,42 @@ describe('CLI run integration', () => {
       type: 'session.started',
       payload: { eventSchemaVersion: 2 },
     });
+    expect(provider.listModelCallCount).toBe(0);
+  });
+
+  it('lets CLI --model override the config model without querying /models', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root, 'config-model');
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'cli model' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const captured = output();
+
+    const outcome = await runGoal(
+      'do the task',
+      {
+        workspace: root,
+        model: 'cli-model',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+      },
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(provider.requests[0]?.model).toBe('cli-model');
+    expect(provider.listModelCallCount).toBe(0);
   });
 
   it('fails configuration before constructing a Provider and never prints a secret', async () => {
@@ -177,5 +214,15 @@ describe('CLI run integration', () => {
     expect(toExitCode({ ...base, status: 'failed', stopReason: 'provider_error' })).toBe(3);
     expect(toExitCode({ ...base, status: 'failed', stopReason: 'tool_error' })).toBe(4);
     expect(toExitCode({ ...base, status: 'failed', stopReason: 'policy_denied' })).toBe(5);
+  });
+
+  it('does not import or invoke model catalog discovery', async () => {
+    const runSource = await fs.readFile(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/cli/run.ts'),
+      'utf8',
+    );
+    expect(runSource).not.toContain('ProcessModelCatalog');
+    expect(runSource).not.toContain('listCandidates');
+    expect(runSource).not.toContain('listModelIds');
   });
 });

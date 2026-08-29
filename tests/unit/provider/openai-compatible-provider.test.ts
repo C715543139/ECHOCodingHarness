@@ -31,6 +31,10 @@ function usageChunk(prompt: number, completion: number): Chunk {
   return { choices: [], usage: { prompt_tokens: prompt, completion_tokens: completion } };
 }
 
+async function unusedListModelIds(): Promise<readonly string[]> {
+  throw new Error('listModelIds must not be called during chat completion streaming');
+}
+
 function clientFromChunks(
   chunks: readonly Chunk[],
   options: { failFirstWith?: unknown; recordCalls?: Record<string, unknown>[] } = {},
@@ -53,6 +57,7 @@ function clientFromChunks(
       }
       return generate();
     },
+    listModelIds: unusedListModelIds,
   };
 }
 
@@ -247,6 +252,7 @@ describe('OpenAICompatibleProvider', () => {
         }
         return generate();
       },
+      listModelIds: unusedListModelIds,
     };
     const provider = new OpenAICompatibleProvider({
       client: failing,
@@ -285,6 +291,7 @@ describe('OpenAICompatibleProvider', () => {
         }
         return generate();
       },
+      listModelIds: unusedListModelIds,
     };
     const provider = new OpenAICompatibleProvider({
       client,

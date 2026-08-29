@@ -39,6 +39,21 @@ describe('FakeProvider', () => {
     expect(provider.requests).toEqual([request, request]);
   });
 
+  it('scripts catalog lists independently from stream responses', async () => {
+    const provider = new FakeProvider(
+      [{ events: [{ type: 'completed', finishReason: 'stop' }] }],
+      'fake',
+      [{ ids: ['model-a', 'model-b'] }],
+    );
+
+    await expect(provider.listModelIds({ signal: new AbortController().signal })).resolves.toEqual([
+      'model-a',
+      'model-b',
+    ]);
+    expect(provider.listModelCallCount).toBe(1);
+    expect(provider.requests).toEqual([]);
+  });
+
   it('surfaces a scripted error after prior events', async () => {
     const error = {
       category: 'provider_protocol',

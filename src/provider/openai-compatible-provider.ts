@@ -36,6 +36,9 @@ export interface OpenAICompatibleClient {
     wireRequest: Record<string, unknown>,
     options: Readonly<{ signal: AbortSignal; timeoutMs?: number }>,
   ): Promise<AsyncIterable<StreamChunk>>;
+  listModelIds(
+    options: Readonly<{ signal: AbortSignal; timeoutMs?: number }>,
+  ): Promise<readonly string[]>;
 }
 
 export interface OpenAICompatibleProviderOptions {

@@ -8,7 +8,23 @@ export {
   withRetries,
 } from './errors.js';
 export { mapFinishReason } from './finish-reason.js';
-export { type FakeProviderResponse, FakeProvider } from './fake-provider.js';
+export {
+  type FakeProviderListResponse,
+  type FakeProviderResponse,
+  FakeProvider,
+} from './fake-provider.js';
+export {
+  clearModelCatalogProcessCache,
+  isSelectableCatalogModel,
+  listModelCandidates,
+  ProcessModelCatalog,
+  uniqueModelIds,
+  type DiscoverModels,
+  type ListCandidateOptions,
+  type ListModelCandidatesInput,
+  type ModelCandidateList,
+  type ProcessModelCatalogOptions,
+} from './model-catalog.js';
 export {
   type OpenAICompatibleProviderOptions,
   OpenAICompatibleProvider,

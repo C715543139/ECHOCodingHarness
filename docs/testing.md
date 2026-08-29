@@ -43,13 +43,14 @@ pnpm vitest run tests/integration/file-tools.test.ts tests/integration/tools/run
 | Temporary workspace isolation | file/command integration tests and evals create `os.tmpdir()` workspaces and delete them |
 | P1-0 frozen contracts, config errors, exit codes, paste/slash, artifact-root | `tests/unit/contracts/p1-baseline.test.ts`, `tests/unit/contracts/doc-consistency.test.ts`; each `P1_TEST_MATRIX` row has `contractEvidence` (this freeze) and `runtimeEvidence` (later task or existing P0 tests) |
 | P1-2A artifact-root loader and config wizard | `tests/unit/config/**`, `tests/unit/cli/config-wizard.test.ts`, `tests/integration/cli-run.test.ts`; matrix CFG-* rows now point at runtime tests |
+| P1-2B `/models` catalog, in-process cache, and fail-open configured model | `tests/unit/provider/model-catalog.test.ts`, `tests/unit/provider/openai-client.test.ts`, `tests/unit/provider/fake-provider.test.ts`, `tests/integration/cli-run.test.ts`; matrix MDL-* rows |
 
 P1-0 增加契约与矩阵测试。矩阵每一行同时记录 `contractEvidence` 与 `runtimeEvidence`；后续任务必须在同一分支把对应行的 `runtimeEvidence` 从 `pending:<task>` 换成真实运行时测试：
 
 | Runtime task | Additional automated evidence |
 | --- | --- |
 | P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL`（已落地） |
-| P1-2B | `/models` 发现、缓存、失败不阻断已配置模型 |
+| P1-2B | `/models` 发现、缓存、失败不阻断已配置模型、CLI `--model` 优先于配置且不发现、手动 `/model refresh` 拒绝。证据：`tests/unit/provider/model-catalog.test.ts`、`tests/unit/provider/openai-client.test.ts`、`tests/integration/cli-run.test.ts`、`tests/integration/cli-help.test.ts` |
 | P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变。证据：`tests/unit/application/echo-application-service.test.ts`、`tests/unit/session/jsonl-session-repository.test.ts`、`tests/unit/session/endpoint-fingerprint.test.ts`、`tests/integration/cli-run.test.ts` |
 | P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn |
 | P1-3 | 分组时间线、窄宽度/CJK、Chat 启动摘要与状态条：`tests/unit/cli/event-renderer.test.ts`、`tests/unit/cli/render-layout.test.ts`、`tests/unit/cli/chat-view.test.ts`；非 TTY/`--no-color` 与 stdout/stderr 契约保持 |
@@ -163,6 +164,11 @@ shell environment after the check. This path is local acceptance only and is not
   this branch proves the equivalent loop with Fake Provider evals.
 - Dual-blind automation is an aid. Final submission still needs a human pass over Git metadata,
   screenshots, and local paths.
+- Offline evals (`demo-loop`) and PowerShell process-tree assertions (`terminationSucceeded`) can
+  time out or fail when many test files run in parallel on a loaded Windows host. Sequential
+  `pnpm check` / `pnpm eval:offline` is the quality gate. Treat those as resource contention, not a
+  catalog or Agent Loop defect, and do not weaken the P0 tests to hide them.
 - P1 Chat is frozen by P1-0 but not yet implemented. P1-2A added `echo-harness config` and the
-  artifact-root loader. P1-1A added ApplicationService and session resume. Do not treat remaining
+  artifact-root loader. P1-2B added in-process `/models` discovery that `run` does not invoke.
+  P1-1A added ApplicationService and session resume. Do not treat remaining
   contract tests as proof that `echo-harness chat` exists.

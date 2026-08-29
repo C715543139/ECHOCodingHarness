@@ -132,7 +132,7 @@ P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。�
 
 ### 5.5 Application service
 
-P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；Chat 输入适配器属于 P1-1B。
+P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。Chat 输入适配器属于 P1-1B。
 
 ## 6. Turn、Step 与 Agent Loop
 
@@ -189,6 +189,8 @@ Provider 接收规范化的模型请求，并产生规范化流事件：
 5. 工具调度权始终由 Orchestrator 持有。
 
 首版可使用官方 `openai` npm 包处理协议与流，但不使用任何 Agent SDK、Agent 框架或托管代码执行功能。
+
+模型目录是独立于 completion 流的只读发现路径。`GET {baseUrl}/models` 只产生模型 ID，缓存在当前进程，不进入 Agent Loop。`run` 不发现模型；Chat 仅在 `/model` 或 `/model refresh` 时调用 `listModelCandidates` / `ProcessModelCatalog`。发现失败仍允许使用已配置模型；手动目录下的 `/model refresh` 必须失败并说明仅 `discover` 可刷新。P1-2B 实现该边界。
 
 ## 8. 工具执行管线
 
@@ -281,7 +283,7 @@ Context Projector 按优先级构建上下文：
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
-P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
+P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已使模型发现独立于 `run`：CLI `--model` 只覆盖本次运行的模型名，不查询 `/models`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
 
 具体视觉语义见 [cli-ux.md](./cli-ux.md)（P0）与 [p1-cli.md](./plans/p1-cli.md) 第 5 节（P1 分组时间线）。
 
@@ -312,13 +314,14 @@ ECHO 可以借鉴公开项目中通用的软件设计思想，例如显式循环
 
 P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JSONL 事件存储和
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
-artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-1A 已抽出
+artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
+`GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已抽出
 `ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-3 已实现分组式时间线与 Chat 输入表现层；尚未实现 Chat 输入解析。
 
 当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI
 只通过公开事件和 `AgentResult` 观察循环。P1 类型位于 `src/contracts/application.ts`、
-`src/contracts/config.ts` 与 `src/contracts/chat-input.ts`。
+`src/contracts/config.ts`、`src/contracts/model.ts` 与 `src/contracts/chat-input.ts`。
 
 已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 20,000 字符、
 32,000 近似 token 上下文（其中预留 4,000 输出 token），以及同一规范化工具调用第三次

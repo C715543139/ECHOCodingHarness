@@ -17,12 +17,16 @@ describe('CLI metadata', () => {
     expect(help).toContain('local-first autonomous coding agent');
     expect(help).toContain('run');
     expect(help).toContain('config');
+    expect(cli.commands.find((item) => item.name() === 'run')?.helpInformation()).toContain(
+      'GET /models',
+    );
   });
 
   it('registers the interactive config command', () => {
     const cli = createCli({ version: '9.8.7', artifactRoot });
     const command = cli.commands.find((item) => item.name() === 'config');
     expect(command?.description()).toContain('echo.config.json');
+    expect(command?.description()).toContain('/model');
   });
 
   it('uses an injected version for deterministic tests', () => {

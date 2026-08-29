@@ -1,3 +1,5 @@
+import type { ModelCatalogSource } from './config.js';
+import type { EchoError } from './errors.js';
 import type { ToolCallId } from './identifiers.js';
 
 export interface ModelProvider {
@@ -7,6 +9,26 @@ export interface ModelProvider {
     request: ModelRequest,
     options: Readonly<{ signal: AbortSignal }>,
   ): AsyncIterable<ModelStreamEvent>;
+}
+
+/**
+ * Separate from `ModelProvider.stream`. Chat `/model` and `/model refresh` are
+ * the only intended callers; `run` must not list models.
+ */
+export interface ModelCatalogClient {
+  listModelIds(
+    options: Readonly<{ signal: AbortSignal; timeoutMs?: number }>,
+  ): Promise<readonly string[]>;
+}
+
+export interface ModelCatalogSnapshot {
+  readonly status: 'ok' | 'failed';
+  readonly source: ModelCatalogSource;
+  readonly models: readonly string[];
+  readonly cached: boolean;
+  readonly refreshed: boolean;
+  readonly configuredModel: string;
+  readonly error?: EchoError;
 }
 
 export interface ModelRequest {

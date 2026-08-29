@@ -217,6 +217,11 @@ export async function runConfigWizard(
               signal,
             ),
           };
+    if (source === 'discover') {
+      io.write(
+        'Discover stores only the default model. Candidate IDs are fetched later with GET /models and cached in-process.\n',
+      );
+    }
     const model = await promptDefaultModel(io, catalog, existing?.model, signal);
     const safetyMode = await promptSafetyMode(io, existing?.safetyMode, signal);
     const draft: EchoPersistentConfig = { baseUrl, model, modelCatalog: catalog, safetyMode };

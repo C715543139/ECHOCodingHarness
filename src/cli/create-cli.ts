@@ -47,7 +47,10 @@ export function createCli(options: CreateCliOptions = {}): Command {
     .description('Run one autonomous coding turn in a fixed workspace.')
     .argument('<goal>', 'Goal for the agent to complete.')
     .option('-w, --workspace <path>', 'Workspace directory (defaults to current directory).')
-    .option('--model <name>', 'Override the configured model name.')
+    .option(
+      '--model <name>',
+      'Override the configured model for this run. This does not query GET /models.',
+    )
     .option('--base-url <url>', 'Override the OpenAI-compatible API base URL.')
     .addOption(
       new Option('--safety-mode <mode>', 'Safety mode.').choices(['safe', 'balanced', 'auto']),
@@ -116,7 +119,7 @@ export function createCli(options: CreateCliOptions = {}): Command {
   cli
     .command('config')
     .description(
-      'Create or update the persistent configuration file at <artifact-root>/config/echo.config.json.',
+      'Create or update <artifact-root>/config/echo.config.json. Discover catalogs store only the default model; candidate lists are fetched later by chat /model.',
     )
     .action(async () => {
       const controller = new AbortController();

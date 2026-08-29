@@ -53,6 +53,10 @@ describe('P1 documentation freeze', () => {
     expect(files.plan).toContain('ADR-0003');
     expect(files.testing).toContain('P1-0');
     expect(files.readme).toContain('P1-2A');
+    expect(files.readme).toContain('P1-2B');
+    expect(files.architecture).toContain('P1-2B');
+    expect(files.contracts).toContain('GET {baseUrl}/models');
+    expect(files.testing).toContain('P1-2B');
 
     expect(files.adr2).toContain('P1-2A');
     expect(files.adr3).toContain('P1-1A');

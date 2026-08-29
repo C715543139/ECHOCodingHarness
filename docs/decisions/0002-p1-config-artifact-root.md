@@ -61,7 +61,7 @@ CLI 显式参数 > echo.config.json
 
 ### 2.4 模型目录
 
-自动发现只允许当前 OpenAI-compatible 客户端请求 `GET {baseUrl}/models`，并只使用响应中的模型 ID。列表缓存在当前进程内。`run` 不主动发现；`chat` 仅在 `/model` 需要候选项时延迟发现。发现失败不得阻止已配置模型的实际调用。
+自动发现只允许当前 OpenAI-compatible 客户端请求 `GET {baseUrl}/models`，并只使用响应中的模型 ID。列表缓存在当前进程内。`run` 不主动发现；`chat` 仅在 `/model` 需要候选项时延迟发现。发现失败不得阻止已配置模型的实际调用。P1-2B 实现该运行时：`ProcessModelCatalog` 与 `ModelCatalogClient` 独立于 `ModelProvider.stream`，刷新失败时保留旧缓存，错误必须脱敏。
 
 ### 2.5 取代时点与兼容边界
 
@@ -69,9 +69,10 @@ CLI 显式参数 > echo.config.json
 | --- | --- |
 | P1-0 合入后、P1-2A 之前 | 本文与 [contracts.md](../contracts.md) 1.1 是 P1 的冻结契约。当时 `echo-harness run` 仍执行 P0 合并规则。 |
 | P1-2A 合入后 | 运行时执行本文与契约 1.1。加载器只读取 `<artifact-root>/config/echo.config.json`；P0 来源测试改为断言这些来源已被忽略，且不得继续读取已移除来源。 |
+| P1-2B 合入后 | 运行时执行模型目录发现与进程内缓存。`run` 仍不调用 `/models`；Chat `/model` 与 `/model refresh` 是唯一延迟发现入口。 |
 | 已有 P0 本地文件 | 不迁移工作区或用户目录中的旧配置文件。操作者使用 `echo-harness config` 重新写入产物配置。 |
 
-P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifact-root 解析、配置文件校验与 `echo-harness config`。Chat 输入解析属于 P1-1B。
+P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifact-root 解析、配置文件校验与 `echo-harness config`。P1-2B 实现 `GET /models` 发现、进程内缓存与失败不阻断。Chat 输入解析属于 P1-1B。
 
 ## 3. 选择理由
 

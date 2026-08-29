@@ -72,10 +72,13 @@ $env:ECHO_API_KEY = '<secret>'
 
 The wizard asks for the OpenAI-compatible Provider URL, discover vs manual model catalog, default
 model, and safety mode. It keeps a memory draft until the final confirmation, then writes the file
-atomically. `ECHO_API_KEY` is the only supported secret environment variable and is never saved.
-CLI flags such as `--model`, `--base-url`, and `--safety-mode` override the file for one `run`.
-Missing configuration makes `run` exit `2` and suggest `echo-harness config`. P1-2A landed this
-loader; it does not read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, or workspace config files.
+atomically. Discover mode stores only the default model; candidate IDs are fetched later with
+`GET /models`, cached in-process, and never required by `run`. Discovery failure does not block the
+configured model. `ECHO_API_KEY` is the only supported secret environment variable and is never saved.
+CLI flags such as `--model`, `--base-url`, and `--safety-mode` override the file for one `run` and
+do not query the catalog. Missing configuration makes `run` exit `2` and suggest `echo-harness config`.
+P1-2A landed the loader; P1-2B landed catalog discovery. Neither reads `ECHO_BASE_URL`, `ECHO_MODEL`,
+`ECHO_SAFETY_MODE`, or workspace config files.
 
 See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
 

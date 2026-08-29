@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -79,6 +80,85 @@ async function readEvents(root: string): Promise<EchoEvent[]> {
 }
 
 describe('CLI chat integration', () => {
+  it('shows approval choices on stderr before reading input and does not submit the choice as chat', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          {
+            type: 'tool_call',
+            call: {
+              id: 'call-version',
+              name: 'run_command',
+              arguments: { command: 'node --version' },
+            },
+          },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'version checked' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const approvalInput = new PassThrough();
+    let stdout = '';
+    let stderr = '';
+    let answered = false;
+    const approvalOutput = new Writable({
+      write(chunk, _encoding, callback) {
+        stderr += String(chunk);
+        if (!answered && stderr.includes('Approve [y] once / [s] session / [n] deny')) {
+          answered = true;
+          queueMicrotask(() => approvalInput.write('y\n'));
+        }
+        callback();
+      },
+    });
+
+    const outcome = await runChat(
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: true,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: {
+          writeStdout: (text) => {
+            stdout += text;
+          },
+          writeStderr: (text) => {
+            stderr += text;
+          },
+        },
+        providerFactory: () => provider,
+        input: new ScriptedChatInput([
+          { kind: 'batch', text: 'check the version', source: 'typed' },
+          { kind: 'batch', text: '/quit', source: 'typed' },
+        ]),
+        stdin: approvalInput,
+        stderr: approvalOutput,
+      },
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(answered).toBe(true);
+    expect(stderr).toContain('Approve [y] once / [s] session / [n] deny');
+    expect(stdout).not.toContain('Approve [y] once / [s] session / [n] deny');
+    expect(provider.requests).toHaveLength(2);
+    expect(
+      provider.requests.some((request) =>
+        request.messages.some((message) => message.role === 'user' && message.content === 'y'),
+      ),
+    ).toBe(false);
+  });
+
   it('runs Fake Provider turns, slash commands, empty input, and paste without slash injection', async () => {
     const root = await workspace();
     await writeArtifactConfig(root);

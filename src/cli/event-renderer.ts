@@ -34,6 +34,13 @@ interface RequestedTool {
 
 export const APPROVAL_CHOICES = 'Approve [y] once / [s] session / [n] deny';
 
+export function formatApprovalQuestion(capabilities: RenderCapabilities): string {
+  const marker = capabilities.unicode ? '›' : '>';
+  const body = `${APPROVAL_CHOICES} ${marker}`;
+  const lines = formatLabeled('', body, layoutOptions(capabilities));
+  return `${lines.at(-1) ?? body} `;
+}
+
 function compact(value: string, maximum = 240): string {
   const oneLine = [...value.replace(/\s+/gu, ' ')]
     .filter((character) => {
@@ -556,8 +563,7 @@ export class DefaultEventRenderer implements EventRenderer {
         );
     if (!capabilities.interactive) return stderrLines(lines);
     const closed = lines.slice(0, -1);
-    const last = lines.at(-1) ?? prompt;
-    return [...stderrLines(closed), stderrOpenLine(`${last} `)];
+    return [...stderrLines(closed), stderrOpenLine(formatApprovalQuestion(capabilities))];
   }
 
   private renderCompleted(

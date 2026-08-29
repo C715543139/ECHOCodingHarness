@@ -2,9 +2,13 @@ import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
 import type { ApprovalHandler } from '../agent/index.js';
-import type { AgentResult, ModelProvider } from '../contracts/index.js';
+import type { AgentResult, ModelProvider, RenderCapabilities } from '../contracts/index.js';
 
-import { DefaultEventRenderer } from './event-renderer.js';
+import {
+  APPROVAL_CHOICES,
+  DefaultEventRenderer,
+  formatApprovalQuestion,
+} from './event-renderer.js';
 import {
   createHarnessService,
   defaultIo,
@@ -47,16 +51,23 @@ export function toExitCode(result: AgentResult): number {
 export class InteractiveApprovalHandler implements ApprovalHandler {
   private readonly input: Readable;
   private readonly output: Writable;
+  private readonly question: string;
 
-  constructor(input: Readable = process.stdin, output: Writable = process.stderr) {
+  constructor(
+    input: Readable = process.stdin,
+    output: Writable = process.stderr,
+    capabilities?: RenderCapabilities,
+  ) {
     this.input = input;
     this.output = output;
+    this.question =
+      capabilities === undefined ? `${APPROVAL_CHOICES} > ` : formatApprovalQuestion(capabilities);
   }
 
   async requestApproval(request: Parameters<ApprovalHandler['requestApproval']>[0]) {
     const terminal = createInterface({ input: this.input, output: this.output, terminal: true });
     try {
-      const answer = await terminal.question('', {
+      const answer = await terminal.question(this.question, {
         signal: request.signal,
       });
       const normalized = answer.trim().toLocaleLowerCase('en-US');
@@ -100,7 +111,11 @@ export async function runGoal(
     runtime: loaded,
     unattendedApproval: options.interactive ? 'wait' : 'deny',
     ...(options.interactive
-      ? { approvalHandler: dependencies.approvalHandler ?? new InteractiveApprovalHandler() }
+      ? {
+          approvalHandler:
+            dependencies.approvalHandler ??
+            new InteractiveApprovalHandler(process.stdin, process.stderr, loaded.capabilities),
+        }
       : {}),
     onEvent: (event) => writeChunks(renderer.renderEvent(event, loaded.capabilities), io),
   });

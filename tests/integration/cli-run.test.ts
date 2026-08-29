@@ -1,11 +1,12 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runGoal, toExitCode } from '../../src/cli/run.js';
+import { InteractiveApprovalHandler, runGoal, toExitCode } from '../../src/cli/run.js';
 import type { AgentResult } from '../../src/contracts/index.js';
 import { FakeProvider } from '../../src/provider/index.js';
 
@@ -197,6 +198,61 @@ describe('CLI run integration', () => {
     expect(outcome.result).toMatchObject({ status: 'failed', stopReason: 'policy_denied' });
     expect(captured.stderr()).toContain('APPROVAL');
     expect(captured.stderr()).toContain('DENIED');
+  });
+
+  it('shows approval choices on stderr before accepting an interactive run decision', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          {
+            type: 'tool_call',
+            call: {
+              id: 'call-version',
+              name: 'run_command',
+              arguments: { command: 'node --version' },
+            },
+          },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'version checked' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const captured = output();
+    const approvalInput = new PassThrough();
+    let approvalStderr = '';
+    const approvalOutput = new Writable({
+      write(chunk, _encoding, callback) {
+        approvalStderr += String(chunk);
+        callback();
+      },
+    });
+    const approvalHandler = new InteractiveApprovalHandler(approvalInput, approvalOutput);
+
+    const running = runGoal(
+      'check the version',
+      { workspace: root, verbose: false, color: false, interactive: true, artifactRoot: root },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+        approvalHandler,
+      },
+    );
+    await vi.waitFor(() => expect(approvalStderr).toContain('Approve [y] once'));
+    approvalInput.end('y\n');
+    const outcome = await running;
+
+    expect(outcome.exitCode).toBe(0);
+    expect(approvalStderr).toContain('Approve [y] once / [s] session / [n] deny');
+    expect(captured.stdout()).toBe('version checked\n');
+    expect(captured.stdout()).not.toContain('Approve [y] once');
   });
 
   it('maps every Agent result class to the stable documented exit code', () => {

@@ -158,7 +158,9 @@ export async function runChat(
     });
   const approvalHandler =
     dependencies.approvalHandler ??
-    (options.interactive ? new InteractiveApprovalHandler(stdin, stderr) : undefined);
+    (options.interactive
+      ? new InteractiveApprovalHandler(stdin, stderr, loaded.capabilities)
+      : undefined);
 
   let turnRunning = false;
   const service = createHarnessService({

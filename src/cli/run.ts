@@ -1,17 +1,10 @@
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
 import { AgentLoop, type ApprovalHandler } from '../agent/index.js';
-import {
-  checkConfig,
-  loadConfig,
-  loadConfigFile,
-  type EchoConfig,
-  type RawConfigValues,
-} from '../config/index.js';
+import { loadRuntimeConfig, type EchoConfig, type RawConfigValues } from '../config/index.js';
 import type {
   AgentResult,
   ModelProvider,
@@ -44,6 +37,7 @@ export interface RunGoalOptions {
   readonly color: boolean;
   readonly interactive: boolean;
   readonly signal?: AbortSignal;
+  readonly artifactRoot?: string;
 }
 
 export interface CliIo {
@@ -62,7 +56,7 @@ export interface RunGoalDependencies {
   readonly io?: CliIo;
   readonly providerFactory?: (options: ProviderFactoryOptions) => ModelProvider;
   readonly approvalHandler?: ApprovalHandler;
-  readonly userConfigDirectory?: string | false;
+  readonly artifactRoot?: string;
 }
 
 export interface RunGoalOutcome {
@@ -75,16 +69,6 @@ function defaultIo(): CliIo {
     writeStdout: (text) => process.stdout.write(text),
     writeStderr: (text) => process.stderr.write(text),
   };
-}
-
-function defaultUserConfigDirectory(env: Readonly<Record<string, string | undefined>>): string {
-  if (process.platform === 'win32' && env['APPDATA'] !== undefined) {
-    return path.join(env['APPDATA'], 'echo-harness');
-  }
-  if (env['XDG_CONFIG_HOME'] !== undefined) {
-    return path.join(env['XDG_CONFIG_HOME'], 'echo-harness');
-  }
-  return path.join(os.homedir(), '.config', 'echo-harness');
 }
 
 async function resolveWorkspace(candidate: string): Promise<string> {
@@ -172,6 +156,7 @@ export async function runGoal(
   const io = dependencies.io ?? defaultIo();
   const secret = env['ECHO_API_KEY'] ?? '';
   const redaction = { secrets: secret.length === 0 ? [] : [secret] };
+  const artifactRoot = options.artifactRoot ?? dependencies.artifactRoot;
 
   let workspaceRoot: string;
   try {
@@ -181,37 +166,21 @@ export async function runGoal(
     return { exitCode: 2 };
   }
 
-  const projectFile = await loadConfigFile(workspaceRoot);
-  if (projectFile.error !== undefined) {
-    io.writeStderr(`FAIL   configuration · ${projectFile.error}\n`);
-    return { exitCode: 2 };
-  }
-  const userDirectory =
-    dependencies.userConfigDirectory === false
-      ? undefined
-      : (dependencies.userConfigDirectory ?? defaultUserConfigDirectory(env));
-  const userFile =
-    userDirectory === undefined ? { config: undefined } : await loadConfigFile(userDirectory);
-  if (userFile.error !== undefined) {
-    io.writeStderr(`FAIL   configuration · ${userFile.error}\n`);
+  if (artifactRoot === undefined) {
+    io.writeStderr(
+      'FAIL   configuration · artifact-root is missing. The CLI must resolve it from its entry module.\n',
+    );
     return { exitCode: 2 };
   }
 
-  const loaded = loadConfig({
+  const loaded = await loadRuntimeConfig({
+    artifactRoot,
     env,
-    projectConfig: projectFile.config,
-    userConfig: userFile.config,
     overrides: cliOverrides(options),
   });
-  for (const warning of loaded.warnings) {
-    io.writeStderr(`WARN   configuration · ${redactText(warning.message, redaction)}\n`);
-  }
-  const checked = checkConfig(loaded.config);
-  if (!checked.ok) {
-    for (const issue of checked.issues) {
-      io.writeStderr(
-        `${issue.severity === 'error' ? 'FAIL' : 'WARN'}   configuration · ${redactText(issue.message, redaction)}\n`,
-      );
+  if (!loaded.ok) {
+    for (const issue of loaded.issues) {
+      io.writeStderr(`FAIL   configuration · ${redactText(issue.message, redaction)}\n`);
     }
     return { exitCode: 2 };
   }

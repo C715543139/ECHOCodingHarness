@@ -1,15 +1,18 @@
+import {
+  CONFIG_ERROR_CODES,
+  P1_CONFIG_RELATIVE_PATH,
+  type ConfigIssue,
+  type EchoPersistentConfig,
+  type ModelCatalogConfig,
+} from '../contracts/config.js';
 import type { SafetyMode } from '../contracts/safety.js';
 
+import { inspectProviderUrl, parsePersistentConfig, SAFETY_MODES } from './schema.js';
+
 export const ENV_KEYS = {
-  baseUrl: 'ECHO_BASE_URL',
   apiKey: 'ECHO_API_KEY',
-  model: 'ECHO_MODEL',
-  safetyMode: 'ECHO_SAFETY_MODE',
 } as const;
 
-export const CONFIG_FILE_NAMES = ['echo.config.json', '.echo-config.json'] as const;
-
-export const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 export const DEFAULT_SAFETY_MODE: SafetyMode = 'balanced';
 export const DEFAULT_MAX_STEPS = 24;
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -17,19 +20,6 @@ export const DEFAULT_MAX_OUTPUT_CHARS = 20_000;
 export const DEFAULT_MAX_APPROX_TOKENS = 32_000;
 export const DEFAULT_RESERVED_OUTPUT_TOKENS = 4_000;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
-
-const SAFETY_MODES: readonly SafetyMode[] = ['safe', 'balanced', 'auto'];
-
-const KNOWN_CONFIG_KEYS = [
-  'baseUrl',
-  'model',
-  'safetyMode',
-  'maxSteps',
-  'timeoutMs',
-  'maxOutputChars',
-  'context',
-  'requestTimeoutMs',
-] as const;
 
 export interface ContextConfig {
   readonly maxApproxTokens: number;
@@ -39,6 +29,7 @@ export interface ContextConfig {
 export interface EchoConfig {
   readonly baseUrl: string;
   readonly model: string;
+  readonly modelCatalog: ModelCatalogConfig;
   readonly safetyMode: SafetyMode;
   readonly maxSteps: number;
   readonly timeoutMs: number;
@@ -48,16 +39,7 @@ export interface EchoConfig {
   readonly apiKeyPresent: boolean;
 }
 
-export type ConfigSource = 'cli' | 'env' | 'project' | 'user' | 'default';
-
-export interface ConfigWarning {
-  readonly source: ConfigSource;
-  readonly message: string;
-}
-
-export interface ConfigFileResult {
-  readonly config: RawConfigValues | undefined;
-}
+export type ConfigSource = 'cli' | 'config';
 
 export interface RawConfigValues {
   readonly [key: string]: unknown;
@@ -71,40 +53,17 @@ export interface RawConfigValues {
   readonly context?: unknown;
 }
 
-export interface ConfigLoadResult {
-  readonly config: EchoConfig;
-  readonly warnings: readonly ConfigWarning[];
-}
-
-interface ResolvedValues {
-  readonly baseUrl?: string;
-  readonly model?: string;
-  readonly safetyMode?: SafetyMode;
-  readonly maxSteps?: number;
-  readonly timeoutMs?: number;
-  readonly maxOutputChars?: number;
-  readonly requestTimeoutMs?: number;
-  readonly maxApproxTokens?: number;
-  readonly reservedOutputTokens?: number;
-}
-
-interface RawConfig {
-  readonly values: RawConfigValues;
-  readonly unknownKeys: readonly string[];
-}
+export type ConfigLoadResult =
+  | { readonly ok: true; readonly config: EchoConfig }
+  | { readonly ok: false; readonly issues: readonly ConfigIssue[] };
 
 export interface ConfigInput {
   readonly env?: Record<string, string | undefined>;
-  readonly projectConfig?: RawConfigValues | undefined;
-  readonly userConfig?: RawConfigValues | undefined;
+  readonly fileConfig?: unknown;
   readonly overrides?: RawConfigValues;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function asString(value: unknown): string | undefined {
+function asNonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
@@ -115,217 +74,121 @@ function asPositiveInt(value: unknown): number | undefined {
   return value;
 }
 
-function readRawConfig(source: unknown, sourceName: string): RawConfig {
-  if (source === undefined || source === null) {
-    return { values: {}, unknownKeys: [] };
+function apiKeyPresent(env: Record<string, string | undefined>): boolean {
+  const apiKey = env[ENV_KEYS.apiKey];
+  return typeof apiKey === 'string' && apiKey.trim().length > 0;
+}
+
+function parseCliOverrides(
+  overrides: RawConfigValues | undefined,
+): ConfigIssue[] | RawConfigValues {
+  if (overrides === undefined) {
+    return {};
   }
-  if (!isRecord(source)) {
-    throw new Error(`${sourceName} must be a JSON object`);
-  }
+  const issues: ConfigIssue[] = [];
   const values: Record<string, unknown> = {};
-  const unknownKeys: string[] = [];
-  for (const [key, value] of Object.entries(source)) {
-    if ((KNOWN_CONFIG_KEYS as readonly string[]).includes(key)) {
-      values[key] = value;
+
+  if (overrides.baseUrl !== undefined) {
+    const inspected = inspectProviderUrl(overrides.baseUrl);
+    if ('code' in inspected) {
+      issues.push(inspected);
     } else {
-      unknownKeys.push(key);
+      values['baseUrl'] = inspected.href;
     }
   }
-  return { values: values as RawConfigValues, unknownKeys };
-}
-
-function readSafetyMode(value: unknown): SafetyMode | undefined {
-  const text = asString(value);
-  if (text === undefined) {
-    return undefined;
+  if (overrides.model !== undefined) {
+    const model = asNonEmptyString(overrides.model);
+    if (model === undefined) {
+      issues.push({
+        code: CONFIG_ERROR_CODES.missingModel,
+        message: 'Model name is missing. Run echo-harness config or pass --model.',
+        path: 'model',
+      });
+    } else {
+      values['model'] = model;
+    }
   }
-  const normalized = text.toLowerCase();
-  return (SAFETY_MODES as readonly string[]).includes(normalized)
-    ? (normalized as SafetyMode)
-    : undefined;
-}
-
-interface FieldIssue {
-  readonly key: string;
-  readonly source: ConfigSource;
-  readonly problem: 'invalid_type' | 'unknown_value';
-}
-
-function pick(candidates: readonly { source: ConfigSource; values: RawConfigValues }[]): {
-  resolved: ResolvedValues;
-  issues: readonly FieldIssue[];
-} {
-  const issues: FieldIssue[] = [];
-  const resolved: Record<string, string | number | SafetyMode> = {};
-
-  const takeString = (key: 'baseUrl' | 'model'): void => {
-    for (const candidate of candidates) {
-      const raw = candidate.values[key];
-      if (raw === undefined) {
-        continue;
-      }
-      const parsed = asString(raw);
-      if (parsed === undefined) {
-        issues.push({ key, source: candidate.source, problem: 'invalid_type' });
-        return;
-      }
-      resolved[key] = parsed;
-      return;
+  if (overrides.safetyMode !== undefined) {
+    const text = asNonEmptyString(overrides.safetyMode);
+    const normalized = text?.toLowerCase();
+    if (normalized === undefined || !(SAFETY_MODES as readonly string[]).includes(normalized)) {
+      issues.push({
+        code: CONFIG_ERROR_CODES.invalid,
+        message: `safetyMode must be one of: ${SAFETY_MODES.join(', ')}.`,
+        path: 'safetyMode',
+      });
+    } else {
+      values['safetyMode'] = normalized;
     }
-  };
-
-  const takeInt = (key: 'maxSteps' | 'timeoutMs' | 'maxOutputChars' | 'requestTimeoutMs'): void => {
-    for (const candidate of candidates) {
-      const raw = candidate.values[key];
-      if (raw === undefined) {
-        continue;
-      }
-      const parsed = asPositiveInt(raw);
-      if (parsed === undefined) {
-        issues.push({ key, source: candidate.source, problem: 'invalid_type' });
-        return;
-      }
-      resolved[key] = parsed;
-      return;
-    }
-  };
-
-  const takeSafetyMode = (): void => {
-    for (const candidate of candidates) {
-      const raw = candidate.values.safetyMode;
-      if (raw === undefined) {
-        continue;
-      }
-      const parsed = readSafetyMode(raw);
-      if (parsed === undefined) {
-        issues.push({ key: 'safetyMode', source: candidate.source, problem: 'unknown_value' });
-        return;
-      }
-      resolved.safetyMode = parsed;
-      return;
-    }
-  };
-
-  const takeContext = (): void => {
-    for (const candidate of candidates) {
-      const raw = candidate.values.context;
-      if (raw === undefined) {
-        continue;
-      }
-      const maxApproxTokens = isRecord(raw) ? asPositiveInt(raw['maxApproxTokens']) : undefined;
-      const reservedOutputTokens = isRecord(raw)
-        ? asPositiveInt(raw['reservedOutputTokens'])
-        : undefined;
-      if (maxApproxTokens === undefined || reservedOutputTokens === undefined) {
-        issues.push({ key: 'context', source: candidate.source, problem: 'invalid_type' });
-        return;
-      }
-      resolved.maxApproxTokens = maxApproxTokens;
-      resolved.reservedOutputTokens = reservedOutputTokens;
-      return;
-    }
-  };
-
-  takeString('baseUrl');
-  takeString('model');
-  takeSafetyMode();
-  takeInt('maxSteps');
-  takeInt('timeoutMs');
-  takeInt('maxOutputChars');
-  takeInt('requestTimeoutMs');
-  takeContext();
-
-  return { resolved: resolved as unknown as ResolvedValues, issues };
-}
-
-function describeSource(source: ConfigSource): string {
-  switch (source) {
-    case 'cli':
-      return 'CLI arguments';
-    case 'env':
-      return 'environment variables';
-    case 'project':
-      return 'project configuration';
-    case 'user':
-      return 'user configuration';
-    case 'default':
-      return 'defaults';
   }
+  if (overrides.maxSteps !== undefined) {
+    const parsed = asPositiveInt(overrides.maxSteps);
+    if (parsed === undefined) {
+      issues.push({
+        code: CONFIG_ERROR_CODES.invalid,
+        message: 'maxSteps must be a positive integer.',
+        path: 'maxSteps',
+      });
+    } else {
+      values['maxSteps'] = parsed;
+    }
+  }
+
+  return issues.length > 0 ? issues : values;
 }
 
-function describeProblem(problem: FieldIssue['problem']): string {
-  return problem === 'unknown_value' ? 'uses an unsupported value' : 'must be a valid value';
+function applyDefaults(
+  persistent: EchoPersistentConfig,
+  overrides: RawConfigValues,
+  present: boolean,
+): EchoConfig {
+  return {
+    baseUrl: asNonEmptyString(overrides.baseUrl) ?? persistent.baseUrl,
+    model: asNonEmptyString(overrides.model) ?? persistent.model,
+    modelCatalog: persistent.modelCatalog,
+    safetyMode:
+      (asNonEmptyString(overrides.safetyMode)?.toLowerCase() as SafetyMode | undefined) ??
+      persistent.safetyMode ??
+      DEFAULT_SAFETY_MODE,
+    maxSteps: asPositiveInt(overrides.maxSteps) ?? persistent.maxSteps ?? DEFAULT_MAX_STEPS,
+    timeoutMs: persistent.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    maxOutputChars: persistent.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS,
+    requestTimeoutMs: persistent.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+    context: {
+      maxApproxTokens: persistent.context?.maxApproxTokens ?? DEFAULT_MAX_APPROX_TOKENS,
+      reservedOutputTokens:
+        persistent.context?.reservedOutputTokens ?? DEFAULT_RESERVED_OUTPUT_TOKENS,
+    },
+    apiKeyPresent: present,
+  };
+}
+
+export function missingConfigIssues(configPath = P1_CONFIG_RELATIVE_PATH): readonly ConfigIssue[] {
+  return [
+    {
+      code: CONFIG_ERROR_CODES.missingFile,
+      message: `Configuration file is missing (${configPath}). Run echo-harness config.`,
+      path: configPath,
+    },
+  ];
 }
 
 export function loadConfig(input: ConfigInput = {}): ConfigLoadResult {
-  const warnings: ConfigWarning[] = [];
-  const env = input.env ?? process.env;
-  const apiKey = env[ENV_KEYS.apiKey];
-  const apiKeyPresent = typeof apiKey === 'string' && apiKey.trim().length > 0;
-
-  const envValues: RawConfigValues = {
-    baseUrl: env[ENV_KEYS.baseUrl],
-    model: env[ENV_KEYS.model],
-    safetyMode: env[ENV_KEYS.safetyMode],
-  };
-
-  const cli = readRawConfig(input.overrides, 'CLI overrides');
-  for (const key of cli.unknownKeys) {
-    warnings.push({
-      source: 'cli',
-      message: `Unknown configuration key "${key}" was ignored; check for typos.`,
-    });
+  const env = input.env ?? {};
+  if (input.fileConfig === undefined) {
+    return { ok: false, issues: missingConfigIssues() };
   }
 
-  const project = readRawConfig(input.projectConfig, 'Project configuration');
-  for (const key of project.unknownKeys) {
-    warnings.push({
-      source: 'project',
-      message: `Unknown configuration key "${key}" in project configuration was ignored; check for typos.`,
-    });
+  const parsed = parsePersistentConfig(input.fileConfig);
+  if ('issues' in parsed) {
+    return { ok: false, issues: parsed.issues };
   }
 
-  const user = readRawConfig(input.userConfig, 'User configuration');
-  for (const key of user.unknownKeys) {
-    warnings.push({
-      source: 'user',
-      message: `Unknown configuration key "${key}" in user configuration was ignored; check for typos.`,
-    });
+  const overrideResult = parseCliOverrides(input.overrides);
+  if (Array.isArray(overrideResult)) {
+    return { ok: false, issues: overrideResult };
   }
 
-  const candidates = [
-    { source: 'cli' as const, values: cli.values },
-    { source: 'env' as const, values: envValues },
-    { source: 'project' as const, values: project.values },
-    { source: 'user' as const, values: user.values },
-  ];
-
-  const { resolved, issues } = pick(candidates);
-  for (const issue of issues) {
-    const hint =
-      issue.key === 'safetyMode'
-        ? ` (${issue.key} must be one of: ${SAFETY_MODES.join(', ')})`
-        : '';
-    warnings.push({
-      source: issue.source,
-      message: `${describeSource(issue.source)} provided "${issue.key}" that ${describeProblem(issue.problem)}; it was ignored.${hint}`,
-    });
-  }
-
-  const config: EchoConfig = {
-    baseUrl: resolved.baseUrl ?? DEFAULT_BASE_URL,
-    model: resolved.model ?? '',
-    safetyMode: resolved.safetyMode ?? DEFAULT_SAFETY_MODE,
-    maxSteps: resolved.maxSteps ?? DEFAULT_MAX_STEPS,
-    timeoutMs: resolved.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    maxOutputChars: resolved.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS,
-    requestTimeoutMs: resolved.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
-    context: {
-      maxApproxTokens: resolved.maxApproxTokens ?? DEFAULT_MAX_APPROX_TOKENS,
-      reservedOutputTokens: resolved.reservedOutputTokens ?? DEFAULT_RESERVED_OUTPUT_TOKENS,
-    },
-    apiKeyPresent,
-  };
-
-  return { config, warnings };
+  const config = applyDefaults(parsed.config, overrideResult, apiKeyPresent(env));
+  return { ok: true, config };
 }

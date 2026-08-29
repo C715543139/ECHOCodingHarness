@@ -134,14 +134,25 @@ describe('CLI demo story', () => {
     ]);
     const captured = output();
 
+    await fs.mkdir(path.join(root, 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(root, 'config', 'echo.config.json'),
+      JSON.stringify({
+        baseUrl: 'https://provider.example/v1',
+        model: 'fake-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'balanced',
+      }),
+      'utf8',
+    );
+
     const outcome = await runGoal(
       'Fix the failing parser tests without modifying tests.',
-      { workspace: root, verbose: false, color: false, interactive: false },
+      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
       {
-        env: { ECHO_API_KEY: 'test-key', ECHO_MODEL: 'fake-model' },
+        env: { ECHO_API_KEY: 'test-key' },
         io: captured.io,
         providerFactory: () => provider,
-        userConfigDirectory: false,
       },
     );
 

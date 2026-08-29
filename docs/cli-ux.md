@@ -26,12 +26,13 @@
 ### 2.2 非目标
 
 - 不设计 React/Web 页面；
-- 不承诺 `chat`、`config` 或机器可读输出模式进入 P0；
+- 不承诺 `chat` 或机器可读输出模式进入 P0；
+- 不展示模型内部推理或隐藏思维过程；
 - 不展示模型内部推理或隐藏思维过程；
 - 不用动画、图标数量或主题复杂度衡量产品质量；
 - 不让 CLI 文案参与 Agent 状态判断。
 
-P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准；P1-3 之前本文仍描述当前 `run` 渲染器。
+P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准；P1-3 之前本文仍描述当前 `run` 渲染器。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。
 
 ## 3. 设计原则
 

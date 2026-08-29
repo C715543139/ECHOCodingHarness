@@ -60,33 +60,24 @@ pnpm build
 
 ## Configure
 
-The current `echo-harness run` still uses the P0 merge order: CLI arguments, environment
-variables, project configuration, user configuration, then built-in defaults. Credentials are
-read from the process environment. ECHO does not automatically load `.env` files, and a
-configuration file cannot provide an API key.
+Non-secret settings persist only at `<artifact-root>/config/echo.config.json`.
+`artifact-root` is the directory of the CLI module or executable (`dist/` after `pnpm build`),
+never `process.cwd()`. Create or update that file with the interactive wizard:
 
 ```powershell
-$env:ECHO_BASE_URL = 'https://provider.example/v1'
+pnpm build
+node .\dist\cli.js config
 $env:ECHO_API_KEY = '<secret>'
-$env:ECHO_MODEL = '<model>'
-$env:ECHO_SAFETY_MODE = 'balanced'
 ```
 
-Non-secret defaults may instead be placed in `echo.config.json` or `.echo-config.json`:
+The wizard asks for the OpenAI-compatible Provider URL, discover vs manual model catalog, default
+model, and safety mode. It keeps a memory draft until the final confirmation, then writes the file
+atomically. `ECHO_API_KEY` is the only supported secret environment variable and is never saved.
+CLI flags such as `--model`, `--base-url`, and `--safety-mode` override the file for one `run`.
+Missing configuration makes `run` exit `2` and suggest `echo-harness config`. P1-2A landed this
+loader; it does not read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, or workspace config files.
 
-```json
-{
-  "baseUrl": "https://provider.example/v1",
-  "model": "example-model",
-  "safetyMode": "balanced",
-  "maxSteps": 24
-}
-```
-
-P1-2A replaces that lookup with a single file at `<artifact-root>/config/echo.config.json`.
-`artifact-root` is derived from the CLI module or executable, never `process.cwd()`. After that
-cutover, `ECHO_API_KEY` remains the only supported secret environment variable; `ECHO_BASE_URL`,
-`ECHO_MODEL`, and `ECHO_SAFETY_MODE` are removed. See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
+See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
 
 ## Run
 

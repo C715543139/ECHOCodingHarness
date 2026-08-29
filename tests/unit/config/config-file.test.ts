@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { loadConfigFile } from '../../../src/config/config-file.js';
+import { readPersistentConfigFile } from '../../../src/config/index.js';
 
 const tempDirs: string[] = [];
 
@@ -18,90 +18,75 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
-describe('loadConfigFile', () => {
-  it('returns parsed values for echo.config.json', async () => {
-    const dir = await makeTempDir();
+describe('readPersistentConfigFile', () => {
+  it('reads only <artifact-root>/config/echo.config.json', async () => {
+    const artifactRoot = await makeTempDir();
+    const workspace = await makeTempDir();
+    await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
     await fs.writeFile(
-      path.join(dir, 'echo.config.json'),
-      JSON.stringify({ model: 'file-model', safetyMode: 'safe' }),
+      path.join(artifactRoot, 'config', 'echo.config.json'),
+      JSON.stringify({ model: 'artifact-model' }),
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(workspace, 'echo.config.json'),
+      JSON.stringify({ model: 'cwd-model' }),
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(artifactRoot, '.echo-config.json'),
+      JSON.stringify({ model: 'legacy-model' }),
       'utf8',
     );
 
-    const result = await loadConfigFile(dir);
-    expect(result.config).toEqual({ model: 'file-model', safetyMode: 'safe' });
-    expect(result.error).toBeUndefined();
+    const result = await readPersistentConfigFile(artifactRoot);
+    expect(result).toEqual({
+      status: 'loaded',
+      raw: { model: 'artifact-model' },
+    });
   });
 
-  it('preserves unknown keys so they surface later as config warnings', async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(
-      path.join(dir, '.echo-config.json'),
-      JSON.stringify({ model: 'm', totallyUnknown: 1 }),
-      'utf8',
-    );
-
-    const result = await loadConfigFile(dir);
-    expect(result.config).toEqual({ model: 'm', totallyUnknown: 1 });
-  });
-
-  it('returns undefined when no config file exists', async () => {
-    const dir = await makeTempDir();
-    const result = await loadConfigFile(dir);
-    expect(result.config).toBeUndefined();
-    expect(result.error).toBeUndefined();
+  it('returns missing when the persistent file does not exist', async () => {
+    const artifactRoot = await makeTempDir();
+    const result = await readPersistentConfigFile(artifactRoot);
+    expect(result).toEqual({ status: 'missing' });
   });
 
   it('reports invalid JSON without throwing', async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, 'echo.config.json'), '{ not json', 'utf8');
+    const artifactRoot = await makeTempDir();
+    await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
+    await fs.writeFile(path.join(artifactRoot, 'config', 'echo.config.json'), '{ not json', 'utf8');
 
-    const result = await loadConfigFile(dir);
-    expect(result.config).toBeUndefined();
-    expect(result.error).toContain('not valid JSON');
+    const result = await readPersistentConfigFile(artifactRoot);
+    expect(result.status).toBe('error');
+    if (result.status !== 'error') {
+      return;
+    }
+    expect(result.issue.message).toContain('not valid JSON');
   });
 
-  it('treats an empty file as no configuration', async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, 'echo.config.json'), '   ', 'utf8');
+  it('treats an empty file as invalid configuration', async () => {
+    const artifactRoot = await makeTempDir();
+    await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
+    await fs.writeFile(path.join(artifactRoot, 'config', 'echo.config.json'), '   ', 'utf8');
 
-    const result = await loadConfigFile(dir);
-    expect(result.config).toBeUndefined();
+    const result = await readPersistentConfigFile(artifactRoot);
+    expect(result.status).toBe('error');
   });
 
-  it('rejects a non-object root with an error message', async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, 'echo.config.json'), '["nope"]', 'utf8');
-
-    const result = await loadConfigFile(dir);
-    expect(result.error).toBeTruthy();
-  });
-
-  it('prefers echo.config.json over .echo-config.json', async () => {
-    const dir = await makeTempDir();
+  it('preserves unknown keys and credentials so schema validation can fail closed', async () => {
+    const artifactRoot = await makeTempDir();
+    await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
     await fs.writeFile(
-      path.join(dir, 'echo.config.json'),
-      JSON.stringify({ model: 'first' }),
-      'utf8',
-    );
-    await fs.writeFile(
-      path.join(dir, '.echo-config.json'),
-      JSON.stringify({ model: 'second' }),
+      path.join(artifactRoot, 'config', 'echo.config.json'),
+      JSON.stringify({ model: 'm', apiKey: 'placeholder', totallyUnknown: 1 }),
       'utf8',
     );
 
-    const result = await loadConfigFile(dir);
-    expect(result.config).toEqual({ model: 'first' });
-  });
-
-  it('does not read an api key from a config file', async () => {
-    const dir = await makeTempDir();
-    await fs.writeFile(
-      path.join(dir, 'echo.config.json'),
-      JSON.stringify({ apiKey: 'should-not-load' }),
-      'utf8',
-    );
-
-    const result = await loadConfigFile(dir);
-    expect(result.config).toEqual({});
+    const result = await readPersistentConfigFile(artifactRoot);
+    expect(result).toEqual({
+      status: 'loaded',
+      raw: { model: 'm', apiKey: 'placeholder', totallyUnknown: 1 },
+    });
   });
 });

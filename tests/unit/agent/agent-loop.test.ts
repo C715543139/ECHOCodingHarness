@@ -412,6 +412,34 @@ describe('AgentLoop', () => {
     expect(inspect.execute).toHaveBeenCalledTimes(2);
   });
 
+  it('continues a persisted session without emitting a second session.started event', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'first' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'second' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+    const loop = createLoop({ provider, store });
+
+    const first = await loop.run('first turn');
+    const second = await loop.continueSession(first.sessionId, 'second turn');
+
+    expect(second.sessionId).toBe(first.sessionId);
+    expect(second.turnId).not.toBe(first.turnId);
+    expect(second.finalText).toBe('second');
+    expect(store.events.filter((item) => item.type === 'session.started')).toHaveLength(1);
+    expect(store.events.filter((item) => item.type === 'turn.started')).toHaveLength(2);
+  });
+
   it('does not let a failing event observer change orchestration state', async () => {
     const provider = new FakeProvider([
       {

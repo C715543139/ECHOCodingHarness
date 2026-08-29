@@ -62,7 +62,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'events',
     requirement: 'Event schema version 2 adds session.resumed, model.changed, and safety.changed',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/application/echo-application-service.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -71,7 +71,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'Session Provider fields use ProviderIdentity with branded EndpointFingerprint, never a raw URL string',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/session/endpoint-fingerprint.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -80,7 +80,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'run and chat share ApplicationService; respondToApproval binds turnId+toolCallId+approvalKey and returns accepted/duplicate/expired/not_pending',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/application/echo-application-service.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -89,7 +89,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'SessionRepository.create accepts model and safetyMode so SessionSummary can be returned without extra reads',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/session/jsonl-session-repository.test.ts',
     runtimeTask: 'P1-1A',
   },
   {

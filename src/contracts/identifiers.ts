@@ -8,7 +8,8 @@ declare const endpointFingerprintBrand: unique symbol;
 
 /**
  * Irreversible Provider endpoint identifier. Never a raw URL, credential,
- * userinfo, or a reversible encoding of those values. P1-1A owns the hash.
+ * userinfo, or a reversible encoding of those values. Created by SHA-256 over
+ * `openai-compatible|<scheme>|<host>|<port>`.
  */
 export type EndpointFingerprint = string & {
   readonly [endpointFingerprintBrand]: true;

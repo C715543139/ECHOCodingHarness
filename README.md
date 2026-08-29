@@ -160,8 +160,8 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
 - ECHO is not an operating-system sandbox. Approved PowerShell commands can still access network
   or files permitted to the current user.
 - The current release does not provide Web UI, MCP, multi-agent execution, or a
-  general rollback system. Session resume and `chat` are frozen for P1 but not implemented until
-  P1-1A/P1-1B.
+  general rollback system. Application-service session create/resume exists after P1-1A;
+  `chat` remains scheduled for P1-1B.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

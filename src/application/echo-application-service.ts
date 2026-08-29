@@ -1,0 +1,557 @@
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
+
+import type { ApprovalHandler } from '../agent/index.js';
+import { AgentLoop } from '../agent/index.js';
+import type {
+  AgentResult,
+  ApplicationService,
+  ApprovalChoice,
+  ApprovalResponseInput,
+  ApprovalResponseResult,
+  ContextBudget,
+  ContextBuilder,
+  CreateSessionInput,
+  EchoEvent,
+  EchoEventPayloads,
+  EchoEventType,
+  ModelProvider,
+  P1ConfigSource,
+  ProviderIdentity,
+  ResumeSessionInput,
+  RunTurnInput,
+  SafetyMode,
+  SafetyPolicy,
+  SessionId,
+  SessionQueryView,
+  SessionRepository,
+  SessionRuntimeState,
+  SessionSummary,
+  ToolCallId,
+  ToolLimits,
+  TurnId,
+} from '../contracts/index.js';
+import { CONFIG_ERROR_CODES, EVENT_SCHEMA_VERSION } from '../contracts/index.js';
+import type { ToolRegistry } from '../tools/index.js';
+
+import { configurationError, isStorageError } from '../session/errors.js';
+import { providerIdentitiesEqual } from '../session/endpoint-fingerprint.js';
+import { toRuntimeState } from '../session/session-query.js';
+import { redactValue } from '../session/redaction.js';
+
+export type UnattendedApproval = 'deny' | 'wait';
+
+export interface EchoApplicationServiceOptions {
+  readonly repository: SessionRepository;
+  readonly provider: ModelProvider;
+  readonly providerIdentity: ProviderIdentity;
+  readonly tools: ToolRegistry;
+  readonly policy: SafetyPolicy;
+  readonly contextBuilder: ContextBuilder;
+  readonly workspaceRoot: string;
+  readonly maxSteps: number;
+  readonly contextBudget: ContextBudget;
+  readonly toolLimits: ToolLimits;
+  readonly repeatedToolCallLimit?: number;
+  readonly approvalHandler?: ApprovalHandler;
+  readonly unattendedApproval?: UnattendedApproval;
+  readonly onEvent?: (event: EchoEvent) => void | Promise<void>;
+  readonly secrets?: readonly string[];
+  readonly homeDirectory?: string;
+  readonly idFactory?: (kind: 'session' | 'turn' | 'step' | 'event') => string;
+  readonly now?: () => string;
+}
+
+interface SessionMemory {
+  model: SessionRuntimeState['model'];
+  safetyMode: SessionRuntimeState['safetyMode'];
+}
+
+interface ActiveTurn {
+  readonly turnId: TurnId;
+  readonly controller: AbortController;
+}
+
+interface PendingApproval {
+  readonly sessionId: SessionId;
+  readonly turnId: TurnId;
+  readonly toolCallId: ToolCallId;
+  readonly approvalKey: string;
+  readonly promise: Promise<ApprovalChoice>;
+  readonly resolve: (choice: ApprovalChoice) => void;
+  readonly reject: (error: unknown) => void;
+}
+
+function cancelledTurnError(): {
+  category: 'cancelled';
+  code: string;
+  message: string;
+  retryable: false;
+} {
+  return {
+    category: 'cancelled',
+    code: 'TURN_CANCELLED',
+    message: 'The agent turn was cancelled.',
+    retryable: false,
+  };
+}
+
+function approvalKeyOf(
+  sessionId: SessionId,
+  turnId: TurnId,
+  toolCallId: ToolCallId,
+  approvalKey: string,
+): string {
+  return `${sessionId}\0${turnId}\0${toolCallId}\0${approvalKey}`;
+}
+
+export class EchoApplicationService implements ApplicationService {
+  private readonly options: EchoApplicationServiceOptions;
+  private readonly memory = new Map<SessionId, SessionMemory>();
+  private readonly activeTurns = new Map<SessionId, ActiveTurn>();
+  private readonly pending = new Map<string, PendingApproval>();
+  private readonly settled = new Map<string, ApprovalChoice>();
+  private readonly expired = new Set<string>();
+  private readonly now: () => string;
+  private readonly idFactory: NonNullable<EchoApplicationServiceOptions['idFactory']>;
+
+  constructor(options: EchoApplicationServiceOptions) {
+    this.options = options;
+    this.now = options.now ?? (() => new Date().toISOString());
+    this.idFactory = options.idFactory ?? ((kind) => `${kind}-${randomUUID()}`);
+  }
+
+  async createSession(input: CreateSessionInput): Promise<SessionRuntimeState> {
+    this.assertWorkspace(input.workspaceRoot);
+    if (!providerIdentitiesEqual(input.provider, this.options.providerIdentity)) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.providerMismatch,
+        'The session Provider does not match the current process Provider.',
+      );
+    }
+
+    const summary = await this.options.repository.create({
+      workspaceRoot: input.workspaceRoot,
+      provider: input.provider,
+      model: input.model.value,
+      safetyMode: input.safetyMode.value,
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+    });
+    this.memory.set(summary.sessionId, {
+      model: input.model,
+      safetyMode: input.safetyMode,
+    });
+    const events = await this.options.repository.readAll(summary.sessionId);
+    const started = events[0];
+    if (started !== undefined) await this.notify(started);
+    return this.runtimeFrom(summary.sessionId, events);
+  }
+
+  async resumeSession(input: ResumeSessionInput): Promise<SessionRuntimeState> {
+    this.assertWorkspace(input.workspaceRoot);
+    if (!providerIdentitiesEqual(input.provider, this.options.providerIdentity)) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.providerMismatch,
+        'The current Provider does not match the Provider that created this session.',
+      );
+    }
+
+    const view = await this.options.repository.resume({
+      workspaceRoot: input.workspaceRoot,
+      sessionId: input.sessionId,
+      provider: input.provider,
+    });
+
+    const model = view.runtime.model.value;
+    const safetyMode = view.runtime.safetyMode.value;
+    this.memory.set(input.sessionId, {
+      model: { value: model, source: 'session' },
+      safetyMode: { value: safetyMode, source: 'session' },
+    });
+
+    await this.appendEvent(input.sessionId, 'session.resumed', {
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+      provider: input.provider,
+      model,
+      safetyMode,
+      turnCount: view.runtime.turnCount,
+    });
+
+    if (input.cliModel !== undefined && input.cliModel !== model) {
+      await this.writeSessionModel(input.sessionId, input.cliModel, 'cli');
+    }
+    if (input.cliSafetyMode !== undefined && input.cliSafetyMode !== safetyMode) {
+      await this.writeSessionSafetyMode(input.sessionId, input.cliSafetyMode, 'cli');
+    }
+
+    return this.getRuntimeState(input.sessionId);
+  }
+
+  listSessions(workspaceRoot: string): Promise<readonly SessionSummary[]> {
+    this.assertWorkspace(workspaceRoot);
+    return this.options.repository.list(workspaceRoot);
+  }
+
+  getSession(sessionId: SessionId): Promise<SessionQueryView> {
+    return this.options.repository.getQueryView(sessionId);
+  }
+
+  async runTurn(input: RunTurnInput): Promise<AgentResult> {
+    if (this.activeTurns.has(input.sessionId)) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionIncompatible,
+        'A turn is already running for this session.',
+      );
+    }
+
+    const runtime = await this.getRuntimeState(input.sessionId);
+    if (runtime.activeTurnId !== undefined) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionIncompatible,
+        'The session has an incomplete turn and must be resumed before starting another.',
+      );
+    }
+
+    const controller = new AbortController();
+    const turnIdPlaceholder = this.idFactory('turn');
+    this.activeTurns.set(input.sessionId, { turnId: turnIdPlaceholder, controller });
+
+    const onAbort = (): void => {
+      controller.abort();
+    };
+    input.signal?.addEventListener('abort', onAbort, { once: true });
+
+    const loop = this.createLoop(runtime);
+    try {
+      const result = await loop.continueSession(input.sessionId, input.goal, controller.signal);
+      const active = this.activeTurns.get(input.sessionId);
+      if (active !== undefined) {
+        this.activeTurns.set(input.sessionId, { turnId: result.turnId, controller });
+      }
+      return result;
+    } finally {
+      input.signal?.removeEventListener('abort', onAbort);
+      this.expirePending(input.sessionId);
+      this.activeTurns.delete(input.sessionId);
+    }
+  }
+
+  async cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void> {
+    const active = this.activeTurns.get(sessionId);
+    if (active === undefined) return;
+    if (turnId !== undefined && active.turnId !== turnId && !active.turnId.startsWith('turn-')) {
+      return;
+    }
+    active.controller.abort();
+  }
+
+  async respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult> {
+    const key = approvalKeyOf(input.sessionId, input.turnId, input.toolCallId, input.approvalKey);
+    const pending = this.pending.get(key);
+    if (pending !== undefined) {
+      this.pending.delete(key);
+      this.settled.set(key, input.choice);
+      pending.resolve(input.choice);
+      return { outcome: 'accepted', choice: input.choice };
+    }
+    if (this.settled.has(key)) {
+      return { outcome: 'rejected', reason: 'duplicate' };
+    }
+    if (this.expired.has(key)) {
+      return { outcome: 'rejected', reason: 'expired' };
+    }
+    return { outcome: 'rejected', reason: 'not_pending' };
+  }
+
+  async setSessionModel(sessionId: SessionId, modelId: string): Promise<SessionRuntimeState> {
+    return this.writeSessionModel(sessionId, modelId, 'session');
+  }
+
+  async setSessionSafetyMode(sessionId: SessionId, mode: SafetyMode): Promise<SessionRuntimeState> {
+    return this.writeSessionSafetyMode(sessionId, mode, 'session');
+  }
+
+  async getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState> {
+    const events = await this.options.repository.readAll(sessionId);
+    if (events.length === 0) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionNotFound,
+        'The requested session does not exist in this workspace.',
+      );
+    }
+    const reconstructed = toRuntimeState(sessionId, this.workspaceName(), events);
+    const remembered = this.memory.get(sessionId);
+    if (remembered === undefined) {
+      this.memory.set(sessionId, {
+        model: reconstructed.model,
+        safetyMode: reconstructed.safetyMode,
+      });
+      return reconstructed;
+    }
+    return {
+      ...reconstructed,
+      model: remembered.model,
+      safetyMode: remembered.safetyMode,
+    };
+  }
+
+  private async writeSessionModel(
+    sessionId: SessionId,
+    modelId: string,
+    source: P1ConfigSource,
+  ): Promise<SessionRuntimeState> {
+    const current = await this.getRuntimeState(sessionId);
+    if (current.model.value === modelId && current.model.source === source) {
+      return current;
+    }
+    const previousModel = current.model.value;
+    this.memory.set(sessionId, {
+      model: { value: modelId, source },
+      safetyMode: current.safetyMode,
+    });
+    if (previousModel !== modelId || current.model.source !== source) {
+      await this.appendEvent(sessionId, 'model.changed', {
+        model: modelId,
+        previousModel,
+        source,
+      });
+    }
+    return this.getRuntimeState(sessionId);
+  }
+
+  private async writeSessionSafetyMode(
+    sessionId: SessionId,
+    mode: SafetyMode,
+    source: P1ConfigSource,
+  ): Promise<SessionRuntimeState> {
+    const current = await this.getRuntimeState(sessionId);
+    if (current.safetyMode.value === mode && current.safetyMode.source === source) {
+      return current;
+    }
+    const previousSafetyMode = current.safetyMode.value;
+    this.memory.set(sessionId, {
+      model: current.model,
+      safetyMode: { value: mode, source },
+    });
+    if (previousSafetyMode !== mode || current.safetyMode.source !== source) {
+      await this.appendEvent(sessionId, 'safety.changed', {
+        safetyMode: mode,
+        previousSafetyMode,
+        source,
+      });
+    }
+    return this.getRuntimeState(sessionId);
+  }
+
+  private createLoop(runtime: SessionRuntimeState): AgentLoop {
+    return new AgentLoop({
+      provider: this.options.provider,
+      providerIdentity: this.options.providerIdentity,
+      model: runtime.model.value,
+      tools: this.options.tools,
+      policy: this.options.policy,
+      contextBuilder: this.options.contextBuilder,
+      sessionStore: this.options.repository,
+      workspaceRoot: this.options.workspaceRoot,
+      safetyMode: runtime.safetyMode.value,
+      maxSteps: this.options.maxSteps,
+      contextBudget: this.options.contextBudget,
+      toolLimits: this.options.toolLimits,
+      ...(this.options.repeatedToolCallLimit === undefined
+        ? {}
+        : { repeatedToolCallLimit: this.options.repeatedToolCallLimit }),
+      approvalHandler: this.createApprovalHandler(runtime.sessionId),
+      onEvent: (event) => this.observeLoopEvent(runtime.sessionId, event),
+      ...(this.options.secrets === undefined ? {} : { secrets: this.options.secrets }),
+      ...(this.options.homeDirectory === undefined
+        ? {}
+        : { homeDirectory: this.options.homeDirectory }),
+      idFactory: this.idFactory,
+      now: this.now,
+    });
+  }
+
+  private createApprovalHandler(sessionId: SessionId): ApprovalHandler {
+    return {
+      requestApproval: async (request) => {
+        if (this.options.approvalHandler === undefined) {
+          if (this.options.unattendedApproval === 'wait') {
+            return this.waitForApproval(sessionId, request);
+          }
+          return 'deny';
+        }
+
+        const key = approvalKeyOf(
+          sessionId,
+          request.turnId,
+          request.toolCall.id,
+          request.approvalKey,
+        );
+        const delegated = this.waitForApproval(sessionId, request);
+        void this.options.approvalHandler.requestApproval(request).then(
+          (choice) => {
+            const pending = this.pending.get(key);
+            if (pending === undefined) return;
+            this.pending.delete(key);
+            this.settled.set(key, choice);
+            pending.resolve(choice);
+          },
+          (error) => {
+            const pending = this.pending.get(key);
+            if (pending === undefined) return;
+            this.pending.delete(key);
+            this.expired.add(key);
+            pending.reject(error);
+          },
+        );
+        return delegated;
+      },
+    };
+  }
+
+  private waitForApproval(
+    sessionId: SessionId,
+    request: Parameters<ApprovalHandler['requestApproval']>[0],
+  ): Promise<ApprovalChoice> {
+    const key = approvalKeyOf(sessionId, request.turnId, request.toolCall.id, request.approvalKey);
+    const settled = this.settled.get(key);
+    if (settled !== undefined) return Promise.resolve(settled);
+    const pending = this.ensurePending(
+      sessionId,
+      request.turnId,
+      request.toolCall.id,
+      request.approvalKey,
+    );
+    const onAbort = (): void => {
+      if (!this.pending.has(key)) return;
+      this.pending.delete(key);
+      this.expired.add(key);
+      pending.reject(cancelledTurnError());
+    };
+    request.signal.addEventListener('abort', onAbort, { once: true });
+    return pending.promise;
+  }
+
+  private ensurePending(
+    sessionId: SessionId,
+    turnId: TurnId,
+    toolCallId: ToolCallId,
+    approvalKey: string,
+  ): PendingApproval {
+    const key = approvalKeyOf(sessionId, turnId, toolCallId, approvalKey);
+    const existing = this.pending.get(key);
+    if (existing !== undefined) return existing;
+    let resolve!: (choice: ApprovalChoice) => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<ApprovalChoice>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    void promise.catch(() => undefined);
+    const pending: PendingApproval = {
+      sessionId,
+      turnId,
+      toolCallId,
+      approvalKey,
+      promise,
+      resolve,
+      reject,
+    };
+    this.pending.set(key, pending);
+    return pending;
+  }
+
+  private observeLoopEvent(sessionId: SessionId, event: EchoEvent): void {
+    const active = this.activeTurns.get(sessionId);
+    if (active !== undefined && event.turnId !== undefined && event.type === 'turn.started') {
+      this.activeTurns.set(sessionId, { turnId: event.turnId, controller: active.controller });
+    }
+    if (
+      event.type === 'approval.requested' &&
+      event.turnId !== undefined &&
+      (this.options.unattendedApproval === 'wait' || this.options.approvalHandler !== undefined)
+    ) {
+      this.ensurePending(
+        sessionId,
+        event.turnId,
+        event.payload.toolCallId,
+        event.payload.approvalKey,
+      );
+    }
+    void this.notify(event);
+  }
+
+  private expirePending(sessionId: SessionId): void {
+    for (const [key, pending] of this.pending) {
+      if (pending.sessionId !== sessionId) continue;
+      this.pending.delete(key);
+      this.expired.add(key);
+      pending.reject(cancelledTurnError());
+    }
+  }
+
+  private async appendEvent<TType extends EchoEventType>(
+    sessionId: SessionId,
+    type: TType,
+    payload: EchoEventPayloads[TType],
+  ): Promise<void> {
+    const events = await this.options.repository.readAll(sessionId);
+    const event = redactValue(
+      {
+        id: this.idFactory('event'),
+        sequence: (events.at(-1)?.sequence ?? 0) + 1,
+        timestamp: this.now(),
+        sessionId,
+        type,
+        payload,
+      },
+      {
+        workspaceRoot: this.options.workspaceRoot,
+        ...(this.options.secrets === undefined ? {} : { secrets: this.options.secrets }),
+        ...(this.options.homeDirectory === undefined
+          ? {}
+          : { homeDirectory: this.options.homeDirectory }),
+      },
+    ) as EchoEvent;
+    try {
+      await this.options.repository.append(event);
+    } catch (error) {
+      if (isStorageError(error)) throw error;
+      throw error;
+    }
+    await this.notify(event);
+  }
+
+  private async notify(event: EchoEvent): Promise<void> {
+    try {
+      await this.options.onEvent?.(event);
+    } catch {
+      // Rendering failures must not change application state.
+    }
+  }
+
+  private runtimeFrom(sessionId: SessionId, events: readonly EchoEvent[]): SessionRuntimeState {
+    const reconstructed = toRuntimeState(sessionId, this.workspaceName(), events);
+    const remembered = this.memory.get(sessionId);
+    if (remembered === undefined) return reconstructed;
+    return {
+      ...reconstructed,
+      model: remembered.model,
+      safetyMode: remembered.safetyMode,
+    };
+  }
+
+  private workspaceName(): string {
+    const segments = this.options.workspaceRoot.split(/[/\\]/u).filter((part) => part.length > 0);
+    return segments.at(-1) ?? 'workspace';
+  }
+
+  private assertWorkspace(workspaceRoot: string): void {
+    if (path.resolve(workspaceRoot) !== path.resolve(this.options.workspaceRoot)) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionWorkspaceMismatch,
+        'The session belongs to a different workspace.',
+      );
+    }
+  }
+}

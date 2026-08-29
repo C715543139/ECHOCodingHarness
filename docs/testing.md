@@ -50,7 +50,7 @@ P1-0 只增加契约与矩阵测试，不改变 `run` 行为。矩阵每一行�
 | --- | --- |
 | P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL` |
 | P1-2B | `/models` 发现、缓存、失败不阻断已配置模型 |
-| P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变 |
+| P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变。证据：`tests/unit/application/echo-application-service.test.ts`、`tests/unit/session/jsonl-session-repository.test.ts`、`tests/unit/session/endpoint-fingerprint.test.ts`、`tests/integration/cli-run.test.ts` |
 | P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn |
 | P1-3 | 分组时间线渲染；非 TTY/`--no-color` 契约保持 |
 

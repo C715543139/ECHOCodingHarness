@@ -9,6 +9,10 @@ import { redactValue, type RedactionOptions } from './redaction.js';
 
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
 
+export function isSafeSessionId(sessionId: string): boolean {
+  return SESSION_ID_PATTERN.test(sessionId);
+}
+
 export interface JsonlSessionStoreOptions extends RedactionOptions {
   readonly workspaceRoot: string;
   readonly sessionsDirectory?: string;

@@ -319,8 +319,14 @@ async function resolveResumeSessionId(
       'Multiple sessions match that SESSION identifier. Use the full session ID.',
     );
   }
+  if (match.kind === 'invalid') {
+    throw configurationError(
+      CONFIG_ERROR_CODES.sessionNotFound,
+      'The requested session identifier is not valid.',
+    );
+  }
   if (match.kind === 'resolved') return match.sessionId;
-  return requested;
+  return requested.trim();
 }
 
 async function openSession(

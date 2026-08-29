@@ -1,4 +1,8 @@
-export { type JsonlSessionStoreOptions, JsonlSessionStore } from './jsonl-session-store.js';
+export {
+  type JsonlSessionStoreOptions,
+  isSafeSessionId,
+  JsonlSessionStore,
+} from './jsonl-session-store.js';
 export {
   type JsonlSessionRepositoryOptions,
   JsonlSessionRepository,

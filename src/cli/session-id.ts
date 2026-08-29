@@ -1,3 +1,5 @@
+import { isSafeSessionId } from '../session/jsonl-session-store.js';
+
 export function sessionShortId(sessionId: string): string {
   return sessionId
     .replace(/^session-/u, '')
@@ -8,7 +10,8 @@ export function sessionShortId(sessionId: string): string {
 export type SessionIdMatch =
   | Readonly<{ kind: 'resolved'; sessionId: string }>
   | Readonly<{ kind: 'missing' }>
-  | Readonly<{ kind: 'ambiguous' }>;
+  | Readonly<{ kind: 'ambiguous' }>
+  | Readonly<{ kind: 'invalid' }>;
 
 /**
  * Map a Chat banner / `/status` SESSION value to a unique stored session ID.
@@ -21,7 +24,7 @@ export function matchListedSessionId(
   sessionIds: readonly string[],
 ): SessionIdMatch {
   const trimmed = requested.trim();
-  if (trimmed.length === 0) return { kind: 'missing' };
+  if (trimmed.length === 0 || !isSafeSessionId(trimmed)) return { kind: 'invalid' };
 
   const exact = sessionIds.filter((sessionId) => sessionId === trimmed);
   if (exact.length === 1 && exact[0] !== undefined) {

@@ -167,6 +167,13 @@ export class JsonlSessionRepository extends JsonlSessionStore implements Session
           error,
         );
       }
+      if (isStorageError(error) && error.code === 'INVALID_SESSION_ID') {
+        throw configurationError(
+          CONFIG_ERROR_CODES.sessionNotFound,
+          'The requested session identifier is not valid.',
+          error,
+        );
+      }
       throw error;
     }
 

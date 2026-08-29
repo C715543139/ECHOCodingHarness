@@ -23,4 +23,10 @@ describe('session ID matching', () => {
     expect(sessionShortId(other)).toBe('a13f09c2');
     expect(matchListedSessionId('a13f09c2', [full, other])).toEqual({ kind: 'ambiguous' });
   });
+
+  it('rejects blank and path-like resume identifiers before storage lookup', () => {
+    expect(matchListedSessionId('   ', [full])).toEqual({ kind: 'invalid' });
+    expect(matchListedSessionId('../bad', [full])).toEqual({ kind: 'invalid' });
+    expect(matchListedSessionId('bad/id', [full])).toEqual({ kind: 'invalid' });
+  });
 });

@@ -15,6 +15,7 @@ let sequence = 0;
 function event<TType extends EchoEvent['type']>(
   type: TType,
   payload: EchoEventOf<TType>['payload'],
+  turnId = 'turn-1',
 ): EchoEventOf<TType> {
   sequence += 1;
   return {
@@ -22,7 +23,7 @@ function event<TType extends EchoEvent['type']>(
     sequence,
     timestamp: '2026-08-27T00:00:00.000Z',
     sessionId: 'session-1',
-    turnId: 'turn-1',
+    turnId,
     stepId: 'step-1',
     type,
     payload,
@@ -272,11 +273,11 @@ describe('EventContextBuilder', () => {
   it('keeps prior user goals when a later turn starts so resume can reconstruct chat', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history: EchoEvent[] = [
-      event('turn.started', { goal: 'remember the color blue' }),
-      event('step.started', { step: 1 }),
-      event('model.text_delta', { delta: 'I will remember blue.' }),
-      event('turn.started', { goal: 'what color did I mention?' }),
-      event('step.started', { step: 1 }),
+      event('turn.started', { goal: 'remember the color blue' }, 'turn-1'),
+      event('step.started', { step: 1 }, 'turn-1'),
+      event('model.text_delta', { delta: 'I will remember blue.' }, 'turn-1'),
+      event('turn.started', { goal: 'what color did I mention?' }, 'turn-2'),
+      event('step.started', { step: 1 }, 'turn-2'),
     ];
 
     const projection = builder.build(history, largeBudget);
@@ -288,6 +289,25 @@ describe('EventContextBuilder', () => {
     expect(projection.messages).toContainEqual({
       role: 'assistant',
       content: 'I will remember blue.',
+    });
+  });
+
+  it('keeps a repeated current goal when the previous turn used the same text', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'retry' }, 'turn-1'),
+      event('step.started', { step: 1 }, 'turn-1'),
+      event('model.text_delta', { delta: 'First answer' }, 'turn-1'),
+      event('turn.started', { goal: 'retry' }, 'turn-2'),
+      event('step.started', { step: 1 }, 'turn-2'),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    const users = projection.messages.filter((message) => message.role === 'user');
+    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
+    expect(projection.messages).toContainEqual({
+      role: 'assistant',
+      content: 'First answer',
     });
   });
 

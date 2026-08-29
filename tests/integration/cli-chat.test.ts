@@ -442,6 +442,46 @@ describe('CLI chat integration', () => {
     );
     expect(missingSession.exitCode).toBe(2);
     expect(resumeMissing.stderr()).toContain('does not exist');
+
+    const invalidResume = output();
+    const invalidSession = await runChat(
+      {
+        workspace: root,
+        resume: '../bad',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: invalidResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(invalidSession.exitCode).toBe(2);
+    expect(invalidResume.stderr()).toContain('not valid');
+
+    const blankResume = output();
+    const blankSession = await runChat(
+      {
+        workspace: root,
+        resume: '   ',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: blankResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(blankSession.exitCode).toBe(2);
+    expect(blankResume.stderr()).toContain('not valid');
   });
 
   it('repairs a dangling turn on resume and accepts non-TTY line input', async () => {

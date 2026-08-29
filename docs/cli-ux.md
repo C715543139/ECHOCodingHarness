@@ -167,7 +167,7 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 | 领域事件 | 默认渲染 |
 | --- | --- |
 | `session.started` | 默认隐藏；`--verbose` 可显示 Session 短 ID |
-| `session.resumed` / `model.changed` / `safety.changed` | `run` 默认无输出；Chat 启动摘要与 Slash 反馈由 Chat 表现层渲染。`--resume` 接受摘要中的唯一 SESSION 短 ID |
+| `session.resumed` / `model.changed` / `safety.changed` | `run` 默认无输出；Chat 启动摘要与 Slash 反馈由 Chat 表现层渲染。`--resume` 接受摘要中的唯一 SESSION 短 ID；空白或非法标识以退出码 2 失败 |
 | `turn.started` | `ECHO` 目标摘要 |
 | `step.started` | `── Step <n> ──` 或 ASCII `-- Step <n> --` |
 | `context.projected` | 默认隐藏；详细模式可显示预算与裁剪摘要 |

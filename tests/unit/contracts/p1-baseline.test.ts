@@ -31,7 +31,7 @@ describe('P1 frozen contracts', () => {
     const ids = P1_TEST_MATRIX.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(P1_TEST_MATRIX.some((row) => row.area === 'p0-guard')).toBe(true);
-    expect(P1_CONFIG_RELATIVE_PATH.replaceAll('\\', '/')).toBe('config/echo.config.json');
+    expect(P1_CONFIG_RELATIVE_PATH.replaceAll('\\', '/')).toBe('.echo/config/echo.config.json');
     for (const row of P1_TEST_MATRIX) {
       expect(row.contractEvidence.length).toBeGreaterThan(0);
       expect(row.runtimeEvidence.length).toBeGreaterThan(0);

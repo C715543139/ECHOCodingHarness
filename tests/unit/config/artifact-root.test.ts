@@ -1,48 +1,29 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveArtifactRoot, resolveArtifactRootFromEntry } from '../../../src/config/index.js';
+import { persistentConfigPath } from '../../../src/config/index.js';
 
-describe('resolveArtifactRoot', () => {
-  it('uses an injected absolute directory and ignores process.cwd()', () => {
-    const injected = path.join(os.tmpdir(), 'echo-injected-artifact');
-    const cwd = process.cwd();
-    const resolved = resolveArtifactRoot({ injectedRoot: injected });
-    expect(resolved).toBe(path.normalize(injected));
-    expect(resolved).not.toBe(cwd);
-    expect(path.isAbsolute(resolved)).toBe(true);
+describe('persistentConfigPath', () => {
+  it('places config beside sessions under workspace .echo', () => {
+    const workspace = path.join(os.tmpdir(), 'echo-workspace');
+    const resolved = persistentConfigPath(workspace);
+    expect(resolved).toBe(path.join(workspace, '.echo', 'config', 'echo.config.json'));
+    expect(resolved.replaceAll('\\', '/')).toContain('.echo/config/echo.config.json');
   });
 
-  it('rejects a relative injected root instead of resolving it against cwd', () => {
-    expect(() => resolveArtifactRoot({ injectedRoot: 'relative-artifact' })).toThrow(
-      /absolute path/u,
-    );
-  });
-
-  it('maps a TypeScript CLI entry under src/ to the sibling dist directory', () => {
-    const repo = path.join(os.tmpdir(), 'echo-repo-src');
-    const entry = path.join(repo, 'src', 'cli.ts');
-    expect(resolveArtifactRootFromEntry(pathToFileURL(entry).href)).toBe(path.join(repo, 'dist'));
-  });
-
-  it('uses the directory of a bundled dist/cli.js entry', () => {
-    const dist = path.join(os.tmpdir(), 'echo-repo-dist', 'dist');
-    const entry = path.join(dist, 'cli.js');
-    expect(resolveArtifactRoot({ entryPath: entry })).toBe(path.normalize(dist));
-  });
-
-  it('does not follow process.cwd() when resolving an entry path', () => {
-    const dist = path.join(os.tmpdir(), 'echo-fixed-dist');
-    const entry = path.join(dist, 'cli.js');
+  it('does not resolve against process.cwd() when the workspace is absolute', () => {
+    const workspace = path.join(os.tmpdir(), 'echo-fixed-workspace');
     const original = process.cwd();
-    const decoy = os.tmpdir();
     try {
-      process.chdir(decoy);
-      expect(resolveArtifactRoot({ entryPath: entry })).toBe(path.normalize(dist));
-      expect(resolveArtifactRoot({ entryPath: entry })).not.toBe(process.cwd());
+      process.chdir(os.tmpdir());
+      expect(persistentConfigPath(workspace)).toBe(
+        path.join(workspace, '.echo', 'config', 'echo.config.json'),
+      );
+      expect(persistentConfigPath(workspace)).not.toBe(
+        path.join(process.cwd(), '.echo', 'config', 'echo.config.json'),
+      );
     } finally {
       process.chdir(original);
     }

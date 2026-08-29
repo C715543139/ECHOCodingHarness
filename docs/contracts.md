@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md) 与 [ADR-0004](./decisions/0004-workspace-echo-config.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -443,7 +443,7 @@ interface ApplicationService {
 }
 ```
 
-`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。`model.changed` 只记录会话内模型 ID 与来源，不保存发现列表或凭据。P1-1A 已把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、`--resume`、Slash、Ctrl+C 与 bracketed paste 适配器，并用 `resolveNewSessionSetting` / `resolveResumeSessionSetting` 落实 CLI > session > config。`/model` 与 `/model refresh` 只消费可注入的模型目录端口，不在 Chat 内实现第二套 `GET /models` 发现与缓存。P1-2A 已实现配置加载器与 artifact-root 解析；P1-2B 已实现模型目录发现与进程内缓存。
+`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。`model.changed` 只记录会话内模型 ID 与来源，不保存发现列表或凭据。P1-1A 已把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、`--resume`、Slash、Ctrl+C 与 bracketed paste 适配器，并用 `resolveNewSessionSetting` / `resolveResumeSessionSetting` 落实 CLI > session > config。`/model` 与 `/model refresh` 只消费可注入的模型目录端口，不在 Chat 内实现第二套 `GET /models` 发现与缓存。P1-2A 已实现配置加载器；P1-2B 已实现模型目录发现与进程内缓存。配置落点见 [ADR-0004](./decisions/0004-workspace-echo-config.md)。
 
 ## 8. Context Builder
 
@@ -509,7 +509,7 @@ CLI 显式参数 > echo.config.json
 
 字段缺省（如未写出的 `safetyMode` 使用 `balanced`）是结构默认值，不是第三配置来源，也不进入 `cli | session | config` 来源诊断。`cli | session | config` 只描述会话内模型与安全模式的有效值来源。
 
-唯一持久配置文件为 `<artifact-root>/config/echo.config.json`。`artifact-root` 根据 CLI 模块或可执行文件位置解析，不得使用 `process.cwd()`。`ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。
+唯一持久配置文件为 `<workspace>/.echo/config/echo.config.json`，与 `.echo/sessions/` 同级（[ADR-0004](./decisions/0004-workspace-echo-config.md)）。`workspace` 由 `--workspace` 或启动目录决定。不得读取产物根 `config/echo.config.json`、工作区根 `echo.config.json` 或已移除的环境变量来源。`ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。
 
 | 目的 | P1 来源 | 是否敏感 |
 | --- | --- | --- |
@@ -520,7 +520,7 @@ CLI 显式参数 > echo.config.json
 | 安全模式 | 配置文件 `safetyMode` 或 CLI `--safety-mode` | 否 |
 | 模型目录 | 配置文件 `modelCatalog` | 否 |
 
-P1 不迁移旧工作区或用户目录中的配置文件。操作者使用 `echo-harness config` 写入产物配置。
+P1 不迁移旧工作区、用户目录或产物根中的配置文件。操作者使用 `echo-harness config` 写入当前工作区 `.echo/config`。
 
 - API Key 不得写入配置文件、事件、命令输出或子进程环境；
 - 配置诊断只能显示 Key 是否存在，不显示其值或可还原片段；
@@ -605,10 +605,10 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.1 由 P1-0 冻结，证据为：
 
-- [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md)；
+- [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md) 与 [ADR-0004](./decisions/0004-workspace-echo-config.md)；
 - `src/contracts/` 中的 P1 类型、事件版本、`CONFIG_ERROR_CODES`、`CLI_EXIT_CODES` 与 `ApplicationService`；
 - `P1_TEST_MATRIX`（每行含 `contractEvidence` 与 `runtimeEvidence`）以及 `tests/unit/contracts/p1-baseline.test.ts`、`tests/unit/contracts/doc-consistency.test.ts`；
-- P1-2A 运行时测试覆盖 artifact-root 加载、缺失配置退出码 2、未知键失败，以及不再读取 cwd/`ECHO_BASE_URL`/`ECHO_MODEL`/`ECHO_SAFETY_MODE`。
+- P1-2A 运行时测试覆盖工作区 `.echo/config` 加载、缺失配置退出码 2、未知键失败，以及不再读取 cwd/`ECHO_BASE_URL`/`ECHO_MODEL`/`ECHO_SAFETY_MODE`。
 - P1-2B 运行时测试覆盖 `/models` 发现、进程内缓存、刷新、失败不阻断已配置模型，以及目录错误脱敏。
 - P1-1B 运行时测试覆盖 Chat 恢复、Slash、Ctrl+C、bracketed paste，以及默认目录端口接到 `ProcessModelCatalog`。
 

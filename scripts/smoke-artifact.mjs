@@ -10,13 +10,10 @@ if (!fs.existsSync(repoCli)) {
   throw new Error('Artifact smoke requires dist/cli.js. Run pnpm build first.');
 }
 
-const artifactConfigDir = path.join(path.dirname(repoCli), 'config');
-const artifactConfig = path.join(artifactConfigDir, 'echo.config.json');
-const hadConfig = fs.existsSync(artifactConfig);
-const configBackup = hadConfig ? fs.readFileSync(artifactConfig) : undefined;
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'echo-artifact-smoke-'));
 const cwd = path.join(tempRoot, 'cwd');
 const decoyModel = 'cwd-decoy-model';
+const workspaceModel = 'workspace-echo-model';
 const smokeKey = 'artifact-smoke-key';
 
 function runCli(options = {}) {
@@ -42,21 +39,25 @@ function combined(result) {
   return `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
 }
 
+function writeJson(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value)}\n`, 'utf8');
+}
+
 try {
   fs.mkdirSync(cwd, { recursive: true });
-  fs.writeFileSync(
-    path.join(cwd, 'echo.config.json'),
-    `${JSON.stringify({
-      baseUrl: 'https://cwd.example/v1',
-      model: decoyModel,
-      modelCatalog: { source: 'discover' },
-      safetyMode: 'auto',
-    })}\n`,
-    'utf8',
-  );
-  if (hadConfig) {
-    fs.rmSync(artifactConfig);
-  }
+  writeJson(path.join(cwd, 'echo.config.json'), {
+    baseUrl: 'https://cwd.example/v1',
+    model: decoyModel,
+    modelCatalog: { source: 'discover' },
+    safetyMode: 'auto',
+  });
+  writeJson(path.join(cwd, 'config', 'echo.config.json'), {
+    baseUrl: 'https://legacy.example/v1',
+    model: decoyModel,
+    modelCatalog: { source: 'discover' },
+    safetyMode: 'auto',
+  });
 
   const help = runCli();
   if (help.status !== 0) {
@@ -77,11 +78,11 @@ try {
   const missingText = combined(missing);
   if (missing.status !== 2) {
     throw new Error(
-      `Missing artifact config expected exit 2, got ${String(missing.status)}:\n${missingText}`,
+      `Missing workspace config expected exit 2, got ${String(missing.status)}:\n${missingText}`,
     );
   }
   if (!missingText.includes('echo-harness config')) {
-    throw new Error('Missing artifact config did not suggest echo-harness config.');
+    throw new Error('Missing workspace config did not suggest echo-harness config.');
   }
   if (missingText.includes(decoyModel)) {
     throw new Error('Artifact CLI used a cwd decoy config file.');
@@ -90,17 +91,12 @@ try {
     throw new Error('Artifact CLI leaked the API key.');
   }
 
-  fs.mkdirSync(artifactConfigDir, { recursive: true });
-  fs.writeFileSync(
-    artifactConfig,
-    `${JSON.stringify({
-      baseUrl: 'https://artifact.example/v1',
-      model: 'artifact-root-model',
-      modelCatalog: { source: 'manual', models: ['artifact-root-model'] },
-      safetyMode: 'balanced',
-    })}\n`,
-    'utf8',
-  );
+  writeJson(path.join(cwd, '.echo', 'config', 'echo.config.json'), {
+    baseUrl: 'https://workspace.example/v1',
+    model: workspaceModel,
+    modelCatalog: { source: 'manual', models: [workspaceModel] },
+    safetyMode: 'balanced',
+  });
 
   const noKey = runCli({
     args: ['run', 'ignore cwd decoy', '--non-interactive', '--no-color'],
@@ -114,16 +110,10 @@ try {
     throw new Error('Missing API key did not mention ECHO_API_KEY.');
   }
   if (noKeyText.includes(decoyModel)) {
-    throw new Error('Artifact CLI with a real config still followed the cwd decoy model.');
+    throw new Error('Artifact CLI with a workspace config still followed a decoy model.');
   }
 
   process.stdout.write('Artifact smoke check passed.\n');
 } finally {
-  if (configBackup !== undefined) {
-    fs.mkdirSync(artifactConfigDir, { recursive: true });
-    fs.writeFileSync(artifactConfig, configBackup);
-  } else if (fs.existsSync(artifactConfigDir)) {
-    fs.rmSync(artifactConfigDir, { recursive: true, force: true });
-  }
   fs.rmSync(tempRoot, { recursive: true, force: true });
 }

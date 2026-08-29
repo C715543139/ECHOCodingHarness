@@ -1,38 +1,23 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 
-import { isAbsoluteArtifactRoot, resolveArtifactRootFromEntry } from '../config/index.js';
 import type { SafetyMode } from '../contracts/index.js';
 import { PROJECT_NAME, PROJECT_TAGLINE, PROJECT_VERSION } from '../core/project.js';
 
 import { runChat, type ChatCommandOptions } from './chat.js';
 import { runConfigCommand } from './config-wizard.js';
+import { resolveWorkspace } from './harness-runtime.js';
 import { runGoal, type RunGoalOptions, type RunGoalOutcome } from './run.js';
 
 export interface CreateCliOptions {
   readonly version?: string;
-  readonly artifactRoot?: string;
-  readonly entryUrl?: string;
   readonly runAction?: (goal: string, options: RunGoalOptions) => Promise<RunGoalOutcome>;
   readonly chatAction?: (options: ChatCommandOptions) => Promise<{ exitCode: number }>;
   readonly configAction?: (options: {
-    artifactRoot: string;
+    workspaceRoot: string;
     interactive: boolean;
     signal: AbortSignal;
   }) => Promise<{ exitCode: number }>;
   readonly setExitCode?: (code: number) => void;
-}
-
-function resolveCliArtifactRoot(options: CreateCliOptions): string {
-  if (options.artifactRoot !== undefined) {
-    if (!isAbsoluteArtifactRoot(options.artifactRoot)) {
-      throw new Error('artifact-root must be an absolute path.');
-    }
-    return options.artifactRoot;
-  }
-  if (options.entryUrl !== undefined) {
-    return resolveArtifactRootFromEntry(options.entryUrl);
-  }
-  throw new Error('CLI artifact-root is required.');
 }
 
 export function createCli(options: CreateCliOptions = {}): Command {
@@ -108,7 +93,6 @@ export function createCli(options: CreateCliOptions = {}): Command {
             color,
             interactive,
             signal: controller.signal,
-            artifactRoot: resolveCliArtifactRoot(options),
           };
           const outcome = await (options.runAction ?? runGoal)(goal, runOptions);
           setExitCode(outcome.exitCode);
@@ -171,7 +155,6 @@ export function createCli(options: CreateCliOptions = {}): Command {
           verbose: commandOptions.verbose,
           color,
           interactive,
-          artifactRoot: resolveCliArtifactRoot(options),
         };
         const outcome = await (options.chatAction ?? runChat)(chatOptions);
         setExitCode(outcome.exitCode);
@@ -181,16 +164,27 @@ export function createCli(options: CreateCliOptions = {}): Command {
   cli
     .command('config')
     .description(
-      'Create or update <artifact-root>/config/echo.config.json. Discover catalogs store only the default model; candidate lists are fetched later by chat /model.',
+      'Create or update <workspace>/.echo/config/echo.config.json. Discover catalogs store only the default model; candidate lists are fetched later by chat /model.',
     )
-    .action(async () => {
+    .option('-w, --workspace <path>', 'Workspace directory (defaults to current directory).')
+    .action(async (commandOptions: { workspace?: string }) => {
       const controller = new AbortController();
       const cancel = (): void => controller.abort();
       process.once('SIGINT', cancel);
       try {
         const interactive = process.stdin.isTTY === true && process.stderr.isTTY === true;
+        let workspaceRoot: string;
+        try {
+          workspaceRoot = await resolveWorkspace(commandOptions.workspace ?? process.cwd());
+        } catch {
+          process.stderr.write(
+            'FAIL   configuration · Workspace must be an existing readable directory.\n',
+          );
+          setExitCode(2);
+          return;
+        }
         const outcome = await (options.configAction ?? runConfigCommand)({
-          artifactRoot: resolveCliArtifactRoot(options),
+          workspaceRoot,
           interactive,
           signal: controller.signal,
         });

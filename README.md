@@ -60,13 +60,14 @@ pnpm build
 
 ## Configure
 
-Non-secret settings persist only at `<artifact-root>/config/echo.config.json`.
-`artifact-root` is the directory of the CLI module or executable (`dist/` after `pnpm build`),
-never `process.cwd()`. Create or update that file with the interactive wizard:
+Non-secret settings persist only at `<workspace>/.echo/config/echo.config.json`,
+beside `.echo/sessions/`. `workspace` is `--workspace` or the directory where the CLI starts.
+The loader does not read `dist/config/`, a repo-root `echo.config.json`, or `ECHO_BASE_URL`.
+Create or update the workspace file with the interactive wizard:
 
 ```powershell
 pnpm build
-node .\dist\cli.js config
+node .\dist\cli.js config --workspace .
 $env:ECHO_API_KEY = '<secret>'
 ```
 
@@ -79,9 +80,10 @@ supported secret environment variable and is never saved. CLI flags such as `--m
 and `--safety-mode` override the file for one `run` or `chat` and do not query the catalog. Missing
 configuration makes `run`/`chat` exit `2` and suggest `echo-harness config`. P1-2A landed the loader,
 P1-2B landed catalog discovery, and P1-1B landed `chat`. The loader does not
-read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, or workspace config files.
+read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, cwd `echo.config.json`, or `dist/config`.
 
-See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
+See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md) and
+[ADR-0004](docs/decisions/0004-workspace-echo-config.md).
 
 ## Run
 
@@ -162,6 +164,7 @@ deterministic Fake Provider and never receives a real API key. Details and the c
 - [ADR-0001: project foundation](docs/decisions/0001-project-foundation.md)
 - [ADR-0002: P1 config and artifact-root](docs/decisions/0002-p1-config-artifact-root.md)
 - [ADR-0003: application service and recoverable sessions](docs/decisions/0003-p1-application-service-session.md)
+- [ADR-0004: workspace `.echo/config`](docs/decisions/0004-workspace-echo-config.md)
 - [P1 CLI plan](docs/plans/p1-cli.md)
 - [P2 local WebUI plan](docs/plans/p2-webui.md)
 

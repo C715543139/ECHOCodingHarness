@@ -1,6 +1,6 @@
 import type { SafetyMode } from './safety.js';
 
-export const P1_CONFIG_RELATIVE_PATH = 'config/echo.config.json';
+export const P1_CONFIG_RELATIVE_PATH = '.echo/config/echo.config.json';
 
 /** Effective source of a session-scoped model or safety setting. Not a config-file merge source. */
 export const P1_SETTING_SOURCES = ['cli', 'session', 'config'] as const;
@@ -18,7 +18,7 @@ export const CONFIG_ERROR_CODES = {
   modelNotInCatalog: 'CONFIG_MODEL_NOT_IN_CATALOG',
   missingModel: 'CONFIG_MISSING_MODEL',
   missingApiKey: 'CONFIG_MISSING_API_KEY',
-  artifactRoot: 'CONFIG_ARTIFACT_ROOT',
+  workspaceRoot: 'CONFIG_WORKSPACE_ROOT',
   providerMismatch: 'CONFIG_PROVIDER_MISMATCH',
   sessionIncompatible: 'CONFIG_SESSION_INCOMPATIBLE',
   sessionCorrupt: 'CONFIG_SESSION_CORRUPT',

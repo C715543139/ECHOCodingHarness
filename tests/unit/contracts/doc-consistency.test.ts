@@ -18,6 +18,7 @@ describe('P1 documentation freeze', () => {
     const files = {
       adr2: await readDoc('docs/decisions/0002-p1-config-artifact-root.md'),
       adr3: await readDoc('docs/decisions/0003-p1-application-service-session.md'),
+      adr4: await readDoc('docs/decisions/0004-workspace-echo-config.md'),
       contracts: await readDoc('docs/contracts.md'),
       architecture: await readDoc('docs/architecture.md'),
       testing: await readDoc('docs/testing.md'),
@@ -25,8 +26,17 @@ describe('P1 documentation freeze', () => {
       plan: await readDoc('docs/plans/p1-cli.md'),
     };
 
-    for (const text of Object.values(files)) {
-      expect(text).toContain('artifact-root');
+    expect(files.adr2).toContain('artifact-root');
+    expect(files.adr2).toContain('ECHO_API_KEY');
+    for (const text of [
+      files.adr4,
+      files.contracts,
+      files.architecture,
+      files.testing,
+      files.readme,
+      files.plan,
+    ]) {
+      expect(text).toContain('.echo/config/echo.config.json');
       expect(text).toContain('ECHO_API_KEY');
     }
 
@@ -51,6 +61,7 @@ describe('P1 documentation freeze', () => {
     expect(files.architecture).toContain('P1-2A');
     expect(files.plan).toContain('ADR-0002');
     expect(files.plan).toContain('ADR-0003');
+    expect(files.plan).toContain('ADR-0004');
     expect(files.testing).toContain('P1-0');
     expect(files.readme).toContain('P1-2A');
     expect(files.readme).toContain('P1-2B');

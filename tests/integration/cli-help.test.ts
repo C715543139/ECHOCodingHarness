@@ -1,11 +1,6 @@
-import * as os from 'node:os';
-import * as path from 'node:path';
-
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../../src/cli/create-cli.js';
-
-const artifactRoot = path.join(os.tmpdir(), 'echo-cli-help-artifact');
 
 describe('CLI metadata', () => {
   it('renders stable help text', () => {
@@ -24,7 +19,7 @@ describe('CLI metadata', () => {
   });
 
   it('registers the interactive config command', () => {
-    const cli = createCli({ version: '9.8.7', artifactRoot });
+    const cli = createCli({ version: '9.8.7' });
     const command = cli.commands.find((item) => item.name() === 'config');
     expect(command?.description()).toContain('echo.config.json');
     expect(command?.description()).toContain('/model');
@@ -47,7 +42,6 @@ describe('CLI metadata', () => {
     const runAction = vi.fn().mockResolvedValue({ exitCode: 6 });
     const cli = createCli({
       version: '9.8.7',
-      artifactRoot,
       runAction,
       setExitCode: (code) => {
         exitCode = code;
@@ -82,7 +76,6 @@ describe('CLI metadata', () => {
         verbose: true,
         interactive: false,
         color: false,
-        artifactRoot,
       }),
     );
     expect(exitCode).toBe(6);
@@ -93,7 +86,6 @@ describe('CLI metadata', () => {
     const chatAction = vi.fn().mockResolvedValue({ exitCode: 130 });
     const cli = createCli({
       version: '9.8.7',
-      artifactRoot,
       chatAction,
       setExitCode: (code) => {
         exitCode = code;
@@ -122,7 +114,6 @@ describe('CLI metadata', () => {
         model: 'fake-model',
         safetyMode: 'safe',
         color: false,
-        artifactRoot,
       }),
     );
     expect(exitCode).toBe(130);

@@ -76,11 +76,11 @@ async function replaceAtomically(
 }
 
 export async function writePersistentConfigFile(
-  artifactRoot: string,
+  workspaceRoot: string,
   config: EchoPersistentConfig,
   writer: ConfigFileWriter = defaultWriter,
 ): Promise<WritePersistentConfigResult> {
-  const destPath = persistentConfigPath(artifactRoot);
+  const destPath = persistentConfigPath(workspaceRoot);
   const directory = path.dirname(destPath);
   const serialized = serializePersistentConfig(config);
   const payload = `${JSON.stringify(serialized, null, 2)}\n`;

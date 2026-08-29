@@ -10,7 +10,7 @@
 
 ## 1. 背景
 
-P0 的 `echo-harness run` 在 CLI 层组装 Provider、Agent Loop、SessionStore 和渲染器。该结构足够完成单次 Turn，但若 Chat 与未来 WebUI 各自复制控制流，就会出现第二套取消、恢复和事件语义。P1 必须在实现 Chat 之前冻结可复用的应用服务、Session 查询、运行时可变状态、可解释事件和终端输入边界。配置文件位置与 `ECHO_API_KEY` 隔离仍以 [ADR-0002](./0002-p1-config-artifact-root.md) 的 `artifact-root` 规则为准，本 ADR 不重新定义配置查找。
+P0 的 `echo-harness run` 在 CLI 层组装 Provider、Agent Loop、SessionStore 和渲染器。该结构足够完成单次 Turn，但若 Chat 与未来 WebUI 各自复制控制流，就会出现第二套取消、恢复和事件语义。P1 必须在实现 Chat 之前冻结可复用的应用服务、Session 查询、运行时可变状态、可解释事件和终端输入边界。配置文件位置以 [ADR-0004](./0004-workspace-echo-config.md) 的工作区 `.echo/config` 为准；`ECHO_API_KEY` 隔离仍以 [ADR-0002](./0002-p1-config-artifact-root.md) 为准，本 ADR 不重新定义配置查找。
 
 ## 2. 决策
 

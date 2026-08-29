@@ -1,11 +1,4 @@
-export {
-  artifactRootIssue,
-  isAbsoluteArtifactRoot,
-  persistentConfigPath,
-  resolveArtifactRoot,
-  resolveArtifactRootFromEntry,
-  type ResolveArtifactRootInput,
-} from './artifact-root.js';
+export { isAbsoluteWorkspaceRoot, persistentConfigPath } from './artifact-root.js';
 export {
   type ConfigCheckIssue,
   type ConfigCheckResult,

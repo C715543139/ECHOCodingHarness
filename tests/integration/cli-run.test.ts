@@ -27,9 +27,9 @@ async function workspace(): Promise<string> {
 }
 
 async function writeArtifactConfig(artifactRoot: string, model = 'fake-model'): Promise<void> {
-  await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
+  await fs.mkdir(path.join(artifactRoot, '.echo', 'config'), { recursive: true });
   await fs.writeFile(
-    path.join(artifactRoot, 'config', 'echo.config.json'),
+    path.join(artifactRoot, '.echo', 'config', 'echo.config.json'),
     JSON.stringify({
       baseUrl: 'https://provider.example/v1',
       model,
@@ -73,7 +73,7 @@ describe('CLI run integration', () => {
 
     const outcome = await runGoal(
       'do the task',
-      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
+      { workspace: root, verbose: false, color: false, interactive: false },
       {
         env: { ECHO_API_KEY: 'test-key' },
         io: captured.io,
@@ -126,7 +126,6 @@ describe('CLI run integration', () => {
         verbose: false,
         color: false,
         interactive: false,
-        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },
@@ -147,7 +146,7 @@ describe('CLI run integration', () => {
 
     const outcome = await runGoal(
       'do the task',
-      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
+      { workspace: root, verbose: false, color: false, interactive: false },
       {
         env: { ECHO_API_KEY: 'top-secret-value' },
         io: captured.io,
@@ -159,7 +158,9 @@ describe('CLI run integration', () => {
     expect(providerFactory).not.toHaveBeenCalled();
     expect(captured.stderr()).toContain('echo-harness config');
     expect(captured.stderr()).not.toContain('top-secret-value');
-    await expect(fs.stat(path.join(root, 'config', 'echo.config.json'))).rejects.toMatchObject({
+    await expect(
+      fs.stat(path.join(root, '.echo', 'config', 'echo.config.json')),
+    ).rejects.toMatchObject({
       code: 'ENOENT',
     });
   });
@@ -186,7 +187,7 @@ describe('CLI run integration', () => {
 
     const outcome = await runGoal(
       'install dependencies',
-      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
+      { workspace: root, verbose: false, color: false, interactive: false },
       {
         env: { ECHO_API_KEY: 'test-key' },
         io: captured.io,

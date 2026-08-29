@@ -64,7 +64,7 @@ describe('runConfigWizard', () => {
       'y',
     ]);
 
-    const outcome = await runConfigWizard({ artifactRoot, io: scripted.io });
+    const outcome = await runConfigWizard({ workspaceRoot: artifactRoot, io: scripted.io });
     const dest = persistentConfigPath(artifactRoot);
     const written = JSON.parse(await fs.readFile(dest, 'utf8')) as Record<string, unknown>;
 
@@ -91,7 +91,7 @@ describe('runConfigWizard', () => {
       'n',
     ]);
 
-    const outcome = await runConfigWizard({ artifactRoot, io: scripted.io });
+    const outcome = await runConfigWizard({ workspaceRoot: artifactRoot, io: scripted.io });
     await expect(fs.stat(persistentConfigPath(artifactRoot))).rejects.toMatchObject({
       code: 'ENOENT',
     });
@@ -103,7 +103,7 @@ describe('runConfigWizard', () => {
     const artifactRoot = await makeTempDir();
     const scripted = scriptedIo(['https://provider.example/v1'], 1);
 
-    const outcome = await runConfigWizard({ artifactRoot, io: scripted.io });
+    const outcome = await runConfigWizard({ workspaceRoot: artifactRoot, io: scripted.io });
     await expect(fs.stat(persistentConfigPath(artifactRoot))).rejects.toMatchObject({
       code: 'ENOENT',
     });
@@ -113,7 +113,7 @@ describe('runConfigWizard', () => {
 
   it('keeps an existing file when a later abort happens', async () => {
     const artifactRoot = await makeTempDir();
-    await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
+    await fs.mkdir(path.join(artifactRoot, '.echo', 'config'), { recursive: true });
     const dest = persistentConfigPath(artifactRoot);
     await fs.writeFile(
       dest,
@@ -128,7 +128,7 @@ describe('runConfigWizard', () => {
     const previous = await fs.readFile(dest, 'utf8');
     const scripted = scriptedIo(['https://other.example/v1', '2', 'new-model'], 2);
 
-    const outcome = await runConfigWizard({ artifactRoot, io: scripted.io });
+    const outcome = await runConfigWizard({ workspaceRoot: artifactRoot, io: scripted.io });
     expect(outcome.exitCode).toBe(130);
     expect(await fs.readFile(dest, 'utf8')).toBe(previous);
   });

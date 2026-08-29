@@ -20,7 +20,7 @@ export interface ConfigWizardIo {
 }
 
 export interface RunConfigWizardOptions {
-  readonly artifactRoot: string;
+  readonly workspaceRoot: string;
   readonly io: ConfigWizardIo;
   readonly signal?: AbortSignal;
 }
@@ -181,8 +181,8 @@ async function promptConfirm(io: ConfigWizardIo, signal?: AbortSignal): Promise<
   }
 }
 
-async function readExistingDraft(artifactRoot: string): Promise<EchoPersistentConfig | undefined> {
-  const file = await readPersistentConfigFile(artifactRoot);
+async function readExistingDraft(workspaceRoot: string): Promise<EchoPersistentConfig | undefined> {
+  const file = await readPersistentConfigFile(workspaceRoot);
   if (file.status !== 'loaded') {
     return undefined;
   }
@@ -196,14 +196,14 @@ async function readExistingDraft(artifactRoot: string): Promise<EchoPersistentCo
 export async function runConfigWizard(
   options: RunConfigWizardOptions,
 ): Promise<ConfigWizardOutcome> {
-  const { artifactRoot, io, signal } = options;
-  const destPath = persistentConfigPath(artifactRoot);
+  const { workspaceRoot, io, signal } = options;
+  const destPath = persistentConfigPath(workspaceRoot);
   io.write('ECHO Harness · config\n\n');
   io.write(`This writes ${destPath}\n`);
   io.write('API keys stay in ECHO_API_KEY and are never saved.\n\n');
 
   try {
-    const existing = await readExistingDraft(artifactRoot);
+    const existing = await readExistingDraft(workspaceRoot);
     const baseUrl = await promptUrl(io, existing?.baseUrl, signal);
     const source = await promptCatalogSource(io, existing?.modelCatalog.source, signal);
     const catalog: ModelCatalogConfig =
@@ -238,7 +238,7 @@ export async function runConfigWizard(
       return { exitCode: CLI_EXIT_CODES.success };
     }
 
-    const written = await writePersistentConfigFile(artifactRoot, draft);
+    const written = await writePersistentConfigFile(workspaceRoot, draft);
     io.write(`Wrote ${written.path}\n`);
     return { exitCode: CLI_EXIT_CODES.success, configPath: written.path };
   } catch (error) {
@@ -251,7 +251,7 @@ export async function runConfigWizard(
 }
 
 export async function runConfigCommand(options: {
-  readonly artifactRoot: string;
+  readonly workspaceRoot: string;
   readonly interactive: boolean;
   readonly signal?: AbortSignal;
   readonly io?: ConfigWizardIo;
@@ -265,7 +265,7 @@ export async function runConfigCommand(options: {
 
   if (options.io !== undefined) {
     return runConfigWizard({
-      artifactRoot: options.artifactRoot,
+      workspaceRoot: options.workspaceRoot,
       io: options.io,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
@@ -274,7 +274,7 @@ export async function runConfigCommand(options: {
   const session = createReadlineWizardIo(process.stdin, process.stderr, options.signal);
   try {
     return await runConfigWizard({
-      artifactRoot: options.artifactRoot,
+      workspaceRoot: options.workspaceRoot,
       io: session.io,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });

@@ -72,7 +72,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'run does not list models; chat lists only for /model or /model refresh; refresh bypasses cache',
     contractEvidence: 'docs/plans/p1-cli.md',
-    runtimeEvidence: 'tests/integration/cli-run.test.ts',
+    runtimeEvidence: 'tests/integration/cli-run.test.ts, tests/integration/cli-chat.test.ts',
     runtimeTask: 'P1-2B',
   },
   {

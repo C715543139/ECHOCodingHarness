@@ -319,4 +319,26 @@ describe('OpenAICompatibleProvider', () => {
       code: 'PROVIDER_STREAM_FAILED',
     });
   });
+
+  it('delegates catalog listing to the transport client without streaming', async () => {
+    let listed = 0;
+    const provider = new OpenAICompatibleProvider({
+      client: {
+        createStream: async () => {
+          throw new Error('stream must not run during catalog listing');
+        },
+        listModelIds: async () => {
+          listed += 1;
+          return ['alpha', 'beta'];
+        },
+      },
+      model: 'alpha',
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+    });
+    await expect(provider.listModelIds({ signal: new AbortController().signal })).resolves.toEqual([
+      'alpha',
+      'beta',
+    ]);
+    expect(listed).toBe(1);
+  });
 });

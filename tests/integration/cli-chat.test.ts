@@ -431,6 +431,50 @@ describe('CLI chat integration', () => {
     expect(events.filter((event) => event.type === 'turn.started').length).toBeGreaterThan(1);
   });
 
+  it('lists discover candidates through ProcessModelCatalog when no catalog port is injected', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root, 'discover');
+    const provider = new FakeProvider(
+      [
+        {
+          events: [
+            { type: 'text_delta', delta: 'turn without listing' },
+            { type: 'completed', finishReason: 'stop' },
+          ],
+        },
+      ],
+      'fake',
+      [{ ids: ['fake-model', 'discovered-model'] }],
+    );
+    const captured = output();
+    const outcome = await runChat(
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+        input: new ScriptedChatInput([
+          { kind: 'batch', text: 'do work', source: 'typed' },
+          { kind: 'batch', text: '/model', source: 'typed' },
+          { kind: 'batch', text: '/quit', source: 'typed' },
+        ]),
+      },
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(provider.listModelCallCount).toBe(1);
+    expect(captured.stderr()).toContain('discovered-model');
+    expect(captured.stderr()).not.toContain('Model catalog port is not attached');
+    expect(captured.stderr()).not.toContain('test-key');
+    expect(provider.requests).toHaveLength(1);
+  });
+
   it('rejects unknown model ids and switches only to injected catalog candidates', async () => {
     const root = await workspace();
     await writeArtifactConfig(root, 'discover');

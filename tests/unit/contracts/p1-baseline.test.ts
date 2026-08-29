@@ -37,6 +37,7 @@ describe('P1 frozen contracts', () => {
       expect(row.runtimeEvidence.length).toBeGreaterThan(0);
       expect(row.contractEvidence).not.toBe(row.runtimeEvidence);
       expect(Object.hasOwn(row, 'evidence')).toBe(false);
+      expect(row.runtimeEvidence.includes('pending:')).toBe(false);
     }
   });
 

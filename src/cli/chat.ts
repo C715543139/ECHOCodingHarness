@@ -2,7 +2,13 @@ import type { Readable, Writable } from 'node:stream';
 
 import type { ApprovalHandler } from '../agent/index.js';
 import type { EchoApplicationService } from '../application/index.js';
-import type { ModelProvider, SessionId, SessionRuntimeState } from '../contracts/index.js';
+import type {
+  ModelCatalogClient,
+  ModelProvider,
+  SessionId,
+  SessionRuntimeState,
+} from '../contracts/index.js';
+import { ProcessModelCatalog } from '../provider/index.js';
 import { isConfigurationError } from '../session/index.js';
 
 import {
@@ -90,6 +96,36 @@ function defaultInterrupt(handler: () => void): () => void {
   return () => process.off('SIGINT', handler);
 }
 
+function asCatalogClient(provider: ModelProvider): ModelCatalogClient | undefined {
+  if (
+    !('listModelIds' in provider) ||
+    typeof (provider as { listModelIds?: unknown }).listModelIds !== 'function'
+  ) {
+    return undefined;
+  }
+  return provider as ModelCatalogClient;
+}
+
+function createDefaultChatCatalog(
+  loaded: LoadedHarnessRuntime,
+  configuredModel: string,
+): ChatModelCatalog {
+  const client = asCatalogClient(loaded.provider);
+  if (client === undefined) {
+    return new ConfigBackedChatCatalog(loaded.config.modelCatalog, configuredModel);
+  }
+  const catalog = new ProcessModelCatalog({
+    catalog: loaded.config.modelCatalog,
+    configuredModel,
+    cacheKey: loaded.providerIdentity.endpointFingerprint,
+    client,
+    timeoutMs: loaded.config.requestTimeoutMs,
+  });
+  return {
+    listCandidates: (options) => catalog.listCandidates(options),
+  };
+}
+
 export async function runChat(
   options: ChatCommandOptions,
   dependencies: ChatCommandDependencies = {},
@@ -150,6 +186,8 @@ export async function runChat(
     throw error;
   }
   const sessionId = runtime.sessionId;
+  const catalog =
+    dependencies.modelCatalog ?? createDefaultChatCatalog(loaded, runtime.model.value);
 
   writeChunks(
     renderChatBanner(
@@ -215,9 +253,6 @@ export async function runChat(
       }
       if (parsed.kind === 'slash') {
         catalogAbort = new AbortController();
-        const catalog =
-          dependencies.modelCatalog ??
-          new ConfigBackedChatCatalog(loaded.config.modelCatalog, runtime.model.value);
         const outcome = await handleSlash({
           parsed,
           service,

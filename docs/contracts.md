@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-29
 
@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -141,7 +141,7 @@ interface ModelCatalogSnapshot {
 - `/model <id>` 只更新当前 Session 并从下一个尚未开始的 Turn 生效，追加 `model.changed`，不写回配置文件。
 - Chat 入口是 `listModelCandidates`：返回当前模型、候选项和脱敏后的 `error` 字符串。新会话模型优先级为 CLI `--model` 高于配置文件 `model`，且 `run` 不查询目录。
 
-P1-2B 实现该运行时。Chat Slash 解析仍属于 P1-1B。
+P1-2B 实现发现与缓存。P1-1B 的 Chat `/model` 通过目录端口消费该运行时，不复制第二套 `GET /models`。
 
 ## 4. 工具契约
 
@@ -609,3 +609,6 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 - `P1_TEST_MATRIX`（每行含 `contractEvidence` 与 `runtimeEvidence`）以及 `tests/unit/contracts/p1-baseline.test.ts`、`tests/unit/contracts/doc-consistency.test.ts`；
 - P1-2A 运行时测试覆盖 artifact-root 加载、缺失配置退出码 2、未知键失败，以及不再读取 cwd/`ECHO_BASE_URL`/`ECHO_MODEL`/`ECHO_SAFETY_MODE`。
 - P1-2B 运行时测试覆盖 `/models` 发现、进程内缓存、刷新、失败不阻断已配置模型，以及目录错误脱敏。
+- P1-1B 运行时测试覆盖 Chat 恢复、Slash、Ctrl+C、bracketed paste，以及默认目录端口接到 `ProcessModelCatalog`。
+
+1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。

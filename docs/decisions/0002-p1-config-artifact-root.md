@@ -72,7 +72,7 @@ CLI 显式参数 > echo.config.json
 | P1-2B 合入后 | 运行时执行模型目录发现与进程内缓存。`run` 仍不调用 `/models`；Chat `/model` 与 `/model refresh` 是唯一延迟发现入口。 |
 | 已有 P0 本地文件 | 不迁移工作区或用户目录中的旧配置文件。操作者使用 `echo-harness config` 重新写入产物配置。 |
 
-P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifact-root 解析、配置文件校验与 `echo-harness config`。P1-2B 实现 `GET /models` 发现、进程内缓存与失败不阻断。Chat 输入解析属于 P1-1B。
+P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifact-root 解析、配置文件校验与 `echo-harness config`。P1-2B 实现 `GET /models` 发现、进程内缓存与失败不阻断。P1-1B 已实现 Chat 输入解析、Slash 与 `--resume`，并通过目录端口消费 P1-2B 的发现实现。
 
 ## 3. 选择理由
 

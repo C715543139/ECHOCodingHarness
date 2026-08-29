@@ -1,5 +1,6 @@
 import type {
   EchoError,
+  ModelCatalogClient,
   ModelFinishReason,
   ModelProvider,
   ModelRequest,
@@ -87,7 +88,7 @@ function mapStreamError(error: unknown): EchoError {
  * request/response shapes; loop control, tool execution and session state stay
  * outside this module.
  */
-export class OpenAICompatibleProvider implements ModelProvider {
+export class OpenAICompatibleProvider implements ModelProvider, ModelCatalogClient {
   readonly name = 'openai-compatible';
 
   private readonly client: OpenAICompatibleClient;
@@ -100,6 +101,16 @@ export class OpenAICompatibleProvider implements ModelProvider {
     this.model = options.model;
     this.requestTimeoutMs = options.requestTimeoutMs;
     this.retryPolicy = options.retryPolicy ?? DEFAULT_RETRY_POLICY;
+  }
+
+  async listModelIds(
+    options: Readonly<{ signal: AbortSignal; timeoutMs?: number }>,
+  ): Promise<readonly string[]> {
+    const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs;
+    return this.client.listModelIds({
+      signal: options.signal,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    });
   }
 
   stream(

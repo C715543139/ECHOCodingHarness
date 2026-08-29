@@ -1,12 +1,12 @@
 # P1 CLI 完善计划
 
-> 状态：Frozen
+> 状态：Accepted
 >
-> 版本：0.5
+> 版本：1.0
 >
 > 最后更新：2026-08-29
 >
-> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[contracts.md](../contracts.md) 1.1
+> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[contracts.md](../contracts.md) 1.2
 
 ## 1. 目标
 
@@ -665,6 +665,8 @@ P1 完成必须同时满足：
 - CLI 在 Windows TTY、非 TTY、无颜色和重定向场景具有确定性测试；
 - `pnpm check`、离线 Eval、演示 smoke、秘密扫描和身份扫描全部通过；
 - 真实 Provider 验收继续只在本地显式运行，不进入 CI。
+
+第 8 节已由 P1 最终集成验收用自动化证据闭合：`P1_TEST_MATRIX` 不再含 `pending:` 行；`pnpm check`、`pnpm eval:offline`、`pnpm smoke:demo`、`pnpm smoke:artifact`、秘密/身份扫描与 Windows CI 为可复现门禁。已知限制见第 9 节与 [testing.md](../testing.md)。
 
 ## 9. 主要风险
 

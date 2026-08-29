@@ -224,5 +224,11 @@ describe('CLI run integration', () => {
     expect(runSource).not.toContain('ProcessModelCatalog');
     expect(runSource).not.toContain('listCandidates');
     expect(runSource).not.toContain('listModelIds');
+    const chatSource = await fs.readFile(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/cli/chat.ts'),
+      'utf8',
+    );
+    expect(chatSource).toContain('ProcessModelCatalog');
+    expect(chatSource).toContain('listCandidates');
   });
 });

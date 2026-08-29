@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-29
 
@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实 Provider 验收已与 1.0 边界对齐。P1-0 冻结的配置、应用服务与事件边界见
 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)
-和 [contracts.md](./contracts.md) 1.1。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+和 [contracts.md](./contracts.md) 1.2。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -292,7 +292,7 @@ P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已�
 - Provider 使用 Fake Provider 验证确定性循环；
 - 工具在临时工作区中进行单元与集成测试；
 - 安全测试覆盖路径穿越、工作区外路径、危险命令和密钥泄露；
-- Windows CI 覆盖 lint、typecheck、test、build 和 demo smoke；
+- Windows CI 覆盖 lint、typecheck、test、build、demo smoke 与非产物目录产物 smoke；
 - CI 不调用真实付费模型 API。
 
 具体命令、离线 Eval、覆盖矩阵和 CI 边界见 [testing.md](./testing.md)。
@@ -316,7 +316,7 @@ P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JS
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
 artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已抽出
-`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste，并由可注入目录端口校验 `/model` 候选。P1-3 已实现分组式时间线与 Chat 输入表现层。
+`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据，不启动 P2。
 
 当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI

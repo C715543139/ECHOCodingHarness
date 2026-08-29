@@ -50,6 +50,9 @@ jobs:
       - name: Demo-loop smoke
         run: pnpm smoke:demo
 
+      - name: Artifact cwd smoke
+        run: pnpm smoke:artifact
+
       - name: Scan secrets
         run: pnpm scan:secrets
 

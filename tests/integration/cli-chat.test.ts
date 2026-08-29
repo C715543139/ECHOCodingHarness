@@ -463,6 +463,26 @@ describe('CLI chat integration', () => {
     expect(invalidSession.exitCode).toBe(2);
     expect(invalidResume.stderr()).toContain('not valid');
 
+    const backslashResume = output();
+    const backslashSession = await runChat(
+      {
+        workspace: root,
+        resume: '..\\bad',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: backslashResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(backslashSession.exitCode).toBe(2);
+    expect(backslashResume.stderr()).toContain('not valid');
+
     const blankResume = output();
     const blankSession = await runChat(
       {

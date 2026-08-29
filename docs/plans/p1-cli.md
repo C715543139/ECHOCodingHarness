@@ -42,7 +42,7 @@ echo-harness chat --resume <session-id> [--workspace <path>]
 
 - `chat` 创建新 Session，并在其中连续执行多个 Turn；
 - `--resume` 恢复同一工作区中的已有 Session，并接受启动摘要 / `/status` 中显示的唯一 SESSION 短 ID；
-- 空白、路径分隔符或其他非法字符的 `--resume` 值以退出码 2 报告配置错误，不得抛出未分类的存储异常；
+- 空白、`../`、`..\\` 或其他路径分隔符、非法字符的 `--resume` 值以退出码 2 报告配置错误，不得抛出未分类的存储异常；
 - 每个 Turn 继续使用 P0 的 Agent Loop、Context Projector、工具注册表、安全策略和 JSONL 事件存储；
 - Provider 在 Chat 进程中固定，Chat 内不支持更换 URL 或 API Key；
 - 恢复时若当前 Provider 与会话创建时的 Provider 不一致，应拒绝静默发送历史上下文，并给出可操作的配置错误。事件只保存 `ProviderIdentity`（含不可逆 `EndpointFingerprint`），不保存凭据或原始 URL。

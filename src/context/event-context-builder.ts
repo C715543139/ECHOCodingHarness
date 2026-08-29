@@ -154,7 +154,14 @@ function conversationHasContent(turn: ConversationTurn): boolean {
   );
 }
 
+function latestTurnIndex(events: readonly EchoEvent[]): number {
+  return (
+    events.reduce((count, event) => (event.type === 'turn.started' ? count + 1 : count), 0) - 1
+  );
+}
+
 function collectConversation(events: readonly EchoEvent[]): readonly ConversationTurn[] {
+  const currentTurnIndex = latestTurnIndex(events);
   const turns: ConversationTurn[] = [];
   let current: ConversationTurn | null = null;
   let turnUser: string | undefined;
@@ -163,11 +170,12 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
   let firstFragment = true;
 
   const startFragment = (): ConversationTurn => {
+    const priorUser = firstFragment && pendingTurnIndex !== currentTurnIndex ? turnUser : undefined;
     const turn: ConversationTurn = {
       turnIndex: pendingTurnIndex,
       assistant: { content: '', toolCalls: [] },
       toolMessages: [],
-      ...(firstFragment && turnUser !== undefined ? { user: turnUser } : {}),
+      ...(priorUser === undefined ? {} : { user: priorUser }),
     };
     firstFragment = false;
     return turn;
@@ -307,9 +315,10 @@ function budgetForMessages(budget: ContextBudget): number {
 
 /**
  * Deterministic projection of session events into model messages:
- * system constraints and the current goal are never dropped, recent steps
- * keep verbatim tool traffic, older steps collapse into summaries, and any
- * truncation is recorded in the returned projection.
+ * system constraints and the current goal are never dropped, the current goal
+ * is reserved once and inserted before the current turn's assistant/tool
+ * messages, recent steps keep verbatim tool traffic, older steps collapse into
+ * summaries, and any truncation is recorded in the returned projection.
  */
 export class EventContextBuilder implements ContextBuilder {
   private readonly systemPrompt: string;
@@ -331,6 +340,7 @@ export class EventContextBuilder implements ContextBuilder {
       fixedMessages.push({ role: 'system', content: this.workspaceSummary });
     }
 
+    const currentTurnIndex = latestTurnIndex(events);
     const digests = collectStepDigests(events);
     const conversation = collectConversation(events);
     const turnsWithDigests = conversation.slice(-digests.length || undefined);
@@ -340,21 +350,21 @@ export class EventContextBuilder implements ContextBuilder {
     const fixedTokens = projectionTokens(fixedMessages) + reservedGoal;
     const remaining = Math.max(0, availableBudget - fixedTokens);
 
-    const keptMessages: ModelMessage[] = [];
+    const keptTurns: {
+      readonly turnIndex: number;
+      readonly messages: readonly ModelMessage[];
+    }[] = [];
     let used = 0;
     let start = turnsWithDigests.length;
     for (let index = turnsWithDigests.length - 1; index >= 0; index -= 1) {
-      const messages = conversationMessages(
-        turnsWithDigests[index] as ConversationTurn,
-        this.toolResultMaxChars,
-        truncations,
-      );
-      const cost = projectionTokens(messages);
+      const turn = turnsWithDigests[index] as ConversationTurn;
+      const turnMessages = conversationMessages(turn, this.toolResultMaxChars, truncations);
+      const cost = projectionTokens(turnMessages);
       if (used + cost > remaining) {
         break;
       }
       used += cost;
-      keptMessages.unshift(...messages);
+      keptTurns.unshift({ turnIndex: turn.turnIndex, messages: turnMessages });
       start = index;
     }
 
@@ -369,6 +379,7 @@ export class EventContextBuilder implements ContextBuilder {
       );
     }, 0);
 
+    const summaryMessages: ModelMessage[] = [];
     if (omittedTurns.length > 0) {
       const summaryText = omittedTurns
         .map((_, index) => renderStepDigest(digests[index] as StepDigest))
@@ -376,29 +387,42 @@ export class EventContextBuilder implements ContextBuilder {
       const summaryMessage: ModelMessage = { role: 'user', content: summaryText };
       const summaryTokens = projectionTokens([summaryMessage]);
       if (used + summaryTokens <= remaining) {
-        keptMessages.unshift(summaryMessage);
+        summaryMessages.push(summaryMessage);
       } else {
-        const trimmed = truncateToLimit(summaryText, Math.max(0, remaining - used) * 4);
-        truncations.push({
-          reason: 'older step summaries exceeded remaining budget',
-          originalSize: trimmed.originalSize,
-          keptSize: trimmed.keptSize,
-        });
-        keptMessages.unshift({ role: 'user', content: trimmed.text });
+        const keptChars = Math.max(0, remaining - used) * 4;
+        if (keptChars > 0) {
+          const trimmed = truncateToLimit(summaryText, keptChars);
+          truncations.push({
+            reason: 'older step summaries exceeded remaining budget',
+            originalSize: trimmed.originalSize,
+            keptSize: trimmed.keptSize,
+          });
+          if (trimmed.text.length > 0) {
+            summaryMessages.push({ role: 'user', content: trimmed.text });
+          }
+        } else {
+          truncations.push({
+            reason: 'older step summaries exceeded remaining budget',
+            originalSize: summaryText.length,
+            keptSize: 0,
+          });
+        }
       }
     }
 
-    const messages: ModelMessage[] = [...fixedMessages, ...keptMessages];
-    if (goal !== undefined) {
-      const latestTurnIndex =
-        events.reduce((count, event) => (event.type === 'turn.started' ? count + 1 : count), 0) - 1;
-      const currentTurnAlreadyHasUser = turnsWithDigests
-        .slice(start)
-        .some((turn) => turn.turnIndex === latestTurnIndex && (turn.user?.length ?? 0) > 0);
-      if (!currentTurnAlreadyHasUser) {
-        messages.push(goal);
-      }
-    }
+    const priorMessages = keptTurns
+      .filter((item) => item.turnIndex !== currentTurnIndex)
+      .flatMap((item) => item.messages);
+    const currentMessages = keptTurns
+      .filter((item) => item.turnIndex === currentTurnIndex)
+      .flatMap((item) => item.messages);
+    const messages: ModelMessage[] = [
+      ...fixedMessages,
+      ...summaryMessages,
+      ...priorMessages,
+      ...(goal === undefined ? [] : [goal]),
+      ...currentMessages,
+    ];
     return {
       messages,
       approximateTokens: projectionTokens(messages),

@@ -114,15 +114,32 @@ describe('EventContextBuilder', () => {
     expect(projection.truncations[0]?.originalSize).toBe(500);
   });
 
-  it('preserves the goal and system prompt even under a tiny budget', () => {
+  it('preserves only the system prompt and current goal under a tiny budget', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM CONSTRAINTS' });
-    const tinyBudget: ContextBudget = { maxApproxTokens: 30, reservedOutputTokens: 4 };
+    const tinyBudget: ContextBudget = { maxApproxTokens: 15, reservedOutputTokens: 4 };
 
     const projection = builder.build(simpleHistory(), tinyBudget);
 
-    const roles = projection.messages.map((message) => message.role);
-    expect(roles[0]).toBe('system');
-    expect(projection.messages).toContainEqual({ role: 'user', content: 'Fix the failing tests' });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM CONSTRAINTS' },
+      { role: 'user', content: 'Fix the failing tests' },
+    ]);
+    expect(projection.omittedEventCount).toBeGreaterThan(0);
+  });
+
+  it('keeps the current exchange when the budget equals the actual projection size', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM CONSTRAINTS' });
+    const full = builder.build(simpleHistory(), largeBudget);
+    const tightBudget: ContextBudget = {
+      maxApproxTokens: full.approximateTokens + 4,
+      reservedOutputTokens: 4,
+    };
+
+    const projection = builder.build(simpleHistory(), tightBudget);
+
+    expect(projection.messages).toEqual(full.messages);
+    expect(projection.omittedEventCount).toBe(0);
+    expect(projection.approximateTokens).toBe(full.approximateTokens);
   });
 
   it('summarizes older steps instead of dropping them silently', () => {
@@ -281,15 +298,12 @@ describe('EventContextBuilder', () => {
     ];
 
     const projection = builder.build(history, largeBudget);
-    const users = projection.messages.filter((message) => message.role === 'user');
-    expect(users.map((message) => message.content)).toEqual([
-      'remember the color blue',
-      'what color did I mention?',
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'remember the color blue' },
+      { role: 'assistant', content: 'I will remember blue.' },
+      { role: 'user', content: 'what color did I mention?' },
     ]);
-    expect(projection.messages).toContainEqual({
-      role: 'assistant',
-      content: 'I will remember blue.',
-    });
   });
 
   it('keeps a repeated current goal when the previous turn used the same text', () => {
@@ -303,15 +317,15 @@ describe('EventContextBuilder', () => {
     ];
 
     const projection = builder.build(history, largeBudget);
-    const users = projection.messages.filter((message) => message.role === 'user');
-    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
-    expect(projection.messages).toContainEqual({
-      role: 'assistant',
-      content: 'First answer',
-    });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'First answer' },
+      { role: 'user', content: 'retry' },
+    ]);
   });
 
-  it('does not duplicate the current goal once its turn already has a user fragment', () => {
+  it('places the reserved current goal before the current turn assistant and does not duplicate it', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history: EchoEvent[] = [
       event('turn.started', { goal: 'retry' }),
@@ -323,12 +337,13 @@ describe('EventContextBuilder', () => {
     ];
 
     const projection = builder.build(history, largeBudget);
-    const users = projection.messages.filter((message) => message.role === 'user');
-    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
-    expect(projection.messages).toContainEqual({
-      role: 'assistant',
-      content: 'Second answer',
-    });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'First answer' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'Second answer' },
+    ]);
   });
 
   it('produces a deterministic projection for identical inputs', () => {
@@ -345,9 +360,16 @@ describe('EventContextBuilder', () => {
       workspaceSummary: 'Workspace: demo-repo; platform: windows',
     });
     const projection = builder.build(simpleHistory(), largeBudget);
-    expect(projection.messages).toContainEqual({
-      role: 'system',
-      content: 'Workspace: demo-repo; platform: windows',
-    });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'system', content: 'Workspace: demo-repo; platform: windows' },
+      { role: 'user', content: 'Fix the failing tests' },
+      {
+        role: 'assistant',
+        content: 'Let me look at the file.',
+        toolCalls: [{ id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } }],
+      },
+      { role: 'tool', toolCallId: 'call-1', content: '[completed] file contents here' },
+    ]);
   });
 });

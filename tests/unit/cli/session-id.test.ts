@@ -27,6 +27,8 @@ describe('session ID matching', () => {
   it('rejects blank and path-like resume identifiers before storage lookup', () => {
     expect(matchListedSessionId('   ', [full])).toEqual({ kind: 'invalid' });
     expect(matchListedSessionId('../bad', [full])).toEqual({ kind: 'invalid' });
+    expect(matchListedSessionId('..\\bad', [full])).toEqual({ kind: 'invalid' });
     expect(matchListedSessionId('bad/id', [full])).toEqual({ kind: 'invalid' });
+    expect(matchListedSessionId('bad\\id', [full])).toEqual({ kind: 'invalid' });
   });
 });

@@ -468,8 +468,12 @@ describe('AgentLoop', () => {
     const first = await loop.run('retry');
     await loop.continueSession(first.sessionId, 'retry');
 
-    const users = provider.requests[1]?.messages.filter((message) => message.role === 'user') ?? [];
-    expect(users.map((message) => message.content)).toEqual(['retry', 'retry']);
+    expect(provider.requests[1]?.messages).toEqual([
+      { role: 'system', content: 'system constraints' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'first' },
+      { role: 'user', content: 'retry' },
+    ]);
   });
 
   it('does not let a failing event observer change orchestration state', async () => {

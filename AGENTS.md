@@ -19,6 +19,10 @@ The following documents are the Accepted P0/P1 design baseline:
 - `docs/security.md`
 - `docs/cli-ux.md`
 - `docs/decisions/0001-project-foundation.md`
+- `docs/decisions/0002-p1-config-artifact-root.md`
+- `docs/decisions/0003-p1-application-service-session.md`
+- `docs/plans/p1-cli.md`
+- `docs/testing.md`
 
 Small implementation discoveries must update code, tests, and affected documentation together.
 Changes to the core loop, public contracts, security boundaries, or technology baseline require a

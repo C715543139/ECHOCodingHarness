@@ -523,6 +523,10 @@ describe('DefaultEventRenderer', () => {
     expect(join(renderer.renderEvent(event('turn.started', { goal: 'fix tests' }), unicode))).toBe(
       'ECHO       │ fix tests\n',
     );
+    const chatRenderer = new DefaultEventRenderer({}, 'chat');
+    expect(chatRenderer.renderEvent(event('turn.started', { goal: 'fix tests' }), unicode)).toEqual(
+      [],
+    );
     expect(join(renderer.renderEvent(event('step.started', { step: 6 }), unicode))).toContain(
       '── Step 6 ',
     );

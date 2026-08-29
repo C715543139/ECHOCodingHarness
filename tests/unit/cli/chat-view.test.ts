@@ -101,6 +101,14 @@ describe('Chat presentation', () => {
       'SAFETY     | auto',
     );
     expect(
+      join(
+        renderSlashFeedback(
+          { kind: 'info', label: 'MODEL', lines: ['fake-model', 'Candidates: fake-model'] },
+          plain,
+        ),
+      ),
+    ).toContain('Candidates: fake-model');
+    expect(
       join(renderSlashFeedback({ kind: 'error', label: 'MODEL', message: 'unknown model' }, plain)),
     ).toContain('unknown model');
   });

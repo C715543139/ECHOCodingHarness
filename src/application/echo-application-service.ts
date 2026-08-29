@@ -263,12 +263,20 @@ export class EchoApplicationService implements ApplicationService {
     return { outcome: 'rejected', reason: 'not_pending' };
   }
 
-  async setSessionModel(sessionId: SessionId, modelId: string): Promise<SessionRuntimeState> {
-    return this.writeSessionModel(sessionId, modelId, 'session');
+  async setSessionModel(
+    sessionId: SessionId,
+    modelId: string,
+    source: P1ConfigSource | 'slash' = 'session',
+  ): Promise<SessionRuntimeState> {
+    return this.writeSessionModel(sessionId, modelId, source);
   }
 
-  async setSessionSafetyMode(sessionId: SessionId, mode: SafetyMode): Promise<SessionRuntimeState> {
-    return this.writeSessionSafetyMode(sessionId, mode, 'session');
+  async setSessionSafetyMode(
+    sessionId: SessionId,
+    mode: SafetyMode,
+    source: P1ConfigSource | 'slash' = 'session',
+  ): Promise<SessionRuntimeState> {
+    return this.writeSessionSafetyMode(sessionId, mode, source);
   }
 
   async getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState> {
@@ -295,21 +303,26 @@ export class EchoApplicationService implements ApplicationService {
     };
   }
 
+  private runtimeSource(source: P1ConfigSource | 'slash'): P1ConfigSource {
+    return source === 'slash' ? 'session' : source;
+  }
+
   private async writeSessionModel(
     sessionId: SessionId,
     modelId: string,
-    source: P1ConfigSource,
+    source: P1ConfigSource | 'slash',
   ): Promise<SessionRuntimeState> {
     const current = await this.getRuntimeState(sessionId);
-    if (current.model.value === modelId && current.model.source === source) {
+    const runtimeSource = this.runtimeSource(source);
+    if (current.model.value === modelId && current.model.source === runtimeSource) {
       return current;
     }
     const previousModel = current.model.value;
     this.memory.set(sessionId, {
-      model: { value: modelId, source },
+      model: { value: modelId, source: runtimeSource },
       safetyMode: current.safetyMode,
     });
-    if (previousModel !== modelId || current.model.source !== source) {
+    if (previousModel !== modelId || current.model.source !== runtimeSource) {
       await this.appendEvent(sessionId, 'model.changed', {
         model: modelId,
         previousModel,
@@ -322,18 +335,19 @@ export class EchoApplicationService implements ApplicationService {
   private async writeSessionSafetyMode(
     sessionId: SessionId,
     mode: SafetyMode,
-    source: P1ConfigSource,
+    source: P1ConfigSource | 'slash',
   ): Promise<SessionRuntimeState> {
     const current = await this.getRuntimeState(sessionId);
-    if (current.safetyMode.value === mode && current.safetyMode.source === source) {
+    const runtimeSource = this.runtimeSource(source);
+    if (current.safetyMode.value === mode && current.safetyMode.source === runtimeSource) {
       return current;
     }
     const previousSafetyMode = current.safetyMode.value;
     this.memory.set(sessionId, {
       model: current.model,
-      safetyMode: { value: mode, source },
+      safetyMode: { value: mode, source: runtimeSource },
     });
-    if (previousSafetyMode !== mode || current.safetyMode.source !== source) {
+    if (previousSafetyMode !== mode || current.safetyMode.source !== runtimeSource) {
       await this.appendEvent(sessionId, 'safety.changed', {
         safetyMode: mode,
         previousSafetyMode,

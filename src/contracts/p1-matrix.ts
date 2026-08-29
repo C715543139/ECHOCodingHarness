@@ -98,7 +98,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'Model and safety resolve cli > session > config on resume, cli > config on new sessions; P1-0 freezes the table only',
     contractEvidence: 'docs/decisions/0003-p1-application-service-session.md',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/config/session-settings.test.ts',
     runtimeTask: 'P1-1B',
   },
   {
@@ -106,7 +106,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'chat',
     requirement: 'Slash commands parse only typed idle input; paste never becomes a slash command',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/cli/parse-chat-input.test.ts, tests/integration/cli-chat.test.ts',
     runtimeTask: 'P1-1B',
   },
   {
@@ -114,7 +114,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'chat',
     requirement: 'Bracketed paste is the frozen multi-line boundary; one paste is at most one Turn',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/cli/chat-input-decoder.test.ts',
     runtimeTask: 'P1-1B',
   },
   {

@@ -16,6 +16,7 @@ describe('CLI metadata', () => {
     expect(help).toContain('ECHO Harness');
     expect(help).toContain('local-first autonomous coding agent');
     expect(help).toContain('run');
+    expect(help).toContain('chat');
     expect(help).toContain('config');
   });
 
@@ -81,6 +82,46 @@ describe('CLI metadata', () => {
       }),
     );
     expect(exitCode).toBe(6);
+  });
+
+  it('parses chat options and delegates without embedding agent logic', async () => {
+    let exitCode: number | undefined;
+    const chatAction = vi.fn().mockResolvedValue({ exitCode: 130 });
+    const cli = createCli({
+      version: '9.8.7',
+      artifactRoot,
+      chatAction,
+      setExitCode: (code) => {
+        exitCode = code;
+      },
+    });
+
+    await cli.parseAsync([
+      'node',
+      'echo-harness',
+      'chat',
+      '--workspace',
+      '.',
+      '--resume',
+      'session-demo',
+      '--model',
+      'fake-model',
+      '--safety-mode',
+      'safe',
+      '--no-color',
+    ]);
+
+    expect(chatAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: '.',
+        resume: 'session-demo',
+        model: 'fake-model',
+        safetyMode: 'safe',
+        color: false,
+        artifactRoot,
+      }),
+    );
+    expect(exitCode).toBe(130);
   });
 
   it('throws a Commander error for missing run arguments instead of exiting the host process', async () => {

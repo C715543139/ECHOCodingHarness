@@ -238,6 +238,7 @@ export class DefaultEventRenderer implements EventRenderer {
       case 'safety.changed':
         return [];
       case 'turn.started':
+        if (this.surface === 'chat') return [];
         return this.emit('ECHO', compact(this.sanitize(event.payload.goal)), capabilities, 'cyan');
       case 'step.started': {
         this.resetStep();

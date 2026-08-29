@@ -11,6 +11,9 @@ export {
   renderYouPrompt,
   workspaceDisplayName,
 } from './cli/chat-view.js';
+export { parseIdleInput } from './cli/parse-chat-input.js';
+export { ChatInputDecoder } from './cli/chat-input-decoder.js';
+export { runChat, type ChatCommandOptions } from './cli/chat.js';
 export { DefaultEventRenderer } from './cli/event-renderer.js';
 export * from './cli/run.js';
 export * from './config/index.js';

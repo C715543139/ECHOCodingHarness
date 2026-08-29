@@ -59,6 +59,8 @@ describe('P1 documentation freeze', () => {
 
     expect(files.architecture).toContain('Application service');
     expect(files.architecture).toContain('P1-2A');
+    expect(files.architecture).not.toContain('后续将配置落点');
+    expect(files.plan).not.toContain('实现固定产物配置');
     expect(files.plan).toContain('ADR-0002');
     expect(files.plan).toContain('ADR-0003');
     expect(files.plan).toContain('ADR-0004');

@@ -28,6 +28,8 @@ P1 需要在写 Chat 与配置向导之前冻结唯一持久配置位置、秘�
 <artifact-root>/config/echo.config.json
 ```
 
+> 现行落点已改为 `<workspace>/.echo/config/echo.config.json`，见 [ADR-0004](./0004-workspace-echo-config.md)。以下段落保留原产物根决策原文。
+
 `artifact-root` 必须根据 CLI 入口模块或可执行文件的解析位置得到，不得使用 `process.cwd()` 或当前工作区根目录寻找配置。开发、测试和 `tsx` 入口通过显式依赖注入提供产物根，避免绑定个人路径。
 
 从非产物工作目录启动时，仍读取上述固定文件。
@@ -89,9 +91,11 @@ P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifac
 
 ## 5. 后果
 
+下列后果描述 P1-2A 合入时的产物根方案；落点相关条目已由 [ADR-0004](./0004-workspace-echo-config.md) 取代。
+
 - P1-2A 必须同时改加载器、错误码、文档和测试；不能只改运行时。
 - 只读安装目录与多用户系统不是本决策的目标环境。
-- `pnpm dev` 必须注入 artifact-root，否则会误写 `src/config/`。
+- `pnpm dev` 必须注入 artifact-root，否则会误写 `src/config/`。（ADR-0004 之后配置不再写在产物根，开发入口不再注入 artifact-root。）
 
 ## 6. 重新评估触发条件
 

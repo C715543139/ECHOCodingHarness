@@ -285,7 +285,7 @@ Context Projector 按优先级构建上下文：
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
-P1-2A 已使 `run` 读取产物配置文件。P1 后续将配置落点改为工作区 `.echo/config`（[ADR-0004](./decisions/0004-workspace-echo-config.md)）。P1-2B 已使模型发现独立于 `run`：CLI `--model` 只覆盖本次运行的模型名，不查询 `/models`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
+P1-2A 已使 `run`/`chat` 加载持久配置；现行落点为工作区 `.echo/config`（[ADR-0004](./decisions/0004-workspace-echo-config.md)），不再读取产物根 `config/`。P1-2B 已使模型发现独立于 `run`：CLI `--model` 只覆盖本次运行的模型名，不查询 `/models`。P1-3 只改变表现层：分组式时间线、宽度感知换行和 Chat 输入表面，不得改变事件、退出码或应用服务语义。
 
 具体视觉语义见 [cli-ux.md](./cli-ux.md)（P0）与 [p1-cli.md](./plans/p1-cli.md) 第 5 节（P1 分组时间线）。
 

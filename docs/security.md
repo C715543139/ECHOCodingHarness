@@ -212,7 +212,7 @@ PowerShell 不是沙箱。获准执行的程序可能自行访问工作区外文
 ### 10.1 API Key
 
 - 只从进程环境变量 `ECHO_API_KEY` 读取；
-- 不写入仓库文件、产物配置、JSONL 事件或异常详情；
+- 不写入仓库文件、工作区 `.echo/config`、JSONL 事件或异常详情；
 - 诊断只显示“已配置/未配置”；
 - Provider 请求日志不得包含 `Authorization` 头；
 - 不把 Key 放入模型消息。

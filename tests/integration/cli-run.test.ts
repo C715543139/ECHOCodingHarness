@@ -238,7 +238,7 @@ describe('CLI run integration', () => {
 
     const running = runGoal(
       'check the version',
-      { workspace: root, verbose: false, color: false, interactive: true, artifactRoot: root },
+      { workspace: root, verbose: false, color: false, interactive: true },
       {
         env: { ECHO_API_KEY: 'test-key' },
         io: captured.io,

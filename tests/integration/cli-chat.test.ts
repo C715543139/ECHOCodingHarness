@@ -126,7 +126,6 @@ describe('CLI chat integration', () => {
         verbose: false,
         color: false,
         interactive: true,
-        artifactRoot: root,
       },
       {
         env: { ECHO_API_KEY: 'test-key' },

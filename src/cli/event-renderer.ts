@@ -108,6 +108,8 @@ function isUnhelpfulProgress(text: string): boolean {
 
 function defensiveRedact(text: string, options: RedactionOptions): string {
   return redactText(text, options)
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
     .replace(/[A-Za-z]:\\Users\\[^\\/\s]+/giu, '<home>')
     .replace(/\/Users\/[^/\s]+/gu, '<home>')
     .replace(/\/home\/[^/\s]+/gu, '<home>');

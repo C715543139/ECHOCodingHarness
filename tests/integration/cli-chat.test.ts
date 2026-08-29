@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ScriptedChatInput } from '../../src/cli/chat-input-reader.js';
 import { runChat } from '../../src/cli/chat.js';
 import type { ChatModelCatalog, ChatModelCatalogSnapshot } from '../../src/cli/model-candidates.js';
+import { sessionShortId } from '../../src/cli/session-id.js';
 import type { EchoEvent, ModelProvider, ModelStreamEvent } from '../../src/contracts/index.js';
 import { FakeProvider } from '../../src/provider/index.js';
 import { cancellationError } from '../../src/provider/errors.js';
@@ -213,6 +214,7 @@ describe('CLI chat integration', () => {
     expect(captured.stderr()).toContain('YOU > ');
     expect(captured.stderr()).toContain('HELP');
     expect(captured.stderr()).toContain('/model refresh');
+    expect(captured.stderr()).toContain('ECHO       | first reply');
     expect(captured.stderr()).toContain('paste reply');
     expect(captured.stderr()).toContain('Turn completed');
     expect(captured.stderr()).toContain('Applies to the next turn.');
@@ -271,7 +273,7 @@ describe('CLI chat integration', () => {
     const resumed = await runChat(
       {
         workspace: root,
-        resume: sessionId,
+        resume: sessionShortId(sessionId),
         model: 'resume-model',
         verbose: false,
         color: false,
@@ -294,6 +296,13 @@ describe('CLI chat integration', () => {
     expect(captured.stderr()).toContain('Session status');
     expect(captured.stderr()).toContain('cli');
     expect(provider.requests[1]?.model).toBe('resume-model');
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'first' }),
+        expect.objectContaining({ role: 'user', content: 'continue' }),
+        expect.objectContaining({ role: 'assistant', content: 'one' }),
+      ]),
+    );
     const events = await readEvents(root);
     expect(events.some((event) => event.type === 'session.resumed')).toBe(true);
   });

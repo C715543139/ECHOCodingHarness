@@ -45,7 +45,7 @@ pnpm vitest run tests/integration/file-tools.test.ts tests/integration/tools/run
 | P1-0 frozen contracts, config errors, exit codes, paste/slash, artifact-root | `tests/unit/contracts/p1-baseline.test.ts`, `tests/unit/contracts/doc-consistency.test.ts`; each `P1_TEST_MATRIX` row has `contractEvidence` (this freeze) and `runtimeEvidence` (later task or existing P0 tests) |
 | P1-2A artifact-root loader and config wizard | `tests/unit/config/**`, `tests/unit/cli/config-wizard.test.ts`, `tests/integration/cli-run.test.ts`; matrix CFG-* rows now point at runtime tests |
 | P1-2B `/models` catalog, in-process cache, and fail-open configured model | `tests/unit/provider/model-catalog.test.ts`, `tests/unit/provider/openai-client.test.ts`, `tests/unit/provider/fake-provider.test.ts`, `tests/integration/cli-run.test.ts`; matrix MDL-* rows |
-| P1-1B Chat resume, slash, Ctrl+C, paste, and default catalog port | `tests/integration/cli-chat.test.ts`, `tests/unit/cli/parse-chat-input.test.ts`, `tests/unit/cli/chat-input-decoder.test.ts`, `tests/unit/config/session-settings.test.ts`; matrix APP-03/CHAT-* rows |
+| P1-1B Chat resume, slash, Ctrl+C, paste, and default catalog port | `tests/integration/cli-chat.test.ts`, `tests/unit/cli/parse-chat-input.test.ts`, `tests/unit/cli/chat-input-decoder.test.ts`, `tests/unit/cli/session-id.test.ts`, `tests/unit/config/session-settings.test.ts`; matrix APP-03/CHAT-* rows |
 | Chat interrupt of an in-flight `run_command` PowerShell tree | `tests/integration/cli-chat-cancel-command.test.ts` |
 | Interactive approval prompt and `n`/`y`/`s` decisions in run/chat | `tests/unit/cli/interactive-approval-handler.test.ts`, `tests/integration/cli-run.test.ts`, `tests/integration/cli-chat.test.ts` |
 
@@ -56,7 +56,7 @@ P1-0 增加契约与矩阵测试。矩阵每一行同时记录 `contractEvidence
 | P1-2A | artifact-root 加载、缺失配置退出码 2、未知键失败、不读取 cwd/`ECHO_BASE_URL`（已落地） |
 | P1-2B | `/models` 发现、缓存、失败不阻断已配置模型、CLI `--model` 优先于配置且不发现、手动 `/model refresh` 拒绝。证据：`tests/unit/provider/model-catalog.test.ts`、`tests/unit/provider/openai-client.test.ts`、`tests/integration/cli-run.test.ts`、`tests/integration/cli-help.test.ts` |
 | P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变。证据：`tests/unit/application/echo-application-service.test.ts`、`tests/unit/session/jsonl-session-repository.test.ts`、`tests/unit/session/endpoint-fingerprint.test.ts`、`tests/integration/cli-run.test.ts` |
-| P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn、`/model` 候选校验与目录请求取消：`tests/unit/config/session-settings.test.ts`、`tests/unit/cli/parse-chat-input.test.ts`、`tests/unit/cli/chat-input-decoder.test.ts`、`tests/unit/cli/chat-input-reader.test.ts`、`tests/unit/cli/model-candidates.test.ts`、`tests/integration/cli-chat.test.ts` |
+| P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn、`/model` 候选校验与目录请求取消：`tests/unit/config/session-settings.test.ts`、`tests/unit/cli/parse-chat-input.test.ts`、`tests/unit/cli/chat-input-decoder.test.ts`、`tests/unit/cli/chat-input-reader.test.ts`、`tests/unit/cli/model-candidates.test.ts`、`tests/unit/cli/session-id.test.ts`、`tests/integration/cli-chat.test.ts`。SESSION 短 ID 恢复与先前用户目标进入投影由 `tests/unit/cli/session-id.test.ts`、`tests/unit/context/event-context-builder.test.ts` 与 Chat 集成测试覆盖 |
 | P1-3 | 分组时间线、窄宽度/CJK、Chat 启动摘要与状态条：`tests/unit/cli/event-renderer.test.ts`、`tests/unit/cli/render-layout.test.ts`、`tests/unit/cli/chat-view.test.ts`；非 TTY/`--no-color` 与 stdout/stderr 契约保持 |
 
 `ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<artifact-root>/config/echo.config.json` 是 P1 唯一持久配置路径。

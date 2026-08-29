@@ -541,6 +541,22 @@ describe('DefaultEventRenderer', () => {
     expect(text).toContain('-- Turn completed ');
     expect(text).not.toContain('-- Run completed ');
   });
+
+  it('keeps Chat replies on stderr and does not let CR rewind the ECHO line', () => {
+    const renderer = new DefaultEventRenderer({}, 'chat');
+    const result = renderer.renderResult(
+      {
+        ...completed,
+        finalText: 'line one\r\nline two\r',
+      },
+      plain,
+    );
+    const text = join(result);
+    expect(result.some((chunk) => chunk.channel === 'stdout')).toBe(false);
+    expect(text).toContain('ECHO       | line one');
+    expect(text).toContain('line two');
+    expect(text).not.toContain('\r');
+  });
 });
 
 describe('render helpers', () => {

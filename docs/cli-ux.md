@@ -164,7 +164,7 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 | 领域事件 | 默认渲染 |
 | --- | --- |
 | `session.started` | 默认隐藏；`--verbose` 可显示 Session 短 ID |
-| `session.resumed` / `model.changed` / `safety.changed` | `run` 默认无输出；Chat 启动摘要与 Slash 反馈由 Chat 表现层渲染 |
+| `session.resumed` / `model.changed` / `safety.changed` | `run` 默认无输出；Chat 启动摘要与 Slash 反馈由 Chat 表现层渲染。`--resume` 接受摘要中的唯一 SESSION 短 ID |
 | `turn.started` | `ECHO` 目标摘要 |
 | `step.started` | `── Step <n> ──` 或 ASCII `-- Step <n> --` |
 | `context.projected` | 默认隐藏；详细模式可显示预算与裁剪摘要 |
@@ -194,6 +194,7 @@ Provider 只能把普通 assistant content 转换为 `model.text_delta`；provid
 
 - 若包含工具调用，合格的中间 assistant 文本可以作为 `ECHO` 进度说明写入 stderr，不得进入 stdout；
 - 若不包含工具调用并形成最终答复，`run` 的聚合文本由 `turn.completed` 路径写入 stdout；
+- Chat 最终 `ECHO` 回复写入 stderr，渲染前把 CR 规范为换行，避免 Windows 终端回车覆盖已输出的行；
 - 空白、重复或只描述内部推理的中间文本不显示；
 - Renderer 不自行判断文本是不是最终答复，以 Orchestrator 产生的 Step/Turn 事件为准。
 

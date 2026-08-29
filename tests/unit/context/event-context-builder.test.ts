@@ -269,6 +269,28 @@ describe('EventContextBuilder', () => {
     ).toBe(false);
   });
 
+  it('keeps prior user goals when a later turn starts so resume can reconstruct chat', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'remember the color blue' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'I will remember blue.' }),
+      event('turn.started', { goal: 'what color did I mention?' }),
+      event('step.started', { step: 1 }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    const users = projection.messages.filter((message) => message.role === 'user');
+    expect(users.map((message) => message.content)).toEqual([
+      'remember the color blue',
+      'what color did I mention?',
+    ]);
+    expect(projection.messages).toContainEqual({
+      role: 'assistant',
+      content: 'I will remember blue.',
+    });
+  });
+
   it('produces a deterministic projection for identical inputs', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history = simpleHistory();

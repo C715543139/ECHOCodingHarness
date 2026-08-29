@@ -140,27 +140,60 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
 }
 
 interface ConversationTurn {
+  user?: string;
   assistant: { content: string; toolCalls: { id: string; name: string; arguments: unknown }[] };
   toolMessages: { toolCallId: string; toolName: string; status: string; content: string }[];
+}
+
+function conversationHasContent(turn: ConversationTurn): boolean {
+  return (
+    turn.assistant.content.length > 0 ||
+    turn.assistant.toolCalls.length > 0 ||
+    turn.toolMessages.length > 0
+  );
 }
 
 function collectConversation(events: readonly EchoEvent[]): readonly ConversationTurn[] {
   const turns: ConversationTurn[] = [];
   let current: ConversationTurn | null = null;
+  let turnUser: string | undefined;
+  let firstFragment = true;
+
+  const startFragment = (): ConversationTurn => {
+    const turn: ConversationTurn = {
+      assistant: { content: '', toolCalls: [] },
+      toolMessages: [],
+      ...(firstFragment && turnUser !== undefined ? { user: turnUser } : {}),
+    };
+    firstFragment = false;
+    return turn;
+  };
 
   for (const event of events) {
     switch (event.type) {
-      case 'model.text_delta': {
-        if (current === null) {
-          current = { assistant: { content: '', toolCalls: [] }, toolMessages: [] };
+      case 'turn.started': {
+        if (current !== null && conversationHasContent(current)) {
+          turns.push(current);
         }
+        current = null;
+        turnUser = event.payload.goal;
+        firstFragment = true;
+        break;
+      }
+      case 'step.started': {
+        if (current !== null && conversationHasContent(current)) {
+          turns.push(current);
+          current = null;
+        }
+        break;
+      }
+      case 'model.text_delta': {
+        current ??= startFragment();
         current.assistant.content += event.payload.delta;
         break;
       }
       case 'model.tool_call': {
-        if (current === null) {
-          current = { assistant: { content: '', toolCalls: [] }, toolMessages: [] };
-        }
+        current ??= startFragment();
         current.assistant.toolCalls = [
           ...current.assistant.toolCalls,
           {
@@ -179,32 +212,22 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
           break;
         }
         const result = event.payload.result;
-        const status = result.status;
-        const summary = result.content ?? result.summary;
         current.toolMessages = [
           ...current.toolMessages,
           {
             toolCallId: result.toolCallId,
             toolName: result.toolName,
-            status,
-            content: summary,
+            status: result.status,
+            content: result.content ?? result.summary,
           },
         ];
-        break;
-      }
-      case 'step.started':
-      case 'turn.started': {
-        if (current !== null) {
-          turns.push(current);
-          current = null;
-        }
         break;
       }
       default:
         break;
     }
   }
-  if (current !== null) {
+  if (current !== null && conversationHasContent(current)) {
     turns.push(current);
   }
   return turns;
@@ -224,6 +247,9 @@ function conversationMessages(
     pairedCalls.some((call) => call.id === result.toolCallId && call.name === result.toolName),
   );
   const messages: ModelMessage[] = [];
+  if (turn.user !== undefined && turn.user.length > 0) {
+    messages.push({ role: 'user', content: turn.user });
+  }
   if (turn.assistant.content.length > 0 || pairedCalls.length > 0) {
     messages.push({
       role: 'assistant',
@@ -298,16 +324,14 @@ export class EventContextBuilder implements ContextBuilder {
     if (this.workspaceSummary !== undefined) {
       fixedMessages.push({ role: 'system', content: this.workspaceSummary });
     }
-    if (goal !== undefined) {
-      fixedMessages.push(goal);
-    }
 
     const digests = collectStepDigests(events);
     const conversation = collectConversation(events);
     const turnsWithDigests = conversation.slice(-digests.length || undefined);
 
     const availableBudget = budgetForMessages(budget);
-    const fixedTokens = projectionTokens(fixedMessages);
+    const reservedGoal = goal === undefined ? 0 : projectionTokens([goal]);
+    const fixedTokens = projectionTokens(fixedMessages) + reservedGoal;
     const remaining = Math.max(0, availableBudget - fixedTokens);
 
     const keptMessages: ModelMessage[] = [];
@@ -358,7 +382,17 @@ export class EventContextBuilder implements ContextBuilder {
       }
     }
 
-    const messages = [...fixedMessages, ...keptMessages];
+    const messages: ModelMessage[] = [...fixedMessages, ...keptMessages];
+    if (goal !== undefined) {
+      const lastUser = [...messages]
+        .reverse()
+        .find((message): message is Extract<ModelMessage, { role: 'user' }> => {
+          return message.role === 'user';
+        });
+      if (lastUser?.content !== goal.content) {
+        messages.push(goal);
+      }
+    }
     return {
       messages,
       approximateTokens: projectionTokens(messages),

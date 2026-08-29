@@ -438,6 +438,13 @@ describe('AgentLoop', () => {
     expect(second.finalText).toBe('second');
     expect(store.events.filter((item) => item.type === 'session.started')).toHaveLength(1);
     expect(store.events.filter((item) => item.type === 'turn.started')).toHaveLength(2);
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'first turn' }),
+        expect.objectContaining({ role: 'user', content: 'second turn' }),
+        expect.objectContaining({ role: 'assistant', content: 'first' }),
+      ]),
+    );
   });
 
   it('does not let a failing event observer change orchestration state', async () => {

@@ -134,7 +134,8 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'Model and safety resolve cli > session > config on resume, cli > config on new sessions; P1-0 freezes the table only',
     contractEvidence: 'docs/decisions/0003-p1-application-service-session.md',
-    runtimeEvidence: 'tests/unit/config/session-settings.test.ts',
+    runtimeEvidence:
+      'tests/unit/config/session-settings.test.ts, tests/unit/cli/session-id.test.ts, tests/integration/cli-chat.test.ts',
     runtimeTask: 'P1-1B',
   },
   {

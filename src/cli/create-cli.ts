@@ -122,7 +122,10 @@ export function createCli(options: CreateCliOptions = {}): Command {
     .command('chat')
     .description('Start or resume an interactive chat session in a fixed workspace.')
     .option('-w, --workspace <path>', 'Workspace directory (defaults to current directory).')
-    .option('--resume <session-id>', 'Resume an existing session in this workspace.')
+    .option(
+      '--resume <session-id>',
+      'Resume an existing session in this workspace. Accepts the unique SESSION short id from the Chat banner.',
+    )
     .option('--model <name>', 'Override the configured model name.')
     .option('--base-url <url>', 'Override the OpenAI-compatible API base URL.')
     .addOption(

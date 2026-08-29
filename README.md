@@ -105,6 +105,8 @@ node .\dist\cli.js chat --workspace .
 node .\dist\cli.js chat --resume <session-id> --workspace .
 ```
 
+`<session-id>` may be the full ID or the unique 8-character `SESSION` value from the Chat banner / `/status`.
+
 Chat reuses the same application service as `run`. Typed idle lines may run `/help`, `/status`,
 `/model`, `/model refresh`, `/safety`, and `/quit`. A bracketed paste is at most one Turn and never
 a Slash command. Ctrl+C cancels a running Turn and returns to the prompt; idle Ctrl+C exits `130`.

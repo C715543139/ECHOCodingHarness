@@ -41,7 +41,7 @@ echo-harness chat --resume <session-id> [--workspace <path>]
 ```
 
 - `chat` 创建新 Session，并在其中连续执行多个 Turn；
-- `--resume` 恢复同一工作区中的已有 Session；
+- `--resume` 恢复同一工作区中的已有 Session，并接受启动摘要 / `/status` 中显示的唯一 SESSION 短 ID；
 - 每个 Turn 继续使用 P0 的 Agent Loop、Context Projector、工具注册表、安全策略和 JSONL 事件存储；
 - Provider 在 Chat 进程中固定，Chat 内不支持更换 URL 或 API Key；
 - 恢复时若当前 Provider 与会话创建时的 Provider 不一致，应拒绝静默发送历史上下文，并给出可操作的配置错误。事件只保存 `ProviderIdentity`（含不可逆 `EndpointFingerprint`），不保存凭据或原始 URL。
@@ -363,7 +363,7 @@ SAFETY      │ balanced
 Type /help for commands · Ctrl+C cancels a running turn
 ```
 
-恢复会话使用 `ECHO Harness · resumed session`。摘要显示工作区安全名称、Session 短 ID、Provider 类型、模型和安全模式；不得显示个人绝对路径、完整私有 Provider URL、API Key 或低频运行限制。Provider 与 Key 的详细状态通过 `/status` 查看。
+恢复会话使用 `ECHO Harness · resumed session`。摘要显示工作区安全名称、Session 短 ID、Provider 类型、模型和安全模式；不得显示个人绝对路径、完整私有 Provider URL、API Key 或低频运行限制。`--resume` 必须能用该短 ID 唯一恢复同一工作区会话。Provider 与 Key 的详细状态通过 `/status` 查看。
 
 #### 5.7.2 提示符状态条
 

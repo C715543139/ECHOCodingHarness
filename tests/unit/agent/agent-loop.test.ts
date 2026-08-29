@@ -438,6 +438,42 @@ describe('AgentLoop', () => {
     expect(second.finalText).toBe('second');
     expect(store.events.filter((item) => item.type === 'session.started')).toHaveLength(1);
     expect(store.events.filter((item) => item.type === 'turn.started')).toHaveLength(2);
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'first turn' }),
+        expect.objectContaining({ role: 'user', content: 'second turn' }),
+        expect.objectContaining({ role: 'assistant', content: 'first' }),
+      ]),
+    );
+  });
+
+  it('keeps consecutive identical goals in the continued-turn projection', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'first' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'again' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+    const loop = createLoop({ provider, store });
+
+    const first = await loop.run('retry');
+    await loop.continueSession(first.sessionId, 'retry');
+
+    expect(provider.requests[1]?.messages).toEqual([
+      { role: 'system', content: 'system constraints' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'first' },
+      { role: 'user', content: 'retry' },
+    ]);
   });
 
   it('does not let a failing event observer change orchestration state', async () => {

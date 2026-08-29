@@ -2,14 +2,15 @@ import type { Readable, Writable } from 'node:stream';
 
 import type { ApprovalHandler } from '../agent/index.js';
 import type { EchoApplicationService } from '../application/index.js';
-import type {
-  ModelCatalogClient,
-  ModelProvider,
-  SessionId,
-  SessionRuntimeState,
+import {
+  CONFIG_ERROR_CODES,
+  type ModelCatalogClient,
+  type ModelProvider,
+  type SessionId,
+  type SessionRuntimeState,
 } from '../contracts/index.js';
 import { ProcessModelCatalog } from '../provider/index.js';
-import { isConfigurationError } from '../session/index.js';
+import { configurationError, isConfigurationError } from '../session/index.js';
 
 import {
   renderChatBanner,
@@ -43,6 +44,7 @@ import {
 } from './model-candidates.js';
 import { CHAT_SLASH_HELP_LINES, parseIdleInput } from './parse-chat-input.js';
 import { InteractiveApprovalHandler } from './run.js';
+import { matchListedSessionId, sessionShortId } from './session-id.js';
 
 export type { ChatModelCatalog } from './model-candidates.js';
 
@@ -67,13 +69,6 @@ export interface ChatCommandDependencies {
 
 function streamIsTty(stream: Readable): boolean {
   return 'isTTY' in stream && (stream as { readonly isTTY?: boolean }).isTTY === true;
-}
-
-function sessionShortId(sessionId: SessionId): string {
-  return sessionId
-    .replace(/^session-/u, '')
-    .replaceAll('-', '')
-    .slice(0, 8);
 }
 
 function statusStrip(runtime: SessionRuntimeState): StatusStripInput {
@@ -158,7 +153,9 @@ export async function runChat(
     });
   const approvalHandler =
     dependencies.approvalHandler ??
-    (options.interactive ? new InteractiveApprovalHandler(stdin, stderr) : undefined);
+    (options.interactive
+      ? new InteractiveApprovalHandler(stdin, stderr, loaded.capabilities)
+      : undefined);
 
   let turnRunning = false;
   const service = createHarnessService({
@@ -306,15 +303,42 @@ export async function runChat(
   return { exitCode: idleInterrupt ? 130 : exitCode };
 }
 
+async function resolveResumeSessionId(
+  service: EchoApplicationService,
+  workspaceRoot: string,
+  requested: string,
+): Promise<SessionId> {
+  const listed = await service.listSessions(workspaceRoot);
+  const match = matchListedSessionId(
+    requested,
+    listed.map((session) => session.sessionId),
+  );
+  if (match.kind === 'ambiguous') {
+    throw configurationError(
+      CONFIG_ERROR_CODES.sessionNotFound,
+      'Multiple sessions match that SESSION identifier. Use the full session ID.',
+    );
+  }
+  if (match.kind === 'invalid') {
+    throw configurationError(
+      CONFIG_ERROR_CODES.sessionNotFound,
+      'The requested session identifier is not valid.',
+    );
+  }
+  if (match.kind === 'resolved') return match.sessionId;
+  return requested.trim();
+}
+
 async function openSession(
   service: EchoApplicationService,
   loaded: LoadedHarnessRuntime,
   options: ChatCommandOptions,
 ): Promise<SessionRuntimeState> {
   if (options.resume !== undefined) {
+    const sessionId = await resolveResumeSessionId(service, loaded.workspaceRoot, options.resume);
     return service.resumeSession({
       workspaceRoot: loaded.workspaceRoot,
-      sessionId: options.resume,
+      sessionId,
       provider: loaded.providerIdentity,
       ...(options.model === undefined ? {} : { cliModel: options.model }),
       ...(options.safetyMode === undefined ? {} : { cliSafetyMode: options.safetyMode }),

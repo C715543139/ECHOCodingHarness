@@ -21,6 +21,7 @@ The following documents are the Accepted P0/P1 design baseline:
 - `docs/decisions/0001-project-foundation.md`
 - `docs/decisions/0002-p1-config-artifact-root.md`
 - `docs/decisions/0003-p1-application-service-session.md`
+- `docs/decisions/0005-restore-artifact-config.md`
 - `docs/plans/p1-cli.md`
 - `docs/testing.md`
 

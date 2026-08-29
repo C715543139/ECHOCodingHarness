@@ -54,6 +54,17 @@ try {
     })}\n`,
     'utf8',
   );
+  fs.mkdirSync(path.join(cwd, '.echo', 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(cwd, '.echo', 'config', 'echo.config.json'),
+    `${JSON.stringify({
+      baseUrl: 'https://echo.example/v1',
+      model: 'workspace-echo-decoy',
+      modelCatalog: { source: 'discover' },
+      safetyMode: 'auto',
+    })}\n`,
+    'utf8',
+  );
   if (hadConfig) {
     fs.rmSync(artifactConfig);
   }
@@ -86,6 +97,9 @@ try {
   if (missingText.includes(decoyModel)) {
     throw new Error('Artifact CLI used a cwd decoy config file.');
   }
+  if (missingText.includes('workspace-echo-decoy')) {
+    throw new Error('Artifact CLI used a workspace .echo/config decoy.');
+  }
   if (missingText.includes(smokeKey)) {
     throw new Error('Artifact CLI leaked the API key.');
   }
@@ -115,6 +129,9 @@ try {
   }
   if (noKeyText.includes(decoyModel)) {
     throw new Error('Artifact CLI with a real config still followed the cwd decoy model.');
+  }
+  if (noKeyText.includes('workspace-echo-decoy')) {
+    throw new Error('Artifact CLI with a real config still followed workspace .echo/config.');
   }
 
   process.stdout.write('Artifact smoke check passed.\n');

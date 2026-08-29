@@ -47,6 +47,17 @@ describe('loadRuntimeConfig', () => {
       }),
       'utf8',
     );
+    await fs.mkdir(path.join(cwd, '.echo', 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(cwd, '.echo', 'config', 'echo.config.json'),
+      JSON.stringify({
+        baseUrl: 'https://echo.example/v1',
+        model: 'workspace-echo-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'auto',
+      }),
+      'utf8',
+    );
 
     const original = process.cwd();
     try {

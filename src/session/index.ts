@@ -1,4 +1,8 @@
-export { type JsonlSessionStoreOptions, JsonlSessionStore } from './jsonl-session-store.js';
+export {
+  type JsonlSessionStoreOptions,
+  isSafeSessionId,
+  JsonlSessionStore,
+} from './jsonl-session-store.js';
 export {
   type JsonlSessionRepositoryOptions,
   JsonlSessionRepository,
@@ -8,5 +12,5 @@ export {
   createProviderIdentity,
   providerIdentitiesEqual,
 } from './endpoint-fingerprint.js';
-export { isConfigurationError, isStorageError } from './errors.js';
+export { configurationError, isConfigurationError, isStorageError } from './errors.js';
 export { type RedactionOptions, redactText, redactValue } from './redaction.js';

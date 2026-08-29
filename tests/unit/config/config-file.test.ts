@@ -33,6 +33,12 @@ describe('readPersistentConfigFile', () => {
       JSON.stringify({ model: 'cwd-model' }),
       'utf8',
     );
+    await fs.mkdir(path.join(workspace, '.echo', 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, '.echo', 'config', 'echo.config.json'),
+      JSON.stringify({ model: 'workspace-echo-model' }),
+      'utf8',
+    );
     await fs.writeFile(
       path.join(artifactRoot, '.echo-config.json'),
       JSON.stringify({ model: 'legacy-model' }),

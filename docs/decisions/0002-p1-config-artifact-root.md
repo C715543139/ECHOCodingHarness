@@ -9,6 +9,8 @@
 > 决策者：项目维护者
 >
 > 取代：P0 [contracts.md](../contracts.md) 第 10 节中的配置来源与优先级，自 P1-2A 运行时合入起生效
+>
+> 第 2.1 节现行有效。[ADR-0004](./0004-workspace-echo-config.md) 曾改为工作区 `.echo/config`；[ADR-0005](./0005-restore-artifact-config.md) 已恢复本节。
 
 ## 1. 背景
 

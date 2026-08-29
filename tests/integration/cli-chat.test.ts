@@ -1,12 +1,14 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ScriptedChatInput } from '../../src/cli/chat-input-reader.js';
 import { runChat } from '../../src/cli/chat.js';
 import type { ChatModelCatalog, ChatModelCatalogSnapshot } from '../../src/cli/model-candidates.js';
+import { sessionShortId } from '../../src/cli/session-id.js';
 import type { EchoEvent, ModelProvider, ModelStreamEvent } from '../../src/contracts/index.js';
 import { FakeProvider } from '../../src/provider/index.js';
 import { cancellationError } from '../../src/provider/errors.js';
@@ -79,6 +81,85 @@ async function readEvents(root: string): Promise<EchoEvent[]> {
 }
 
 describe('CLI chat integration', () => {
+  it('shows approval choices on stderr before reading input and does not submit the choice as chat', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          {
+            type: 'tool_call',
+            call: {
+              id: 'call-version',
+              name: 'run_command',
+              arguments: { command: 'node --version' },
+            },
+          },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'version checked' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const approvalInput = new PassThrough();
+    let stdout = '';
+    let stderr = '';
+    let answered = false;
+    const approvalOutput = new Writable({
+      write(chunk, _encoding, callback) {
+        stderr += String(chunk);
+        if (!answered && stderr.includes('Approve [y] once / [s] session / [n] deny')) {
+          answered = true;
+          queueMicrotask(() => approvalInput.write('y\n'));
+        }
+        callback();
+      },
+    });
+
+    const outcome = await runChat(
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: true,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: {
+          writeStdout: (text) => {
+            stdout += text;
+          },
+          writeStderr: (text) => {
+            stderr += text;
+          },
+        },
+        providerFactory: () => provider,
+        input: new ScriptedChatInput([
+          { kind: 'batch', text: 'check the version', source: 'typed' },
+          { kind: 'batch', text: '/quit', source: 'typed' },
+        ]),
+        stdin: approvalInput,
+        stderr: approvalOutput,
+      },
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(answered).toBe(true);
+    expect(stderr).toContain('Approve [y] once / [s] session / [n] deny');
+    expect(stdout).not.toContain('Approve [y] once / [s] session / [n] deny');
+    expect(provider.requests).toHaveLength(2);
+    expect(
+      provider.requests.some((request) =>
+        request.messages.some((message) => message.role === 'user' && message.content === 'y'),
+      ),
+    ).toBe(false);
+  });
+
   it('runs Fake Provider turns, slash commands, empty input, and paste without slash injection', async () => {
     const root = await workspace();
     await writeArtifactConfig(root);
@@ -133,6 +214,7 @@ describe('CLI chat integration', () => {
     expect(captured.stderr()).toContain('YOU > ');
     expect(captured.stderr()).toContain('HELP');
     expect(captured.stderr()).toContain('/model refresh');
+    expect(captured.stderr()).toContain('ECHO       | first reply');
     expect(captured.stderr()).toContain('paste reply');
     expect(captured.stderr()).toContain('Turn completed');
     expect(captured.stderr()).toContain('Applies to the next turn.');
@@ -191,7 +273,7 @@ describe('CLI chat integration', () => {
     const resumed = await runChat(
       {
         workspace: root,
-        resume: sessionId,
+        resume: sessionShortId(sessionId),
         model: 'resume-model',
         verbose: false,
         color: false,
@@ -212,8 +294,17 @@ describe('CLI chat integration', () => {
     expect(resumed.exitCode).toBe(0);
     expect(captured.stderr()).toContain('ECHO Harness · resumed session');
     expect(captured.stderr()).toContain('Session status');
+    expect(captured.stderr()).toMatch(/\n-- Session status /u);
+    expect(captured.stderr()).toMatch(/API KEY\s+\|\s+configured\n\n/u);
     expect(captured.stderr()).toContain('cli');
     expect(provider.requests[1]?.model).toBe('resume-model');
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'first' }),
+        expect.objectContaining({ role: 'user', content: 'continue' }),
+        expect.objectContaining({ role: 'assistant', content: 'one' }),
+      ]),
+    );
     const events = await readEvents(root);
     expect(events.some((event) => event.type === 'session.resumed')).toBe(true);
   });
@@ -351,6 +442,66 @@ describe('CLI chat integration', () => {
     );
     expect(missingSession.exitCode).toBe(2);
     expect(resumeMissing.stderr()).toContain('does not exist');
+
+    const invalidResume = output();
+    const invalidSession = await runChat(
+      {
+        workspace: root,
+        resume: '../bad',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: invalidResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(invalidSession.exitCode).toBe(2);
+    expect(invalidResume.stderr()).toContain('not valid');
+
+    const backslashResume = output();
+    const backslashSession = await runChat(
+      {
+        workspace: root,
+        resume: '..\\bad',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: backslashResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(backslashSession.exitCode).toBe(2);
+    expect(backslashResume.stderr()).toContain('not valid');
+
+    const blankResume = output();
+    const blankSession = await runChat(
+      {
+        workspace: root,
+        resume: '   ',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: path.join(root, 'missing-artifact'),
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: blankResume.io,
+        cwd: root,
+        providerFactory: () => new FakeProvider([]),
+      },
+    );
+    expect(blankSession.exitCode).toBe(2);
+    expect(blankResume.stderr()).toContain('not valid');
   });
 
   it('repairs a dangling turn on resume and accepts non-TTY line input', async () => {

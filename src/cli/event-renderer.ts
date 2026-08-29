@@ -34,6 +34,13 @@ interface RequestedTool {
 
 export const APPROVAL_CHOICES = 'Approve [y] once / [s] session / [n] deny';
 
+export function formatApprovalQuestion(capabilities: RenderCapabilities): string {
+  const marker = capabilities.unicode ? '›' : '>';
+  const body = `${APPROVAL_CHOICES} ${marker}`;
+  const lines = formatLabeled('', body, layoutOptions(capabilities));
+  return `${lines.at(-1) ?? body} `;
+}
+
 function compact(value: string, maximum = 240): string {
   const oneLine = [...value.replace(/\s+/gu, ' ')]
     .filter((character) => {
@@ -101,6 +108,8 @@ function isUnhelpfulProgress(text: string): boolean {
 
 function defensiveRedact(text: string, options: RedactionOptions): string {
   return redactText(text, options)
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
     .replace(/[A-Za-z]:\\Users\\[^\\/\s]+/giu, '<home>')
     .replace(/\/Users\/[^/\s]+/gu, '<home>')
     .replace(/\/home\/[^/\s]+/gu, '<home>');
@@ -171,6 +180,8 @@ export class DefaultEventRenderer implements EventRenderer {
   private hadTruncation = false;
   private hadDenial = false;
   private hadLimit = false;
+  private stepHasGroup = false;
+  private shownDenial: string | undefined;
 
   constructor(redaction: RedactionOptions = {}, surface: RenderSurface = 'run') {
     this.redaction = redaction;
@@ -185,6 +196,14 @@ export class DefaultEventRenderer implements EventRenderer {
     this.textBuffer = '';
     this.stepToolCalls = 0;
     this.flushedProgress = false;
+    this.stepHasGroup = false;
+    this.shownDenial = undefined;
+  }
+
+  private beginGroup(): readonly RenderChunk[] {
+    const gap = this.stepHasGroup ? ([{ channel: 'stderr', text: '\n' }] as const) : [];
+    this.stepHasGroup = true;
+    return gap;
   }
 
   private emit(
@@ -216,7 +235,7 @@ export class DefaultEventRenderer implements EventRenderer {
     this.flushedProgress = true;
     if (isUnhelpfulProgress(text) || text === this.lastProgressText) return [];
     this.lastProgressText = text;
-    return this.emit('ECHO', text, capabilities, 'cyan');
+    return [...this.beginGroup(), ...this.emit('ECHO', text, capabilities, 'cyan')];
   }
 
   renderEvent(event: EchoEvent, capabilities: RenderCapabilities): readonly RenderChunk[] {
@@ -321,7 +340,8 @@ export class DefaultEventRenderer implements EventRenderer {
           event.payload.error.retryable ? 'yellow' : 'red',
         );
       case 'tool.requested': {
-        const chunks: RenderChunk[] = [...this.flushProgress(capabilities)];
+        this.shownDenial = undefined;
+        const chunks: RenderChunk[] = [...this.flushProgress(capabilities), ...this.beginGroup()];
         const field = toolField(event.payload.call.name, event.payload.normalizedInput);
         this.requestedTools.set(event.payload.call.id, {
           summary: field?.summary ?? '',
@@ -339,6 +359,7 @@ export class DefaultEventRenderer implements EventRenderer {
       case 'approval.denied':
         this.hadDenial = true;
         this.lastDenialDetail = compact(this.sanitize(event.payload.reason));
+        this.shownDenial = this.lastDenialDetail;
         return this.emit('DENIED', this.lastDenialDetail, capabilities, 'red');
       case 'tool.authorized':
         return capabilities.verbose
@@ -365,8 +386,10 @@ export class DefaultEventRenderer implements EventRenderer {
         this.hadDenial = true;
         const summary = compact(this.sanitize(event.payload.result.summary));
         this.lastDenialDetail = summary;
+        if (!event.payload.hard && this.shownDenial === summary) return [];
         const headline = event.payload.hard ? 'Hard policy' : summary;
         const extra = event.payload.hard && summary.length > 0 ? [summary] : [];
+        this.shownDenial = headline;
         return this.emitBlock('DENIED', [headline, ...extra], capabilities, 'red');
       }
       case 'tool.cancelled':
@@ -476,13 +499,16 @@ export class DefaultEventRenderer implements EventRenderer {
       rows.push(...formatLabeled('DETAIL', 'One or more outputs were truncated.', options));
     }
     if (result.error !== undefined) {
-      rows.push(
-        ...formatLabeled(
-          'DETAIL',
-          `${result.error.category}${valueJoin(options.unicode)}${compact(this.sanitize(result.error.message))}`,
-          options,
-        ),
-      );
+      const errorDetail = compact(this.sanitize(result.error.message));
+      if (this.lastDenialDetail === undefined || errorDetail !== this.lastDenialDetail) {
+        rows.push(
+          ...formatLabeled(
+            'DETAIL',
+            `${result.error.category}${valueJoin(options.unicode)}${errorDetail}`,
+            options,
+          ),
+        );
+      }
       if (capabilities.verbose) {
         rows.push(
           ...formatLabeled(
@@ -556,8 +582,7 @@ export class DefaultEventRenderer implements EventRenderer {
         );
     if (!capabilities.interactive) return stderrLines(lines);
     const closed = lines.slice(0, -1);
-    const last = lines.at(-1) ?? prompt;
-    return [...stderrLines(closed), stderrOpenLine(`${last} `)];
+    return [...stderrLines(closed), stderrOpenLine(formatApprovalQuestion(capabilities))];
   }
 
   private renderCompleted(

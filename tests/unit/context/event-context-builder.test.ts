@@ -15,6 +15,7 @@ let sequence = 0;
 function event<TType extends EchoEvent['type']>(
   type: TType,
   payload: EchoEventOf<TType>['payload'],
+  turnId = 'turn-1',
 ): EchoEventOf<TType> {
   sequence += 1;
   return {
@@ -22,7 +23,7 @@ function event<TType extends EchoEvent['type']>(
     sequence,
     timestamp: '2026-08-27T00:00:00.000Z',
     sessionId: 'session-1',
-    turnId: 'turn-1',
+    turnId,
     stepId: 'step-1',
     type,
     payload,
@@ -113,15 +114,32 @@ describe('EventContextBuilder', () => {
     expect(projection.truncations[0]?.originalSize).toBe(500);
   });
 
-  it('preserves the goal and system prompt even under a tiny budget', () => {
+  it('preserves only the system prompt and current goal under a tiny budget', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM CONSTRAINTS' });
-    const tinyBudget: ContextBudget = { maxApproxTokens: 30, reservedOutputTokens: 4 };
+    const tinyBudget: ContextBudget = { maxApproxTokens: 15, reservedOutputTokens: 4 };
 
     const projection = builder.build(simpleHistory(), tinyBudget);
 
-    const roles = projection.messages.map((message) => message.role);
-    expect(roles[0]).toBe('system');
-    expect(projection.messages).toContainEqual({ role: 'user', content: 'Fix the failing tests' });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM CONSTRAINTS' },
+      { role: 'user', content: 'Fix the failing tests' },
+    ]);
+    expect(projection.omittedEventCount).toBeGreaterThan(0);
+  });
+
+  it('keeps the current exchange when the budget equals the actual projection size', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM CONSTRAINTS' });
+    const full = builder.build(simpleHistory(), largeBudget);
+    const tightBudget: ContextBudget = {
+      maxApproxTokens: full.approximateTokens + 4,
+      reservedOutputTokens: 4,
+    };
+
+    const projection = builder.build(simpleHistory(), tightBudget);
+
+    expect(projection.messages).toEqual(full.messages);
+    expect(projection.omittedEventCount).toBe(0);
+    expect(projection.approximateTokens).toBe(full.approximateTokens);
   });
 
   it('summarizes older steps instead of dropping them silently', () => {
@@ -269,6 +287,65 @@ describe('EventContextBuilder', () => {
     ).toBe(false);
   });
 
+  it('keeps prior user goals when a later turn starts so resume can reconstruct chat', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'remember the color blue' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'I will remember blue.' }),
+      event('turn.started', { goal: 'what color did I mention?' }),
+      event('step.started', { step: 1 }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'remember the color blue' },
+      { role: 'assistant', content: 'I will remember blue.' },
+      { role: 'user', content: 'what color did I mention?' },
+    ]);
+  });
+
+  it('keeps a repeated current goal when the previous turn used the same text', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'First answer' }),
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'First answer' },
+      { role: 'user', content: 'retry' },
+    ]);
+  });
+
+  it('places the reserved current goal before the current turn assistant and does not duplicate it', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'First answer' }),
+      event('turn.started', { goal: 'retry' }),
+      event('step.started', { step: 1 }),
+      event('model.text_delta', { delta: 'Second answer' }),
+    ];
+
+    const projection = builder.build(history, largeBudget);
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'First answer' },
+      { role: 'user', content: 'retry' },
+      { role: 'assistant', content: 'Second answer' },
+    ]);
+  });
+
   it('produces a deterministic projection for identical inputs', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history = simpleHistory();
@@ -283,9 +360,16 @@ describe('EventContextBuilder', () => {
       workspaceSummary: 'Workspace: demo-repo; platform: windows',
     });
     const projection = builder.build(simpleHistory(), largeBudget);
-    expect(projection.messages).toContainEqual({
-      role: 'system',
-      content: 'Workspace: demo-repo; platform: windows',
-    });
+    expect(projection.messages).toEqual([
+      { role: 'system', content: 'SYSTEM' },
+      { role: 'system', content: 'Workspace: demo-repo; platform: windows' },
+      { role: 'user', content: 'Fix the failing tests' },
+      {
+        role: 'assistant',
+        content: 'Let me look at the file.',
+        toolCalls: [{ id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } }],
+      },
+      { role: 'tool', toolCallId: 'call-1', content: '[completed] file contents here' },
+    ]);
   });
 });

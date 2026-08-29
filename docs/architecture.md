@@ -9,7 +9,8 @@
 ## 1. 文档目的
 
 本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实 Provider 验收已与 1.0 边界对齐。P1-0 冻结的配置、应用服务与事件边界见
-[ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)
+[ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、
+[ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md) 1.2。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
@@ -103,6 +104,7 @@ P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。�
 
 - 保存追加式事件；
 - 保留系统约束、当前目标和最近步骤；
+- 保留先前 Turn 的用户目标，使恢复会话与多轮 Chat 能按时间重建对话；当前目标作为独立保留项只计费一次，插在先前对话之后、当前 Turn 模型消息之前；
 - 裁剪陈旧且体积大的命令输出；
 - 生成稳定的状态摘要；
 - 控制近似上下文预算。

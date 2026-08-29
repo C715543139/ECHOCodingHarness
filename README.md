@@ -60,33 +60,24 @@ pnpm build
 
 ## Configure
 
-The current `echo-harness run` still uses the P0 merge order: CLI arguments, environment
-variables, project configuration, user configuration, then built-in defaults. Credentials are
-read from the process environment. ECHO does not automatically load `.env` files, and a
-configuration file cannot provide an API key.
+Non-secret settings persist only at `<artifact-root>/config/echo.config.json`.
+`artifact-root` is the directory of the CLI module or executable (`dist/` after `pnpm build`),
+never `process.cwd()`. Create or update that file with the interactive wizard:
 
 ```powershell
-$env:ECHO_BASE_URL = 'https://provider.example/v1'
+pnpm build
+node .\dist\cli.js config
 $env:ECHO_API_KEY = '<secret>'
-$env:ECHO_MODEL = '<model>'
-$env:ECHO_SAFETY_MODE = 'balanced'
 ```
 
-Non-secret defaults may instead be placed in `echo.config.json` or `.echo-config.json`:
+The wizard asks for the OpenAI-compatible Provider URL, discover vs manual model catalog, default
+model, and safety mode. It keeps a memory draft until the final confirmation, then writes the file
+atomically. `ECHO_API_KEY` is the only supported secret environment variable and is never saved.
+CLI flags such as `--model`, `--base-url`, and `--safety-mode` override the file for one `run`.
+Missing configuration makes `run` exit `2` and suggest `echo-harness config`. P1-2A landed this
+loader; it does not read `ECHO_BASE_URL`, `ECHO_MODEL`, `ECHO_SAFETY_MODE`, or workspace config files.
 
-```json
-{
-  "baseUrl": "https://provider.example/v1",
-  "model": "example-model",
-  "safetyMode": "balanced",
-  "maxSteps": 24
-}
-```
-
-P1-2A replaces that lookup with a single file at `<artifact-root>/config/echo.config.json`.
-`artifact-root` is derived from the CLI module or executable, never `process.cwd()`. After that
-cutover, `ECHO_API_KEY` remains the only supported secret environment variable; `ECHO_BASE_URL`,
-`ECHO_MODEL`, and `ECHO_SAFETY_MODE` are removed. See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
+See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
 
 ## Run
 
@@ -99,8 +90,9 @@ node .\dist\cli.js run "Inspect the project and fix the failing tests." `
 ```
 
 Use `node .\dist\cli.js run --help` for the complete option list. Progress and diagnostics go to
-stderr; the final model answer goes to stdout. Exit codes distinguish configuration, Provider,
-tool, policy, limit, and cancellation failures.
+stderr as a grouped Step timeline; the final model answer goes to stdout. Exit codes distinguish
+configuration, Provider, tool, policy, limit, and cancellation failures. ASCII is used when the
+terminal is not a TTY; `--no-color` removes ANSI without changing labels or structure.
 
 ## Resettable demonstration
 
@@ -160,8 +152,8 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
 - ECHO is not an operating-system sandbox. Approved PowerShell commands can still access network
   or files permitted to the current user.
 - The current release does not provide Web UI, MCP, multi-agent execution, or a
-  general rollback system. Session resume and `chat` are frozen for P1 but not implemented until
-  P1-1A/P1-1B.
+  general rollback system. Application-service session create/resume exists after P1-1A;
+  `chat` remains scheduled for P1-1B.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

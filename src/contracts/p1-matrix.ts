@@ -1,6 +1,6 @@
 export interface P1MatrixRow {
   readonly id: string;
-  readonly area: 'config' | 'events' | 'application' | 'chat' | 'exit' | 'p0-guard';
+  readonly area: 'config' | 'events' | 'application' | 'chat' | 'exit' | 'p0-guard' | 'cli';
   readonly requirement: string;
   readonly contractEvidence: string;
   readonly runtimeEvidence: string;
@@ -13,7 +13,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'config',
     requirement: 'Persistent config path is only <artifact-root>/config/echo.config.json',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/unit/config/config-file.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -21,7 +21,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'config',
     requirement: 'artifact-root is resolved from the CLI module/executable, never process.cwd()',
     contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/unit/config/artifact-root.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -30,7 +30,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'P1 config merge is only CLI explicit args over echo.config.json; built-in field defaults are not a source',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/unit/config/load-config.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -38,7 +38,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'config',
     requirement: 'Unknown keys, credentials, and embedded URL userinfo fail closed',
     contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/unit/config/schema.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -46,7 +46,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'config',
     requirement: 'Manual catalog uniqueness and default-model membership; discover stores no list',
     contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/unit/config/schema.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -54,7 +54,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'config',
     requirement: 'Missing config is exit code 2 and does not auto-create a real config file',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-2A',
+    runtimeEvidence: 'tests/integration/cli-run.test.ts',
     runtimeTask: 'P1-2A',
   },
   {
@@ -62,7 +62,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'events',
     requirement: 'Event schema version 2 adds session.resumed, model.changed, and safety.changed',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/application/echo-application-service.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -71,7 +71,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'Session Provider fields use ProviderIdentity with branded EndpointFingerprint, never a raw URL string',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/session/endpoint-fingerprint.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -80,7 +80,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'run and chat share ApplicationService; respondToApproval binds turnId+toolCallId+approvalKey and returns accepted/duplicate/expired/not_pending',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/application/echo-application-service.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -89,7 +89,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'SessionRepository.create accepts model and safetyMode so SessionSummary can be returned without extra reads',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1A',
+    runtimeEvidence: 'tests/unit/session/jsonl-session-repository.test.ts',
     runtimeTask: 'P1-1A',
   },
   {
@@ -128,9 +128,19 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
   {
     id: 'P0-01',
     area: 'p0-guard',
-    requirement: 'Until P1-2A, loadConfig still honors cli > env > project > user > defaults',
-    contractEvidence: 'tests/unit/contracts/doc-consistency.test.ts',
-    runtimeEvidence: 'tests/unit/config/load-config.test.ts',
-    runtimeTask: 'P1-0',
+    requirement:
+      'P1-2A runtime does not read ECHO_BASE_URL, ECHO_MODEL, ECHO_SAFETY_MODE, or workspace/user config files',
+    contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
+    runtimeEvidence: 'tests/unit/config/runtime-config.test.ts',
+    runtimeTask: 'P1-2A',
+  },
+  {
+    id: 'CLI-01',
+    area: 'cli',
+    requirement:
+      'Grouped Step timeline, width-aware wrap, and Chat prompt surfaces keep stdout/stderr and exit codes stable',
+    contractEvidence: 'docs/plans/p1-cli.md',
+    runtimeEvidence: 'tests/unit/cli/event-renderer.test.ts',
+    runtimeTask: 'P1-3',
   },
 ] as const;

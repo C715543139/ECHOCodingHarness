@@ -142,7 +142,7 @@ CLI 显式参数 > echo.config.json
 
 `ECHO_API_KEY` 是唯一正式支持的秘密环境变量，不参与普通配置合并。P0 的用户配置、项目配置以及 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 来源在 P1 中移除；由于项目尚未公开发布，不建立复杂迁移层。
 
-本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义。P1-0 已同步 `contracts.md`、`architecture.md`、`testing.md`、README 和可编译测试矩阵。P1-2A 之前，P0 `loadConfig` 仍是当前 `run` 的运行时事实，不能只依据本规划改变加载器。`artifact-root` 与 `ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
+本规划落地时，配置来源已由 [ADR-0002](../decisions/0002-p1-config-artifact-root.md) 取代 [公共契约](../contracts.md) 第 10 节的 P0 定义。P1-2A 已使 `loadConfig` 与 `echo-harness run` 执行该规则。`artifact-root` 与 `ECHO_API_KEY` 隔离规则以 ADR-0002 为准。
 
 ### 4.2 配置入口
 
@@ -216,7 +216,7 @@ Authorization: Bearer ${ECHO_API_KEY}
 
 ## 5. P1-3：CLI 体验与视觉优化
 
-P1-3 只改变表现层，不增加 Agent 能力。视觉基线固定为“分组式时间线”：每个 Step 是一个独立视觉单元，工具、审批与结果在 Step 内形成父子层级。P1 不实现 Spinner、原地刷新、折叠式 TUI 或另一套终端状态机；输出继续采用可复盘的追加式渲染。
+P1-3 只改变表现层，不增加 Agent 能力。视觉基线固定为“分组式时间线”：每个 Step 是一个独立视觉单元，工具、审批与结果在 Step 内形成父子层级。P1 不实现 Spinner、原地刷新、折叠式 TUI 或另一套终端状态机；输出继续采用可复盘的追加式渲染。`run` 的 stdout/stderr 与退出码保持 P0。本节是视觉规范；落地后的当前渲染器见 [cli-ux.md](../cli-ux.md)。
 
 ### 5.1 信息层级与间距
 

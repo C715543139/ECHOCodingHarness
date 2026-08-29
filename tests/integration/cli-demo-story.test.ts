@@ -134,14 +134,25 @@ describe('CLI demo story', () => {
     ]);
     const captured = output();
 
+    await fs.mkdir(path.join(root, 'config'), { recursive: true });
+    await fs.writeFile(
+      path.join(root, 'config', 'echo.config.json'),
+      JSON.stringify({
+        baseUrl: 'https://provider.example/v1',
+        model: 'fake-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'balanced',
+      }),
+      'utf8',
+    );
+
     const outcome = await runGoal(
       'Fix the failing parser tests without modifying tests.',
-      { workspace: root, verbose: false, color: false, interactive: false },
+      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
       {
-        env: { ECHO_API_KEY: 'test-key', ECHO_MODEL: 'fake-model' },
+        env: { ECHO_API_KEY: 'test-key' },
         io: captured.io,
         providerFactory: () => provider,
-        userConfigDirectory: false,
       },
     );
 
@@ -150,18 +161,19 @@ describe('CLI demo story', () => {
     expect(outcome.exitCode).toBe(0);
     expect(outcome.result).toMatchObject({ status: 'completed', stopReason: 'completed' });
     expect(stdout).toContain('Parser totals now include failures and tests pass.');
-    expect(stderr).toContain('STEP   1');
-    expect(stderr).toContain('ECHO   I will inspect the parser tests.');
-    expect(stderr).toContain('TOOL   search_text');
-    expect(stderr).toContain('TOOL   read_file   src/parse-report.ts');
-    expect(stderr).toMatch(/FAIL\s+exit 1/u);
+    expect(stderr).toContain('-- Step 1 ');
+    expect(stderr).toContain('ECHO       | I will inspect the parser tests.');
+    expect(stderr).toContain('TOOL       | search_text');
+    expect(stderr).toContain('PATH       | src/parse-report.ts');
+    expect(stderr).toMatch(/FAIL \| exit 1/u);
     expect(stderr).toMatch(/1 test failed/u);
-    expect(stderr).toContain('TOOL   apply_patch   src/parse-report.ts');
-    expect(stderr).toContain('src/parse-report.ts · +');
+    expect(stderr).toContain('TOOL       | apply_patch');
+    expect(stderr).toContain('TARGET     | src/parse-report.ts');
+    expect(stderr).toContain('1 file changed');
     expect(stderr).toContain('total: passed + failed');
-    expect(stderr).toMatch(/OK\s+exit 0/u);
-    expect(stderr).toContain('DONE   completed');
-    expect(stderr).toContain('Verification: npm test · exit 0');
+    expect(stderr).toMatch(/OK \| exit 0/u);
+    expect(stderr).toContain('Run completed');
+    expect(stderr).toContain('VERIFIED   | npm test | exit 0');
     expect(stderr).not.toContain('test-key');
     expect(stderr).not.toMatch(/[A-Za-z]:\\Users\\/u);
     expect(stdout).not.toMatch(/[A-Za-z]:\\Users\\/u);

@@ -1,14 +1,36 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 
+import { isAbsoluteArtifactRoot, resolveArtifactRootFromEntry } from '../config/index.js';
 import type { SafetyMode } from '../contracts/index.js';
 import { PROJECT_NAME, PROJECT_TAGLINE, PROJECT_VERSION } from '../core/project.js';
 
+import { runConfigCommand } from './config-wizard.js';
 import { runGoal, type RunGoalOptions, type RunGoalOutcome } from './run.js';
 
 export interface CreateCliOptions {
   readonly version?: string;
+  readonly artifactRoot?: string;
+  readonly entryUrl?: string;
   readonly runAction?: (goal: string, options: RunGoalOptions) => Promise<RunGoalOutcome>;
+  readonly configAction?: (options: {
+    artifactRoot: string;
+    interactive: boolean;
+    signal: AbortSignal;
+  }) => Promise<{ exitCode: number }>;
   readonly setExitCode?: (code: number) => void;
+}
+
+function resolveCliArtifactRoot(options: CreateCliOptions): string {
+  if (options.artifactRoot !== undefined) {
+    if (!isAbsoluteArtifactRoot(options.artifactRoot)) {
+      throw new Error('artifact-root must be an absolute path.');
+    }
+    return options.artifactRoot;
+  }
+  if (options.entryUrl !== undefined) {
+    return resolveArtifactRootFromEntry(options.entryUrl);
+  }
+  throw new Error('CLI artifact-root is required.');
 }
 
 export function createCli(options: CreateCliOptions = {}): Command {
@@ -17,6 +39,8 @@ export function createCli(options: CreateCliOptions = {}): Command {
     .name('echo-harness')
     .description(`${PROJECT_NAME}: ${PROJECT_TAGLINE}`)
     .version(options.version ?? PROJECT_VERSION);
+
+  const setExitCode = options.setExitCode ?? ((code: number) => (process.exitCode = code));
 
   cli
     .command('run')
@@ -65,7 +89,7 @@ export function createCli(options: CreateCliOptions = {}): Command {
             interactive &&
             process.env['NO_COLOR'] === undefined &&
             process.env['CI'] === undefined;
-          const outcome = await (options.runAction ?? runGoal)(goal, {
+          const runOptions: RunGoalOptions = {
             ...(commandOptions.workspace === undefined
               ? {}
               : { workspace: commandOptions.workspace }),
@@ -79,13 +103,37 @@ export function createCli(options: CreateCliOptions = {}): Command {
             color,
             interactive,
             signal: controller.signal,
-          });
-          (options.setExitCode ?? ((code: number) => (process.exitCode = code)))(outcome.exitCode);
+            artifactRoot: resolveCliArtifactRoot(options),
+          };
+          const outcome = await (options.runAction ?? runGoal)(goal, runOptions);
+          setExitCode(outcome.exitCode);
         } finally {
           process.off('SIGINT', cancel);
         }
       },
     );
+
+  cli
+    .command('config')
+    .description(
+      'Create or update the persistent configuration file at <artifact-root>/config/echo.config.json.',
+    )
+    .action(async () => {
+      const controller = new AbortController();
+      const cancel = (): void => controller.abort();
+      process.once('SIGINT', cancel);
+      try {
+        const interactive = process.stdin.isTTY === true && process.stderr.isTTY === true;
+        const outcome = await (options.configAction ?? runConfigCommand)({
+          artifactRoot: resolveCliArtifactRoot(options),
+          interactive,
+          signal: controller.signal,
+        });
+        setExitCode(outcome.exitCode);
+      } finally {
+        process.off('SIGINT', cancel);
+      }
+    });
 
   return cli;
 }

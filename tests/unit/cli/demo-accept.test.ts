@@ -4,24 +4,35 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error -- no project-owned declaration for scripts/*.mjs
 import { analyzeDemoOutput } from '../../../scripts/demo-accept.mjs';
 
-const storyStderr = `ECHO   Fix the failing parser tests.
-STEP   1
-TOOL   search_text   "parseReport" in src
-OK     1 match
-STEP   3
-TOOL   run_command   npm test
-FAIL   exit 1 · 2.4s
-  1 test failed
-STEP   4
-TOOL   apply_patch   src/parse-report.ts
-OK     src/parse-report.ts · +1 -1
-STEP   5
-TOOL   run_command   npm test
-OK     exit 0 · 2.1s
-  2 tests passed
-DONE   completed
-  5 steps · 5 tool calls · 1 file changed
-  Verification: npm test · exit 0
+const storyStderr = `ECHO       | Fix the failing parser tests.
+
+-- Step 1 ------------------------------------------------
+TOOL       | search_text
+QUERY      | "parseReport" in src
+RESULT     | 1 match
+
+-- Step 3 ------------------------------------------------
+TOOL       | run_command
+COMMAND    | npm test
+RESULT     | FAIL | exit 1 | 2.4 s
+           | 1 test failed
+
+-- Step 4 ------------------------------------------------
+TOOL       | apply_patch
+TARGET     | src/parse-report.ts
+RESULT     | OK | 1 file changed | +1 -1
+
+-- Step 5 ------------------------------------------------
+TOOL       | run_command
+COMMAND    | npm test
+RESULT     | OK | exit 0 | 2.1 s
+           | 2 tests passed
+
+-- Run completed -----------------------------------------
+STEPS      | 5
+TOOLS      | 5
+CHANGES    | 1 file
+VERIFIED   | npm test | exit 0 | 2.1 s
 `;
 
 describe('demo acceptance stats', () => {
@@ -37,7 +48,11 @@ describe('demo acceptance stats', () => {
   });
 
   it('keeps a terminal provider failure as the stopReason', () => {
-    const stats = analyzeDemoOutput('', 'STEP   1\nFAIL   provider_error\n', '');
+    const stats = analyzeDemoOutput(
+      '',
+      '-- Step 1 --\nFAIL       | provider_error\n\n-- Run failed --\nREASON     | provider_error\n',
+      '',
+    );
     expect(stats.stopReason).toBe('provider_error');
     expect(stats.done).toBe(false);
   });

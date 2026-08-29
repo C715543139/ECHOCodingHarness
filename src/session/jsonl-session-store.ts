@@ -2,8 +2,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import type { EchoError, EchoEvent, SessionId, SessionStore } from '../contracts/index.js';
+import type { EchoEvent, SessionId, SessionStore } from '../contracts/index.js';
 
+import { isStorageError, storageError } from './errors.js';
 import { redactValue, type RedactionOptions } from './redaction.js';
 
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
@@ -11,25 +12,6 @@ const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
 export interface JsonlSessionStoreOptions extends RedactionOptions {
   readonly workspaceRoot: string;
   readonly sessionsDirectory?: string;
-}
-
-function storageError(code: string, message: string, cause?: unknown): EchoError {
-  return {
-    category: 'storage',
-    code,
-    message,
-    retryable: false,
-    ...(cause === undefined ? {} : { cause }),
-  };
-}
-
-function isStorageError(error: unknown): error is EchoError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'category' in error &&
-    error.category === 'storage'
-  );
 }
 
 function assertSessionId(sessionId: SessionId): void {
@@ -54,8 +36,8 @@ function isEchoEvent(value: unknown): value is EchoEvent {
 }
 
 export class JsonlSessionStore implements SessionStore {
-  private readonly workspaceRoot: string;
-  private readonly sessionsDirectory: string;
+  protected readonly workspaceRoot: string;
+  protected readonly sessionsDirectory: string;
   private readonly redactionOptions: RedactionOptions;
   private readonly queues = new Map<SessionId, Promise<void>>();
   private readonly lastSequences = new Map<SessionId, number>();
@@ -159,6 +141,31 @@ export class JsonlSessionStore implements SessionStore {
       }
       previousSequence = parsed.sequence;
       yield parsed;
+    }
+  }
+
+  async listSessionIds(): Promise<readonly SessionId[]> {
+    try {
+      await this.prepareSessionsDirectory(false);
+      const entries = await fs.readdir(this.sessionsDirectory, { withFileTypes: true });
+      return entries
+        .filter(
+          (entry) =>
+            entry.isFile() &&
+            !entry.name.startsWith('.') &&
+            entry.name.endsWith('.jsonl') &&
+            !entry.name.endsWith('.tmp.jsonl'),
+        )
+        .map((entry) => entry.name.slice(0, -'.jsonl'.length))
+        .filter((sessionId) => SESSION_ID_PATTERN.test(sessionId));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      if (isStorageError(error)) throw error;
+      throw storageError(
+        'SESSION_LIST_FAILED',
+        'The session directory could not be listed.',
+        error,
+      );
     }
   }
 

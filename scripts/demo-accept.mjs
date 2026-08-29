@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,7 +8,35 @@ const demoRoot = path.join(repoRoot, 'fixtures', 'demo');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 const runs = 3;
 const timeoutMs = 180_000;
-const TURN_STATUS = /^(DONE|FAIL|LIMIT|CANCELLED)\s+(\S+)/gmu;
+const TURN_TITLE = /^-- Run (completed|failed|cancelled|limited)/gmu;
+const REASON = /^REASON\s+[|│]\s+(\S+)/gmu;
+
+export function analyzeDemoOutput(stdout, stderr, secret) {
+  const combined = `${stdout}\n${stderr}`;
+  const leak = secret.length > 0 && combined.includes(secret);
+  const userPath = /[A-Za-z]:\\Users\\/u.test(combined) || /\/Users\/[^/\s]+/u.test(combined);
+  const reasoning = /\b(?:reasoning|analysis)\s*[:=]\s*\S/iu.test(combined);
+  const failedTest = /FAIL\s*[|·].*exit\s+[1-9]/u.test(stderr) || /\d+ tests? failed/u.test(stderr);
+  const applyPatch = /TOOL\s+[|│]\s+apply_patch/u.test(stderr);
+  const passingRetest = /OK\s*[|·].*exit\s+0/u.test(stderr);
+  const done = /Run completed/u.test(stderr);
+  const step = /Step\s+\d+/u.test(stderr);
+  const reason = [...stderr.matchAll(REASON)].at(-1)?.[1];
+  const title = [...stderr.matchAll(TURN_TITLE)].at(-1)?.[1];
+  return {
+    leak,
+    userPath,
+    reasoning,
+    failedTest,
+    applyPatch,
+    passingRetest,
+    done,
+    step,
+    stopReason: reason ?? (title === 'completed' ? 'completed' : (title ?? 'unknown')),
+    story:
+      step && failedTest && applyPatch && passingRetest && done && !leak && !userPath && !reasoning,
+  };
+}
 
 function present(name) {
   return Boolean(process.env[name]?.trim());
@@ -36,7 +64,16 @@ async function loadEnvFile(filePath) {
 }
 
 function secretConfigured() {
-  return present('ECHO_API_KEY') && present('ECHO_BASE_URL') && present('ECHO_MODEL');
+  return present('ECHO_API_KEY');
+}
+
+async function persistentConfigExists() {
+  try {
+    await access(path.join(path.dirname(cliPath), 'config', 'echo.config.json'));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function resetFixture() {
@@ -54,57 +91,34 @@ async function resetFixture() {
   });
 }
 
-export function analyzeDemoOutput(stdout, stderr, secret) {
-  const combined = `${stdout}\n${stderr}`;
-  const leak = secret.length > 0 && combined.includes(secret);
-  const userPath = /[A-Za-z]:\\Users\\/u.test(combined) || /\/Users\/[^/\s]+/u.test(combined);
-  const reasoning = /\b(?:reasoning|analysis)\s*[:=]\s*\S/iu.test(combined);
-  const failedTest = /FAIL\s+exit\s+[1-9]/u.test(stderr) || /\d+ tests? failed/u.test(stderr);
-  const applyPatch = /TOOL\s+apply_patch/u.test(stderr);
-  const passingRetest = /OK\s+exit\s+0/u.test(stderr);
-  const done = /^DONE\s+completed/mu.test(stderr);
-  const step = /STEP\s+\d+/u.test(stderr);
-  const stop = [...stderr.matchAll(TURN_STATUS)].at(-1);
-  return {
-    leak,
-    userPath,
-    reasoning,
-    failedTest,
-    applyPatch,
-    passingRetest,
-    done,
-    step,
-    stopReason: stop?.[2] ?? 'unknown',
-    story:
-      step && failedTest && applyPatch && passingRetest && done && !leak && !userPath && !reasoning,
-  };
-}
-
 function runOnce(goal) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const child = spawn(
-      process.execPath,
-      [
-        cliPath,
-        'run',
-        goal,
-        '--workspace',
-        demoRoot,
-        '--safety-mode',
-        'balanced',
-        '--non-interactive',
-        '--no-color',
-        '--max-steps',
-        '12',
-      ],
-      {
-        cwd: repoRoot,
-        env: process.env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      },
-    );
+    const args = [
+      cliPath,
+      'run',
+      goal,
+      '--workspace',
+      demoRoot,
+      '--safety-mode',
+      'balanced',
+      '--non-interactive',
+      '--no-color',
+      '--max-steps',
+      '12',
+    ];
+    if (present('ECHO_BASE_URL')) {
+      args.push('--base-url', process.env.ECHO_BASE_URL);
+    }
+    if (present('ECHO_MODEL')) {
+      args.push('--model', process.env.ECHO_MODEL);
+    }
+    const child = spawn(process.execPath, args, {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8');
@@ -143,8 +157,12 @@ if (isMainModule()) {
   }
 
   if (!secretConfigured()) {
+    process.stderr.write('Demo acceptance skipped: ECHO_API_KEY is required.\n');
+    process.exit(2);
+  }
+  if (!(await persistentConfigExists())) {
     process.stderr.write(
-      'Demo acceptance skipped: ECHO_BASE_URL, ECHO_API_KEY, and ECHO_MODEL are required.\n',
+      'Demo acceptance skipped: run echo-harness config to write dist/config/echo.config.json.\n',
     );
     process.exit(2);
   }

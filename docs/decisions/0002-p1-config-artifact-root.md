@@ -67,11 +67,11 @@ CLI 显式参数 > echo.config.json
 
 | 阶段 | 有效事实 |
 | --- | --- |
-| P1-0 合入后、P1-2A 之前 | 本文与 [contracts.md](../contracts.md) 1.1 是 P1 的冻结契约。当前 `echo-harness run` 仍执行 P0 合并规则，P0 测试继续锁定该行为。 |
-| P1-2A 合入后 | 运行时改为本文与契约 1.1。P0 来源测试改为断言新规则；不得继续读取已移除来源。 |
+| P1-0 合入后、P1-2A 之前 | 本文与 [contracts.md](../contracts.md) 1.1 是 P1 的冻结契约。当时 `echo-harness run` 仍执行 P0 合并规则。 |
+| P1-2A 合入后 | 运行时执行本文与契约 1.1。加载器只读取 `<artifact-root>/config/echo.config.json`；P0 来源测试改为断言这些来源已被忽略，且不得继续读取已移除来源。 |
 | 已有 P0 本地文件 | 不迁移工作区或用户目录中的旧配置文件。操作者使用 `echo-harness config` 重新写入产物配置。 |
 
-P1-0 只冻结契约、ADR 与测试矩阵，不得提前改变 `loadConfig`、`runGoal` 或 CLI 参数语义，也不得实现配置校验器、artifact-root 解析器、会话优先级解析器或 Chat 输入解析器。那些实现属于 P1-2A 与 P1-1B。
+P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifact-root 解析、配置文件校验与 `echo-harness config`。Chat 输入解析属于 P1-1B。
 
 ## 3. 选择理由
 

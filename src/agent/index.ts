@@ -1,6 +1,5 @@
 export {
   type AgentLoopOptions,
-  type ApprovalChoice,
   type ApprovalHandler,
   type ApprovalRequest,
   AgentLoop,

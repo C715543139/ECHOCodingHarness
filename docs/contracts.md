@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P0 `echo-harness run` 在 P1-2A / P1-1A 合入前仍执行已验收的 P0 装配与配置合并。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-1A 已将 `run` 接到 `ApplicationService`。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -37,7 +37,7 @@ interface ProviderIdentity {
 - 文件路径在工具边界使用相对工作区路径；
 - 绝对路径只在 Execution 内部短暂存在，不发送给模型或写入可分享材料；
 - 对模型名、Provider 名和工具名使用稳定的小写标识；
-- `EndpointFingerprint` 是不可逆的 endpoint 标识（由 scheme、host 与可选 port 派生），不得是原始 URL、凭据、userinfo 或这些值的可逆编码。生成算法由 P1-1A 实现；P0 `model.started.provider` 仍是适配器名字符串。
+- `EndpointFingerprint` 是不可逆的 endpoint 标识（由 scheme、host 与可选 port 派生），不得是原始 URL、凭据、userinfo 或这些值的可逆编码。生成算法由 P1-1A 实现为 SHA-256 十六进制摘要；P0 `model.started.provider` 仍是适配器名字符串。
 
 ## 3. Model Provider
 
@@ -305,6 +305,7 @@ interface RenderCapabilities {
   color: boolean;
   unicode: boolean;
   verbose: boolean;
+  columns?: number;
 }
 
 type OutputChannel = "stdout" | "stderr";
@@ -327,7 +328,7 @@ interface EventRenderer {
 }
 ```
 
-`interactive`、`color` 与 `unicode` 来自启动时的终端能力检测；`verbose` 默认是 `false`，只由显式 CLI `--verbose` 启用。详细模式只能增加经过脱敏且受输出上限约束的诊断信息，不能隐式打开颜色、泄露原始数据或改变 Agent 行为。
+`interactive`、`color` 与 `unicode` 来自启动时的终端能力检测；`verbose` 默认是 `false`，只由显式 CLI `--verbose` 启用。`columns` 是可选的可见列预算，缺省按 80 列换行；它只影响表现层换行与窄终端堆叠，不得改变事件顺序、Agent 行为或 stdout/stderr 通道。详细模式只能增加经过脱敏且受输出上限约束的诊断信息，不能隐式打开颜色、泄露原始数据或改变 Agent 行为。
 
 渲染器必须满足：
 
@@ -341,7 +342,7 @@ interface EventRenderer {
 - 工具成功与 Turn 完成必须使用不同语义，不能由人类文本猜测状态；
 - 截断、拒绝、取消和限制必须明确显示，不能省略为普通成功。
 
-颜色、标签、间距和完整示例见 [cli-ux.md](./cli-ux.md)。未来 UI 必须消费 `EchoEvent`，不得解析 CLI 文本。
+颜色、标签、间距和完整示例见 [cli-ux.md](./cli-ux.md) 与 [p1-cli.md](./plans/p1-cli.md) 第 5 节。未来 UI 必须消费 `EchoEvent`，不得解析 CLI 文本。
 
 ## 7. 会话存储
 
@@ -411,7 +412,7 @@ interface ApplicationService {
 }
 ```
 
-`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。该接口在 P1-1A 接入 `run`；在此之前 `runGoal` 仍直接构造 `AgentLoop`。P1-0 只冻结这些类型，不实现配置加载器、artifact-root 解析、会话优先级解析器或 Chat 输入解析。
+`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。P1-1A 已把 `run` 接到该服务；`chat`、Slash 与粘贴适配器仍属于 P1-1B。P1-2A 已实现配置加载器与 artifact-root 解析；会话优先级解析器与 Chat 输入解析属于 P1-1B。
 
 ## 8. Context Builder
 
@@ -468,7 +469,7 @@ interface AgentResult {
 
 ## 10. 配置契约
 
-P1 普通配置优先级（[ADR-0002](./decisions/0002-p1-config-artifact-root.md)，自 P1-2A 起由运行时执行）：
+P1 普通配置优先级（[ADR-0002](./decisions/0002-p1-config-artifact-root.md)）：
 
 ```text
 CLI 显式参数 > echo.config.json
@@ -487,7 +488,7 @@ CLI 显式参数 > echo.config.json
 | 安全模式 | 配置文件 `safetyMode` 或 CLI `--safety-mode` | 否 |
 | 模型目录 | 配置文件 `modelCatalog` | 否 |
 
-P0 运行时（P1-2A 之前）仍按已验收规则合并：`CLI 显式参数 > 环境变量 > 项目配置 > 用户配置 > 内置默认值`，并仍识别 `ECHO_BASE_URL`、`ECHO_MODEL`、`ECHO_SAFETY_MODE` 以及工作区/用户目录中的 `echo.config.json` 与 `.echo-config.json`。该行为由 `tests/unit/config/load-config.test.ts` 锁定，直到 P1-2A 删除这些来源。P1 不迁移旧文件。
+P1 不迁移旧工作区或用户目录中的配置文件。操作者使用 `echo-harness config` 写入产物配置。
 
 - API Key 不得写入配置文件、事件、命令输出或子进程环境；
 - 配置诊断只能显示 Key 是否存在，不显示其值或可还原片段；
@@ -574,4 +575,4 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 - [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md)；
 - `src/contracts/` 中的 P1 类型、事件版本、`CONFIG_ERROR_CODES`、`CLI_EXIT_CODES` 与 `ApplicationService`；
 - `P1_TEST_MATRIX`（每行含 `contractEvidence` 与 `runtimeEvidence`）以及 `tests/unit/contracts/p1-baseline.test.ts`、`tests/unit/contracts/doc-consistency.test.ts`；
-- P0 `loadConfig` 与 `run` 行为测试仍然全绿，配置加载器未被提前改写。
+- P1-2A 运行时测试覆盖 artifact-root 加载、缺失配置退出码 2、未知键失败，以及不再读取 cwd/`ECHO_BASE_URL`/`ECHO_MODEL`/`ECHO_SAFETY_MODE`。

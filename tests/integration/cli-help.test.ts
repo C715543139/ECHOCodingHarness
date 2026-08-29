@@ -1,6 +1,11 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../../src/cli/create-cli.js';
+
+const artifactRoot = path.join(os.tmpdir(), 'echo-cli-help-artifact');
 
 describe('CLI metadata', () => {
   it('renders stable help text', () => {
@@ -11,6 +16,13 @@ describe('CLI metadata', () => {
     expect(help).toContain('ECHO Harness');
     expect(help).toContain('local-first autonomous coding agent');
     expect(help).toContain('run');
+    expect(help).toContain('config');
+  });
+
+  it('registers the interactive config command', () => {
+    const cli = createCli({ version: '9.8.7', artifactRoot });
+    const command = cli.commands.find((item) => item.name() === 'config');
+    expect(command?.description()).toContain('echo.config.json');
   });
 
   it('uses an injected version for deterministic tests', () => {
@@ -30,6 +42,7 @@ describe('CLI metadata', () => {
     const runAction = vi.fn().mockResolvedValue({ exitCode: 6 });
     const cli = createCli({
       version: '9.8.7',
+      artifactRoot,
       runAction,
       setExitCode: (code) => {
         exitCode = code;
@@ -64,6 +77,7 @@ describe('CLI metadata', () => {
         verbose: true,
         interactive: false,
         color: false,
+        artifactRoot,
       }),
     );
     expect(exitCode).toBe(6);

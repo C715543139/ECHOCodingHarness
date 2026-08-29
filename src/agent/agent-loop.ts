@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   AgentResult,
   AgentStopReason,
+  ApprovalChoice,
   ContextBudget,
   ContextBuilder,
   EchoError,
@@ -12,6 +13,7 @@ import type {
   ModelFinishReason,
   ModelProvider,
   ModelToolCall,
+  ProviderIdentity,
   SafetyMode,
   SafetyPolicy,
   SessionId,
@@ -21,12 +23,10 @@ import type {
   ToolResultMessage,
   TurnId,
 } from '../contracts/index.js';
-import { isToolTerminalEvent } from '../contracts/index.js';
+import { EVENT_SCHEMA_VERSION, isToolTerminalEvent } from '../contracts/index.js';
 import { redactValue, type RedactionOptions } from '../session/index.js';
 import { normalizeToolInput, toolCallSignature } from '../tools/tool-registry.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-
-export type ApprovalChoice = 'deny' | 'once' | 'session';
 
 export interface ApprovalRequest {
   readonly toolCall: ModelToolCall;
@@ -34,6 +34,7 @@ export interface ApprovalRequest {
   readonly reason: string;
   readonly approvalKey: string;
   readonly signal: AbortSignal;
+  readonly turnId: TurnId;
 }
 
 export interface ApprovalHandler {
@@ -54,6 +55,7 @@ export interface AgentLoopOptions extends RedactionOptions {
   readonly contextBudget: ContextBudget;
   readonly toolLimits: ToolLimits;
   readonly approvalHandler?: ApprovalHandler;
+  readonly providerIdentity?: ProviderIdentity;
   readonly onEvent?: (event: EchoEvent) => void | Promise<void>;
   readonly idFactory?: (kind: 'session' | 'turn' | 'step' | 'event') => string;
   readonly now?: () => string;
@@ -254,44 +256,99 @@ export class AgentLoop {
     goal: string,
     signal: AbortSignal = new AbortController().signal,
   ): Promise<AgentResult> {
-    const state: TurnState = {
-      sessionId: this.idFactory('session'),
+    const state = this.createState(this.idFactory('session'));
+    try {
+      await this.emit(state, 'session.started', this.sessionStartedPayload());
+      return await this.executeTurn(state, goal, signal);
+    } catch (error) {
+      return this.handleTurnException(state, error);
+    }
+  }
+
+  async continueSession(
+    sessionId: SessionId,
+    goal: string,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<AgentResult> {
+    const prior = await this.readPersistedEvents(sessionId);
+    if (prior === undefined || prior.length === 0) {
+      throw {
+        category: 'storage',
+        code: 'SESSION_NOT_FOUND',
+        message: 'The session event log could not be loaded for a continued turn.',
+        retryable: false,
+      } satisfies EchoError;
+    }
+    const state = this.createState(sessionId, prior);
+    try {
+      return await this.executeTurn(state, goal, signal);
+    } catch (error) {
+      return this.handleTurnException(state, error);
+    }
+  }
+
+  private createState(sessionId: SessionId, prior: readonly EchoEvent[] = []): TurnState {
+    const approvals = new Set<string>();
+    const seenToolCallIds = new Set<string>();
+    for (const event of prior) {
+      if (event.type === 'approval.granted' && event.payload.scope === 'session') {
+        approvals.add(event.payload.approvalKey);
+      }
+      if (event.type === 'model.tool_call') seenToolCallIds.add(event.payload.call.id);
+      if (event.type === 'tool.requested') seenToolCallIds.add(event.payload.call.id);
+    }
+    return {
+      sessionId,
       turnId: this.idFactory('turn'),
-      events: [],
-      approvals: new Set<string>(),
+      events: [...prior],
+      approvals,
       signatures: new Map<string, number>(),
-      seenToolCallIds: new Set<string>(),
-      sequence: 0,
+      seenToolCallIds,
+      sequence: prior.at(-1)?.sequence ?? 0,
       steps: 0,
       toolCalls: 0,
     };
+  }
 
-    try {
-      await this.emit(state, 'session.started', {
-        workspace: '.',
-        safetyMode: this.options.safetyMode,
-      });
-      await this.emit(state, 'turn.started', { goal }, undefined, state.turnId);
-      return await this.runSteps(state, signal);
-    } catch (error) {
-      const normalized = errorFromUnknown(
-        error,
-        toolError('AGENT_LOOP_FAILED', 'The agent loop stopped because of an internal error.'),
-      );
-      const result: AgentResult = {
-        sessionId: state.sessionId,
-        turnId: state.turnId,
-        status: normalized.category === 'cancelled' ? 'cancelled' : 'failed',
-        stopReason: normalized.category === 'cancelled' ? 'cancelled' : 'tool_error',
-        steps: state.steps,
-        toolCalls: state.toolCalls,
-        error: normalized,
-      };
-      if (normalized.category === 'storage') {
-        await this.repairStorageFailure(state, result, normalized);
-      }
-      return result;
+  private sessionStartedPayload(): EchoEventPayloads['session.started'] {
+    return {
+      workspace: '.',
+      safetyMode: this.options.safetyMode,
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+      model: this.options.model,
+      ...(this.options.providerIdentity === undefined
+        ? {}
+        : { provider: this.options.providerIdentity }),
+    };
+  }
+
+  private async executeTurn(
+    state: TurnState,
+    goal: string,
+    signal: AbortSignal,
+  ): Promise<AgentResult> {
+    await this.emit(state, 'turn.started', { goal }, undefined, state.turnId);
+    return this.runSteps(state, signal);
+  }
+
+  private async handleTurnException(state: TurnState, error: unknown): Promise<AgentResult> {
+    const normalized = errorFromUnknown(
+      error,
+      toolError('AGENT_LOOP_FAILED', 'The agent loop stopped because of an internal error.'),
+    );
+    const result: AgentResult = {
+      sessionId: state.sessionId,
+      turnId: state.turnId,
+      status: normalized.category === 'cancelled' ? 'cancelled' : 'failed',
+      stopReason: normalized.category === 'cancelled' ? 'cancelled' : 'tool_error',
+      steps: state.steps,
+      toolCalls: state.toolCalls,
+      error: normalized,
+    };
+    if (normalized.category === 'storage') {
+      await this.repairStorageFailure(state, result, normalized);
     }
+    return result;
   }
 
   private async runSteps(state: TurnState, signal: AbortSignal): Promise<AgentResult> {
@@ -319,7 +376,13 @@ export class AgentLoop {
       await this.emit(
         state,
         'model.started',
-        { provider: this.options.provider.name, model: this.options.model },
+        {
+          provider: this.options.provider.name,
+          model: this.options.model,
+          ...(this.options.providerIdentity === undefined
+            ? {}
+            : { endpointFingerprint: this.options.providerIdentity.endpointFingerprint }),
+        },
         stepId,
         state.turnId,
       );
@@ -571,6 +634,7 @@ export class AgentLoop {
                 reason: decision.reason,
                 approvalKey: decision.approvalKey,
                 signal,
+                turnId: state.turnId,
               });
       } catch (error) {
         if (signal.aborted) {

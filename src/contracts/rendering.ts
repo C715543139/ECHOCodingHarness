@@ -6,6 +6,7 @@ export interface RenderCapabilities {
   readonly color: boolean;
   readonly unicode: boolean;
   readonly verbose: boolean;
+  readonly columns?: number;
 }
 
 export type OutputChannel = 'stdout' | 'stderr';

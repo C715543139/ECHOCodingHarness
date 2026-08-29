@@ -16,5 +16,7 @@ export default defineConfig({
     },
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Windows process-tree assertions race when many PowerShell fixtures spawn in parallel.
+    ...(process.platform === 'win32' ? { maxWorkers: 1 } : {}),
   },
 });

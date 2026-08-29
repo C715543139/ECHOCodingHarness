@@ -58,6 +58,42 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     runtimeTask: 'P1-2A',
   },
   {
+    id: 'MDL-01',
+    area: 'config',
+    requirement:
+      'Discover catalog calls GET /models, uses only model IDs, and caches the list in-process',
+    contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
+    runtimeEvidence: 'tests/unit/provider/model-catalog.test.ts',
+    runtimeTask: 'P1-2B',
+  },
+  {
+    id: 'MDL-02',
+    area: 'config',
+    requirement:
+      'run does not list models; chat lists only for /model or /model refresh; refresh bypasses cache',
+    contractEvidence: 'docs/plans/p1-cli.md',
+    runtimeEvidence: 'tests/integration/cli-run.test.ts, tests/integration/cli-chat.test.ts',
+    runtimeTask: 'P1-2B',
+  },
+  {
+    id: 'MDL-03',
+    area: 'config',
+    requirement:
+      'Discovery failure does not block the configured model; session model changes do not write the config file',
+    contractEvidence: 'docs/decisions/0002-p1-config-artifact-root.md',
+    runtimeEvidence: 'tests/unit/provider/model-catalog.test.ts',
+    runtimeTask: 'P1-2B',
+  },
+  {
+    id: 'MDL-04',
+    area: 'config',
+    requirement:
+      'Catalog auth, network, timeout, cancel, invalid, empty, and duplicate-ID errors stay redacted',
+    contractEvidence: 'docs/plans/p1-cli.md',
+    runtimeEvidence: 'tests/unit/provider/model-catalog.test.ts',
+    runtimeTask: 'P1-2B',
+  },
+  {
     id: 'EVT-01',
     area: 'events',
     requirement: 'Event schema version 2 adds session.resumed, model.changed, and safety.changed',
@@ -98,7 +134,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     requirement:
       'Model and safety resolve cli > session > config on resume, cli > config on new sessions; P1-0 freezes the table only',
     contractEvidence: 'docs/decisions/0003-p1-application-service-session.md',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/config/session-settings.test.ts',
     runtimeTask: 'P1-1B',
   },
   {
@@ -106,7 +142,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'chat',
     requirement: 'Slash commands parse only typed idle input; paste never becomes a slash command',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/cli/parse-chat-input.test.ts, tests/integration/cli-chat.test.ts',
     runtimeTask: 'P1-1B',
   },
   {
@@ -114,7 +150,7 @@ export const P1_TEST_MATRIX: readonly P1MatrixRow[] = [
     area: 'chat',
     requirement: 'Bracketed paste is the frozen multi-line boundary; one paste is at most one Turn',
     contractEvidence: 'tests/unit/contracts/p1-baseline.test.ts',
-    runtimeEvidence: 'pending:P1-1B',
+    runtimeEvidence: 'tests/unit/cli/chat-input-decoder.test.ts',
     runtimeTask: 'P1-1B',
   },
   {

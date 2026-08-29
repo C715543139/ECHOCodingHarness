@@ -1,5 +1,6 @@
 import { OpenAI } from 'openai';
 
+import { toEchoError } from './errors.js';
 import type { OpenAICompatibleClient } from './openai-compatible-provider.js';
 
 type WireChunk = OpenAI.Chat.Completions.ChatCompletionChunk;
@@ -64,6 +65,23 @@ export function createOpenAIClient(
         }
       }
       return toChunks();
+    },
+    async listModelIds(requestOptions) {
+      try {
+        const page = await client.models.list({
+          signal: requestOptions.signal,
+          ...(requestOptions.timeoutMs !== undefined ? { timeout: requestOptions.timeoutMs } : {}),
+        });
+        const ids: string[] = [];
+        for await (const model of page) {
+          if (typeof model.id === 'string' && model.id.trim().length > 0) {
+            ids.push(model.id.trim());
+          }
+        }
+        return ids;
+      } catch (error) {
+        throw toEchoError(error);
+      }
     },
   };
 }

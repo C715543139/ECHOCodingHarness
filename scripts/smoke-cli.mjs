@@ -20,8 +20,12 @@ if (result.status !== 0) {
 if (!result.stdout.includes('echo-harness') || !result.stdout.includes('ECHO Harness')) {
   throw new Error('CLI smoke check did not produce the expected help output.');
 }
-if (!result.stdout.includes('run') || !result.stdout.includes('config')) {
-  throw new Error('CLI smoke check did not list the run and config commands.');
+if (
+  !result.stdout.includes('run') ||
+  !result.stdout.includes('chat') ||
+  !result.stdout.includes('config')
+) {
+  throw new Error('CLI smoke check did not list the run, chat, and config commands.');
 }
 
 process.stdout.write('CLI smoke check passed.\n');

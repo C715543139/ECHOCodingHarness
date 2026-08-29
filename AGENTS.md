@@ -12,13 +12,17 @@ repository. Read it together with the documents under `docs/` before changing co
 - Supported development platform: Windows with PowerShell as a first-class environment.
 - CLI executable: `echo-harness`.
 
-The following documents are the Proposed v0.1 design baseline:
+The following documents are the Accepted P0/P1 design baseline:
 
 - `docs/architecture.md`
 - `docs/contracts.md`
 - `docs/security.md`
 - `docs/cli-ux.md`
 - `docs/decisions/0001-project-foundation.md`
+- `docs/decisions/0002-p1-config-artifact-root.md`
+- `docs/decisions/0003-p1-application-service-session.md`
+- `docs/plans/p1-cli.md`
+- `docs/testing.md`
 
 Small implementation discoveries must update code, tests, and affected documentation together.
 Changes to the core loop, public contracts, security boundaries, or technology baseline require a

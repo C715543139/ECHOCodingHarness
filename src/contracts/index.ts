@@ -59,6 +59,8 @@ export type {
   TurnId,
 } from './identifiers.js';
 export type {
+  ModelCatalogClient,
+  ModelCatalogSnapshot,
   ModelFinishReason,
   ModelMessage,
   ModelProvider,

@@ -53,6 +53,16 @@ describe('P1 documentation freeze', () => {
     expect(files.plan).toContain('ADR-0003');
     expect(files.testing).toContain('P1-0');
     expect(files.readme).toContain('P1-2A');
+    expect(files.readme).toContain('P1-2B');
+    expect(files.readme).toContain('chat --resume');
+    expect(files.architecture).toContain('P1-2B');
+    expect(files.architecture).toContain('P1-1B');
+    expect(files.contracts).toContain('GET {baseUrl}/models');
+    expect(files.testing).toContain('P1-2B');
+    expect(files.testing).toContain('smoke:artifact');
+    expect(files.testing).not.toContain('not yet implemented');
+    expect(files.plan).toContain('状态：Accepted');
+    expect(P1_TEST_MATRIX.every((row) => !row.runtimeEvidence.includes('pending:'))).toBe(true);
 
     expect(files.adr2).toContain('P1-2A');
     expect(files.adr3).toContain('P1-1A');

@@ -78,6 +78,7 @@ describe('runConfigWizard', () => {
     });
     expect(JSON.stringify(written)).not.toMatch(/apiKey|secret/iu);
     expect(scripted.output()).toContain('ECHO_API_KEY');
+    expect(scripted.output()).toContain('GET /models');
   });
 
   it('does not create a file when the user cancels before writing', async () => {

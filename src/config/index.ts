@@ -44,3 +44,4 @@ export {
   writePersistentConfigFile,
 } from './write-config.js';
 export { loadRuntimeConfig, type RuntimeConfigInput } from './runtime-config.js';
+export { resolveNewSessionSetting, resolveResumeSessionSetting } from './session-settings.js';

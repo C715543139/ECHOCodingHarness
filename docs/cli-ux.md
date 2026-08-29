@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-29
 
@@ -18,7 +18,7 @@
 
 - `echo-harness run <goal>` 的帮助、运行进度、审批、错误和最终摘要；
 - P1-3 分组式时间线：独立 Step 标题、工具/审批/结果分组、宽度感知换行与 ASCII 降级；
-- Chat 表现层：启动摘要、状态条、`YOU` 提示符、`ECHO` 回复节奏与 `/status`（由 P1-1B 接入命令）；
+- Chat 表现层：启动摘要、状态条、`YOU` 提示符、`ECHO` 回复节奏与 `/status`（已由 P1-1B 接入命令）；
 - 显式 `--verbose` 诊断模式；
 - `EchoEvent` 到终端文本的确定性映射；
 - TTY、非 TTY、CI 和 `NO_COLOR` 环境的兼容行为；
@@ -34,7 +34,7 @@
 - 不用动画、图标数量或主题复杂度衡量产品质量；
 - 不让 CLI 文案参与 Agent 状态判断。
 
-P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。本文描述 P1-3 落地后的当前 `run`/`chat` 渲染器；stdout/stderr、退出码与追加式输出仍保持 P0 契约。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。
+P1 分组式时间线、Chat 启动摘要与粘贴边界以 [p1-cli.md](./plans/p1-cli.md) 第 5 节和 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。本文描述 P1-3 落地后的当前 `run`/`chat` 渲染器；stdout/stderr、退出码与追加式输出仍保持 P0 契约。P1-2A 增加 `echo-harness config`，其交互属于配置向导，不改变 `run` 的渲染契约。P1-2B 增加模型目录发现，同样不改变 `run` 渲染。
 
 ## 3. 设计原则
 
@@ -100,7 +100,7 @@ stderr 承载执行过程和诊断：
 `echo-harness run <goal>` 支持以下 P0 参数：
 
 - `--workspace <path>`：固定工作区，默认当前目录；
-- `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；
+- `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；`--model` 只作用于本次 `run`，不查询 `/models`；
 - `--safety-mode <safe|balanced|auto>`：覆盖安全模式；
 - `--max-steps <count>`：覆盖 Step 上限；
 - `--verbose`：增加脱敏且有界的诊断；
@@ -391,10 +391,10 @@ CI 使用 Fake Provider 执行最小事件序列，并验证稳定输出。真�
 
 颜色、间距和措辞属于本文管理的可演进细节。stdout/stderr 语义、无颜色行为、隐私要求、Renderer 无副作用及任务/工具成功不得混淆属于稳定契约；改变这些内容应同步审查 [contracts.md](./contracts.md)。
 
-本文已基于以下证据升级为 `Accepted / 1.1`：
+本文已基于以下证据升级为 `Accepted / 1.2`：
 
 - `EventRenderer` 已实现分组式时间线，并具有 snapshot/行为测试；
 - 窄宽度、CJK、无颜色、非 TTY、审批和成功/失败摘要经过验证；
 - stdout/stderr 与退出码契约保持 P0；
-- Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，供 P1-1B 接入；
+- Chat 启动摘要、状态条与 `YOU` 提示符由独立表现层覆盖，并由 P1-1B 接到 `echo-harness chat`；
 - 文中示例与真实输出一致，不含伪造能力。

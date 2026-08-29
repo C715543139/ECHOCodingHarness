@@ -31,6 +31,10 @@ function usageChunk(prompt: number, completion: number): Chunk {
   return { choices: [], usage: { prompt_tokens: prompt, completion_tokens: completion } };
 }
 
+async function unusedListModelIds(): Promise<readonly string[]> {
+  throw new Error('listModelIds must not be called during chat completion streaming');
+}
+
 function clientFromChunks(
   chunks: readonly Chunk[],
   options: { failFirstWith?: unknown; recordCalls?: Record<string, unknown>[] } = {},
@@ -53,6 +57,7 @@ function clientFromChunks(
       }
       return generate();
     },
+    listModelIds: unusedListModelIds,
   };
 }
 
@@ -247,6 +252,7 @@ describe('OpenAICompatibleProvider', () => {
         }
         return generate();
       },
+      listModelIds: unusedListModelIds,
     };
     const provider = new OpenAICompatibleProvider({
       client: failing,
@@ -285,6 +291,7 @@ describe('OpenAICompatibleProvider', () => {
         }
         return generate();
       },
+      listModelIds: unusedListModelIds,
     };
     const provider = new OpenAICompatibleProvider({
       client,
@@ -311,5 +318,27 @@ describe('OpenAICompatibleProvider', () => {
       category: 'provider_network',
       code: 'PROVIDER_STREAM_FAILED',
     });
+  });
+
+  it('delegates catalog listing to the transport client without streaming', async () => {
+    let listed = 0;
+    const provider = new OpenAICompatibleProvider({
+      client: {
+        createStream: async () => {
+          throw new Error('stream must not run during catalog listing');
+        },
+        listModelIds: async () => {
+          listed += 1;
+          return ['alpha', 'beta'];
+        },
+      },
+      model: 'alpha',
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+    });
+    await expect(provider.listModelIds({ signal: new AbortController().signal })).resolves.toEqual([
+      'alpha',
+      'beta',
+    ]);
+    expect(listed).toBe(1);
   });
 });

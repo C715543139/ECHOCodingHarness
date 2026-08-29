@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   constructorOptions: vi.fn(),
   create: vi.fn(),
+  list: vi.fn(),
 }));
 
 vi.mock('openai', () => ({
   OpenAI: class {
     readonly chat = { completions: { create: mocks.create } };
+    readonly models = { list: mocks.list };
 
     constructor(options: unknown) {
       mocks.constructorOptions(options);
@@ -21,6 +23,7 @@ describe('createOpenAIClient', () => {
   beforeEach(() => {
     mocks.constructorOptions.mockReset();
     mocks.create.mockReset();
+    mocks.list.mockReset();
   });
 
   it('configures the official client without SDK retries and forwards request boundaries', async () => {
@@ -124,5 +127,39 @@ describe('createOpenAIClient', () => {
       function: { name: 'read_file', arguments: '{}' },
     });
     expect(chunks[0]).not.toHaveProperty('id');
+  });
+
+  it('lists model IDs only and maps catalog failures without echoing secrets', async () => {
+    mocks.list.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { id: 'model-a', owned_by: 'hidden-org', object: 'model' };
+        yield { id: ' model-b ', permission: { allow: true } };
+        yield { owned_by: 'ignored' };
+      },
+    });
+    const client = createOpenAIClient({
+      baseUrl: 'https://provider.example/v1',
+      apiKey: 'test-only-key',
+      timeoutMs: 5_000,
+    });
+    const controller = new AbortController();
+
+    await expect(
+      client.listModelIds({ signal: controller.signal, timeoutMs: 1_000 }),
+    ).resolves.toEqual(['model-a', 'model-b']);
+    expect(mocks.list).toHaveBeenCalledWith({
+      signal: controller.signal,
+      timeout: 1_000,
+    });
+
+    mocks.list.mockRejectedValue({
+      status: 401,
+      message: 'invalid credentials',
+    });
+    await expect(client.listModelIds({ signal: controller.signal })).rejects.toMatchObject({
+      category: 'provider_auth',
+      code: 'PROVIDER_AUTH_FAILED',
+      message: 'The model provider rejected authentication.',
+    });
   });
 });

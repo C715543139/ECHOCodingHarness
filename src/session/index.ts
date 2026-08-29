@@ -8,4 +8,5 @@ export {
   createProviderIdentity,
   providerIdentitiesEqual,
 } from './endpoint-fingerprint.js';
+export { isConfigurationError, isStorageError } from './errors.js';
 export { type RedactionOptions, redactText, redactValue } from './redaction.js';

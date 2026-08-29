@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-29
 
@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-1A 已将 `run` 接到 `ApplicationService`。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md) 与 [ADR-0003](./decisions/0003-p1-application-service-session.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -111,6 +111,37 @@ type ModelFinishReason =
 ```
 
 Provider 必须保证同一调用中的事件顺序稳定。若上游只提供参数增量，Provider 必须在发出完整 `tool_call` 前完成聚合和 JSON 解析。
+
+### 3.4 模型目录
+
+单 Provider 模型目录与 chat completion 流分离。`ModelProvider.stream` 不得列出模型。候选列表通过 `ModelCatalogClient.listModelIds` 读取：
+
+```ts
+interface ModelCatalogClient {
+  listModelIds(options: { signal: AbortSignal; timeoutMs?: number }): Promise<readonly string[]>;
+}
+
+interface ModelCatalogSnapshot {
+  status: "ok" | "failed";
+  source: "discover" | "manual";
+  models: readonly string[];
+  cached: boolean;
+  refreshed: boolean;
+  configuredModel: string;
+  error?: EchoError;
+}
+```
+
+- 手动目录返回配置文件中的唯一非空模型 ID，不访问网络；
+- 自动发现只允许当前 OpenAI-compatible 客户端请求 `GET {baseUrl}/models`，只使用响应中的模型 ID，不推断价格、上下文长度或工具能力；
+- 发现列表缓存在当前进程内；`run` 不得发现；`chat` 仅在 `/model` 或 `/model refresh` 需要候选项时延迟发现；
+- `/model refresh` 只在 `discover` 源下绕过缓存；手动目录必须返回可展示错误，不得静默当作成功；
+- 发现失败不得阻止已配置模型的实际调用；快照仍包含该模型 ID；
+- 鉴权、网络、超时、取消、无效响应、空列表和重复 ID 必须映射为稳定 `EchoError`，不得回显 API Key、授权头或 Provider 原始敏感响应；
+- `/model <id>` 只更新当前 Session 并从下一个尚未开始的 Turn 生效，追加 `model.changed`，不写回配置文件。
+- Chat 入口是 `listModelCandidates`：返回当前模型、候选项和脱敏后的 `error` 字符串。新会话模型优先级为 CLI `--model` 高于配置文件 `model`，且 `run` 不查询目录。
+
+P1-2B 实现发现与缓存。P1-1B 的 Chat `/model` 通过目录端口消费该运行时，不复制第二套 `GET /models`。
 
 ## 4. 工具契约
 
@@ -412,7 +443,7 @@ interface ApplicationService {
 }
 ```
 
-`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。P1-1A 已把 `run` 接到该服务；`chat`、Slash 与粘贴适配器仍属于 P1-1B。P1-2A 已实现配置加载器与 artifact-root 解析；会话优先级解析器与 Chat 输入解析属于 P1-1B。
+`run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。`model.changed` 只记录会话内模型 ID 与来源，不保存发现列表或凭据。P1-1A 已把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、`--resume`、Slash、Ctrl+C 与 bracketed paste 适配器，并用 `resolveNewSessionSetting` / `resolveResumeSessionSetting` 落实 CLI > session > config。`/model` 与 `/model refresh` 只消费可注入的模型目录端口，不在 Chat 内实现第二套 `GET /models` 发现与缓存。P1-2A 已实现配置加载器与 artifact-root 解析；P1-2B 已实现模型目录发现与进程内缓存。
 
 ## 8. Context Builder
 
@@ -495,6 +526,7 @@ P1 不迁移旧工作区或用户目录中的配置文件。操作者使用 `ech
 - 未知键、`apiKey` 和 URL 内嵌凭据必须产生配置错误并拒绝加载，不得静默忽略；
 - 缺少配置文件时 `run`/`chat` 使用退出码 `2`，提示执行 `echo-harness config`，不得自动创建含真实 Provider 信息的文件；
 - 手动模型目录必须包含唯一非空模型 ID，且默认模型位于列表中；自动发现模式不持久化完整列表；
+- 自动发现由 P1-2B 在进程内缓存；`run` 不调用 `/models`；发现失败不得阻断已配置模型；
 - 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、20,000 字符工具输出上限、
   300 秒 Provider 请求超时、32,000 近似 token 上下文与 4,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源。
 - 稳定配置错误码见 `CONFIG_ERROR_CODES`：`CONFIG_MISSING`、`CONFIG_UNKNOWN_KEY`、`CONFIG_CREDENTIAL_FORBIDDEN`、`CONFIG_PROVIDER_MISMATCH`、`CONFIG_SESSION_INCOMPATIBLE` 等。
@@ -576,3 +608,7 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 - `src/contracts/` 中的 P1 类型、事件版本、`CONFIG_ERROR_CODES`、`CLI_EXIT_CODES` 与 `ApplicationService`；
 - `P1_TEST_MATRIX`（每行含 `contractEvidence` 与 `runtimeEvidence`）以及 `tests/unit/contracts/p1-baseline.test.ts`、`tests/unit/contracts/doc-consistency.test.ts`；
 - P1-2A 运行时测试覆盖 artifact-root 加载、缺失配置退出码 2、未知键失败，以及不再读取 cwd/`ECHO_BASE_URL`/`ECHO_MODEL`/`ECHO_SAFETY_MODE`。
+- P1-2B 运行时测试覆盖 `/models` 发现、进程内缓存、刷新、失败不阻断已配置模型，以及目录错误脱敏。
+- P1-1B 运行时测试覆盖 Chat 恢复、Slash、Ctrl+C、bracketed paste，以及默认目录端口接到 `ProcessModelCatalog`。
+
+1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。

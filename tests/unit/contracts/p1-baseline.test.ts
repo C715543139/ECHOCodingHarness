@@ -19,6 +19,8 @@ import {
   type EchoEventPayloads,
   type EchoEventType,
   type EndpointFingerprint,
+  type ModelCatalogClient,
+  type ModelCatalogSnapshot,
   type ProviderIdentity,
   type SessionRepository,
   type SessionSummary,
@@ -35,6 +37,7 @@ describe('P1 frozen contracts', () => {
       expect(row.runtimeEvidence.length).toBeGreaterThan(0);
       expect(row.contractEvidence).not.toBe(row.runtimeEvidence);
       expect(Object.hasOwn(row, 'evidence')).toBe(false);
+      expect(row.runtimeEvidence.includes('pending:')).toBe(false);
     }
   });
 
@@ -111,6 +114,9 @@ describe('P1 frozen contracts', () => {
     expectTypeOf<SessionRepository['create']>().toBeFunction();
     expectTypeOf<SessionRepository['resume']>().toBeFunction();
     expectTypeOf<SessionRepository['getQueryView']>().toBeFunction();
+    expectTypeOf<ModelCatalogClient['listModelIds']>().toBeFunction();
+    expectTypeOf<ModelCatalogSnapshot>().toHaveProperty('configuredModel');
+    expectTypeOf<ModelCatalogSnapshot['source']>().toEqualTypeOf<'discover' | 'manual'>();
     type P1Events = Extract<EchoEventType, 'model.changed' | 'safety.changed' | 'session.resumed'>;
     expectTypeOf<P1Events>().toEqualTypeOf<
       'model.changed' | 'safety.changed' | 'session.resumed'

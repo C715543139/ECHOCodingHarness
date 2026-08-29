@@ -48,11 +48,11 @@ describe('parsePersistentConfig', () => {
     const unknown = parsePersistentConfig({ ...validDiscover, typoKey: 1 });
     expect('issues' in unknown && unknown.issues[0]?.code).toBe(CONFIG_ERROR_CODES.unknownKey);
 
-    const secret = parsePersistentConfig({ ...validDiscover, apiKey: 'should-not-load' });
-    expect('issues' in secret && secret.issues[0]?.code).toBe(
+    const withApiKey = parsePersistentConfig({ ...validDiscover, apiKey: 'placeholder' });
+    expect('issues' in withApiKey && withApiKey.issues[0]?.code).toBe(
       CONFIG_ERROR_CODES.credentialForbidden,
     );
-    expect(JSON.stringify(secret)).not.toContain('should-not-load');
+    expect(JSON.stringify(withApiKey)).not.toMatch(/placeholder/u);
 
     const embedded = parsePersistentConfig({
       ...validDiscover,

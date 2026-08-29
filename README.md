@@ -99,8 +99,9 @@ node .\dist\cli.js run "Inspect the project and fix the failing tests." `
 ```
 
 Use `node .\dist\cli.js run --help` for the complete option list. Progress and diagnostics go to
-stderr; the final model answer goes to stdout. Exit codes distinguish configuration, Provider,
-tool, policy, limit, and cancellation failures.
+stderr as a grouped Step timeline; the final model answer goes to stdout. Exit codes distinguish
+configuration, Provider, tool, policy, limit, and cancellation failures. ASCII is used when the
+terminal is not a TTY; `--no-color` removes ANSI without changing labels or structure.
 
 ## Resettable demonstration
 

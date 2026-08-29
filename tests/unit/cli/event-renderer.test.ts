@@ -19,7 +19,12 @@ const plain: RenderCapabilities = {
   color: false,
   unicode: false,
   verbose: false,
+  columns: 80,
 };
+
+const unicode: RenderCapabilities = { ...plain, unicode: true };
+const narrow: RenderCapabilities = { ...plain, columns: 28 };
+const colorOn: RenderCapabilities = { ...plain, color: true };
 
 function event<T extends EchoEventType>(type: T, payload: EchoEventPayloads[T]): EchoEvent {
   return {
@@ -44,6 +49,10 @@ const completed: AgentResult = {
   toolCalls: 1,
 };
 
+function join(chunks: readonly { text: string }[]): string {
+  return chunks.map((chunk) => chunk.text).join('');
+}
+
 function requestCommand(
   renderer: DefaultEventRenderer,
   id = 'call-1',
@@ -62,120 +71,139 @@ describe('DefaultEventRenderer', () => {
   it('routes progress to stderr and the final answer only to stdout', () => {
     const renderer = new DefaultEventRenderer();
 
-    expect(renderer.renderEvent(event('turn.started', { goal: 'fix tests' }), plain)).toEqual([
-      { channel: 'stderr', text: 'ECHO   fix tests\n' },
-    ]);
-    expect(renderer.renderEvent(event('step.started', { step: 1 }), plain)).toEqual([
-      { channel: 'stderr', text: 'STEP   1\n' },
-    ]);
-    expect(renderer.renderResult(completed, plain)).toEqual([
-      { channel: 'stdout', text: 'final answer\n' },
-      {
-        channel: 'stderr',
-        text: 'DONE   completed\n  2 steps · 1 tool call · no file changes\n',
-      },
-    ]);
+    expect(join(renderer.renderEvent(event('turn.started', { goal: 'fix tests' }), plain))).toBe(
+      'ECHO       | fix tests\n',
+    );
+    expect(join(renderer.renderEvent(event('step.started', { step: 1 }), plain))).toContain(
+      '-- Step 1 ',
+    );
+    expect(
+      join(renderer.renderEvent(event('step.started', { step: 1 }), plain)).startsWith('\n'),
+    ).toBe(true);
+
+    const result = renderer.renderResult(completed, plain);
+    expect(result[0]).toEqual({ channel: 'stdout', text: 'final answer\n' });
+    const stderr = join(result.slice(1));
+    expect(stderr).toContain('-- Run completed ');
+    expect(stderr).toContain('STEPS      | 2');
+    expect(stderr).toContain('TOOLS      | 1');
+    expect(stderr).toContain('CHANGES    | none');
+    expect(stderr).toContain('NOT VERIFIED');
+    expect(stderr).not.toContain('DONE');
   });
 
   it('keeps command success distinct from turn completion and reports verification evidence', () => {
     const renderer = new DefaultEventRenderer();
-    requestCommand(renderer);
-
     expect(
-      renderer.renderEvent(
-        event('tool.completed', {
-          result: {
-            toolCallId: 'call-1',
-            toolName: 'run_command',
-            status: 'completed',
-            summary: 'Command completed.',
-            metadata: {
-              exitCode: 0,
-              durationMs: 2100,
-              stdout: '# tests 12\n# pass 12\n# fail 0\n',
-              stderr: '',
-            },
-          },
-          durationMs: 2100,
-        }),
-        plain,
+      join(
+        renderer.renderEvent(
+          event('tool.requested', {
+            call: { id: 'call-1', name: 'run_command', arguments: { command: 'pnpm test' } },
+            normalizedInput: { command: 'pnpm test' },
+          }),
+          plain,
+        ),
       ),
-    ).toEqual([
-      { channel: 'stderr', text: 'OK     exit 0 · 2.1s\n' },
-      { channel: 'stderr', text: '  12 tests passed\n' },
-    ]);
+    ).toContain('TOOL       | run_command');
+    expect(
+      join(
+        renderer.renderEvent(
+          event('tool.completed', {
+            result: {
+              toolCallId: 'call-1',
+              toolName: 'run_command',
+              status: 'completed',
+              summary: 'Command completed.',
+              metadata: {
+                exitCode: 0,
+                durationMs: 2100,
+                stdout: '# tests 12\n# pass 12\n# fail 0\n',
+                stderr: '',
+              },
+            },
+            durationMs: 2100,
+          }),
+          plain,
+        ),
+      ),
+    ).toBe('RESULT     | OK | exit 0 | 2.1 s\n           | 12 tests passed\n');
 
-    expect(renderer.renderResult(completed, plain)[1]?.text).toContain(
-      'Verification: pnpm test · exit 0',
-    );
+    const summary = join(renderer.renderResult(completed, plain).slice(1));
+    expect(summary).toContain('VERIFIED   | pnpm test | exit 0 | 2.1 s');
+    expect(summary).not.toContain('LAST CHECK');
   });
 
-  it('renders a failed test command as FAIL with exit code and test summary', () => {
+  it('renders a failed test command as RESULT FAIL with exit code and test summary', () => {
     const renderer = new DefaultEventRenderer();
     requestCommand(renderer);
 
     expect(
-      renderer.renderEvent(
-        event('tool.completed', {
-          result: {
-            toolCallId: 'call-1',
-            toolName: 'run_command',
-            status: 'completed',
-            summary: 'Command exited with code 1 after 2400 ms.',
-            metadata: {
-              exitCode: 1,
-              durationMs: 2400,
-              stdout: '# tests 2\n# pass 1\n# fail 1\n',
-              stderr: '',
+      join(
+        renderer.renderEvent(
+          event('tool.completed', {
+            result: {
+              toolCallId: 'call-1',
+              toolName: 'run_command',
+              status: 'completed',
+              summary: 'Command exited with code 1 after 2400 ms.',
+              metadata: {
+                exitCode: 1,
+                durationMs: 2400,
+                stdout: '# tests 2\n# pass 1\n# fail 1\n',
+                stderr: '',
+              },
             },
-          },
-          durationMs: 2400,
-        }),
-        plain,
+            durationMs: 2400,
+          }),
+          plain,
+        ),
       ),
-    ).toEqual([
-      { channel: 'stderr', text: 'FAIL   exit 1 · 2.4s\n' },
-      { channel: 'stderr', text: '  1 test failed\n' },
-    ]);
+    ).toBe('RESULT     | FAIL | exit 1 | 2.4 s\n           | 1 test failed\n');
   });
 
   it('renders apply_patch with a relative path, change counts, and a bounded diff', () => {
     const renderer = new DefaultEventRenderer();
-    renderer.renderEvent(
-      event('tool.requested', {
-        call: {
-          id: 'call-patch',
-          name: 'apply_patch',
-          arguments: { path: 'src/parse-report.ts', edits: [] },
-        },
-        normalizedInput: { path: 'src/parse-report.ts' },
-      }),
-      plain,
-    );
-
-    const rendered = renderer.renderEvent(
-      event('tool.completed', {
-        result: {
-          toolCallId: 'call-patch',
-          toolName: 'apply_patch',
-          status: 'completed',
-          summary: 'Applied 1 edits to src/parse-report.ts.',
-          metadata: {
-            path: 'src/parse-report.ts',
-            additions: 1,
-            deletions: 1,
-            diff: '--- a/src/parse-report.ts\n+++ b/src/parse-report.ts\n-    total: passed,\n+    total: passed + failed,\n',
+    const requested = join(
+      renderer.renderEvent(
+        event('tool.requested', {
+          call: {
+            id: 'call-patch',
+            name: 'apply_patch',
+            arguments: { path: 'src/parse-report.ts', edits: [] },
           },
-        },
-        durationMs: 12,
-      }),
-      plain,
+          normalizedInput: { path: 'src/parse-report.ts' },
+        }),
+        plain,
+      ),
+    );
+    expect(requested).toContain('TOOL       | apply_patch');
+    expect(requested).toContain('TARGET     | src/parse-report.ts');
+
+    const rendered = join(
+      renderer.renderEvent(
+        event('tool.completed', {
+          result: {
+            toolCallId: 'call-patch',
+            toolName: 'apply_patch',
+            status: 'completed',
+            summary: 'Applied 1 edits to src/parse-report.ts.',
+            metadata: {
+              path: 'src/parse-report.ts',
+              additions: 1,
+              deletions: 1,
+              diff: '--- a/src/parse-report.ts\n+++ b/src/parse-report.ts\n-    total: passed,\n+    total: passed + failed,\n',
+            },
+          },
+          durationMs: 12,
+        }),
+        plain,
+      ),
     );
 
-    expect(rendered[0]?.text).toBe('OK     src/parse-report.ts · +1 -1\n');
-    expect(rendered.map((chunk) => chunk.text).join('')).toContain('--- a/src/parse-report.ts');
-    expect(rendered.map((chunk) => chunk.text).join('')).toContain('+    total: passed + failed,');
-    expect(renderer.renderResult(completed, plain)[1]?.text).toContain('1 file changed');
+    expect(rendered).toContain('RESULT     | OK | 1 file changed | +1 -1');
+    expect(rendered).toContain('--- a/src/parse-report.ts');
+    expect(rendered).toContain('+    total: passed + failed,');
+    expect(join(renderer.renderResult(completed, plain).slice(1))).toContain('CHANGES    | 1 file');
   });
 
   it('buffers assistant progress on stderr only when the Step requested tools', () => {
@@ -194,8 +222,8 @@ describe('DefaultEventRenderer', () => {
       plain,
     );
     expect(
-      renderer.renderEvent(event('model.completed', { finishReason: 'tool_calls' }), plain),
-    ).toEqual([{ channel: 'stderr', text: 'ECHO   I will inspect the parser.\n' }]);
+      join(renderer.renderEvent(event('model.completed', { finishReason: 'tool_calls' }), plain)),
+    ).toBe('ECHO       | I will inspect the parser.\n');
   });
 
   it('does not print intermediate text or reasoning-only progress on the final-text path', () => {
@@ -214,35 +242,39 @@ describe('DefaultEventRenderer', () => {
   it('renders read, search, and list results as structured summaries without file bodies', () => {
     const renderer = new DefaultEventRenderer();
     expect(
-      renderer.renderEvent(
-        event('tool.completed', {
-          result: {
-            toolCallId: 'call-read',
-            toolName: 'read_file',
-            status: 'completed',
-            summary: 'Read lines 1-24 from src/parse-report.ts.',
-            metadata: { path: 'src/parse-report.ts', totalLines: 24, content: 'secret body' },
-          },
-          durationMs: 4,
-        }),
-        plain,
-      )[0]?.text,
-    ).toBe('OK     24 lines read\n');
+      join(
+        renderer.renderEvent(
+          event('tool.completed', {
+            result: {
+              toolCallId: 'call-read',
+              toolName: 'read_file',
+              status: 'completed',
+              summary: 'Read lines 1-24 from src/parse-report.ts.',
+              metadata: { path: 'src/parse-report.ts', totalLines: 24, content: 'secret body' },
+            },
+            durationMs: 4,
+          }),
+          plain,
+        ),
+      ),
+    ).toBe('RESULT     | OK | 24 lines read\n');
     expect(
-      renderer.renderEvent(
-        event('tool.completed', {
-          result: {
-            toolCallId: 'call-search',
-            toolName: 'search_text',
-            status: 'completed',
-            summary: 'Found 3 text matches.',
-            metadata: { totalMatches: 3, omittedMatches: 0 },
-          },
-          durationMs: 8,
-        }),
-        plain,
-      )[0]?.text,
-    ).toBe('OK     3 matches\n');
+      join(
+        renderer.renderEvent(
+          event('tool.completed', {
+            result: {
+              toolCallId: 'call-search',
+              toolName: 'search_text',
+              status: 'completed',
+              summary: 'Found 3 text matches.',
+              metadata: { totalMatches: 3, omittedMatches: 0 },
+            },
+            durationMs: 8,
+          }),
+          plain,
+        ),
+      ),
+    ).toBe('RESULT     | 3 matches\n');
   });
 
   it('renders failures, denials, limits, cancellation, and verbose diagnostics explicitly', () => {
@@ -250,75 +282,131 @@ describe('DefaultEventRenderer', () => {
     const verbose = { ...plain, verbose: true };
 
     expect(
-      renderer.renderEvent(
-        event('tool.denied', {
-          result: {
-            toolCallId: 'call-1',
-            toolName: 'run_command',
-            status: 'denied',
-            summary: 'network denied',
-          },
-          hard: true,
-        }),
-        plain,
-      )[0]?.text,
-    ).toContain('DENIED');
+      join(
+        renderer.renderEvent(
+          event('tool.denied', {
+            result: {
+              toolCallId: 'call-1',
+              toolName: 'run_command',
+              status: 'denied',
+              summary: 'network denied',
+            },
+            hard: true,
+          }),
+          plain,
+        ),
+      ),
+    ).toContain('DENIED     | Hard policy');
     expect(
-      renderer.renderEvent(event('limit.reached', { kind: 'max_steps', limit: 4 }), plain)[0]?.text,
-    ).toContain('LIMIT');
+      join(renderer.renderEvent(event('limit.reached', { kind: 'max_steps', limit: 4 }), plain)),
+    ).toContain('LIMIT      | max_steps | limit 4');
     expect(
-      renderer.renderEvent(
-        event('tool.cancelled', {
-          result: {
-            toolCallId: 'call-1',
-            toolName: 'run_command',
-            status: 'cancelled',
-            summary: 'cancelled',
-          },
-          phase: 'execution',
-        }),
-        plain,
-      )[0]?.text,
-    ).toContain('CANCELLED');
+      join(
+        renderer.renderEvent(
+          event('tool.cancelled', {
+            result: {
+              toolCallId: 'call-1',
+              toolName: 'run_command',
+              status: 'cancelled',
+              summary: 'cancelled',
+            },
+            phase: 'execution',
+          }),
+          plain,
+        ),
+      ),
+    ).toContain('CANCELLED  | execution | cancelled');
     expect(
-      renderer.renderEvent(
-        event('context.projected', {
-          approximateTokens: 100,
-          omittedEventCount: 2,
-          truncationCount: 1,
-        }),
-        verbose,
-      )[0]?.text,
+      join(
+        renderer.renderEvent(
+          event('context.projected', {
+            approximateTokens: 100,
+            omittedEventCount: 2,
+            truncationCount: 1,
+          }),
+          verbose,
+        ),
+      ),
     ).toContain('100 approx tokens');
-    expect(
+    const limited = join(
       renderer
         .renderResult({ ...completed, status: 'limited', stopReason: 'max_steps' }, plain)
-        .at(-1)?.text,
-    ).toContain('a step, repetition, or budget limit was reached');
+        .slice(1),
+    );
+    expect(limited).toContain('-- Run limited ');
+    expect(limited).toContain('REASON     | max_steps');
+    expect(limited).toContain('A step, repetition, or budget limit was reached.');
   });
 
-  it('renders approval with command summary, risk, and session scope options', () => {
+  it('renders approval with hanging risk, scope, and choice keys', () => {
     const renderer = new DefaultEventRenderer();
     requestCommand(renderer, 'call-install', 'pnpm install');
-    const text = renderer
-      .renderEvent(
+    const text = join(
+      renderer.renderEvent(
         event('approval.requested', {
           toolCallId: 'call-install',
           reason: 'dependency and lockfile changes',
           approvalKey: 'approval:test',
         }),
         plain,
-      )
-      .map((chunk) => chunk.text)
-      .join('');
-    expect(text).toContain('APPROVAL');
-    expect(text).toContain('run_command requires confirmation');
-    expect(text).toContain('Command: pnpm install');
-    expect(text).toContain('Risk: dependency and lockfile changes');
-    expect(text).toContain('this operation / equivalent operations in this session');
+      ),
+    );
+    expect(text).toContain('APPROVAL   | Required');
+    expect(text).toContain('Risk   dependency and lockfile changes');
+    expect(text).toContain('Scope  once or equivalent operations in this session');
+    expect(text).toContain('Approve [y] once / [s] session / [n] deny');
+    expect(text).not.toContain('requires confirmation');
+    expect(text.endsWith('\n')).toBe(true);
   });
 
-  it('uses ANSI only when color is enabled and defensively redacts personal paths and secrets', () => {
+  it('keeps the interactive approval prompt open so the answer stays on the same line', () => {
+    const renderer = new DefaultEventRenderer();
+    requestCommand(renderer, 'call-install', 'pnpm install');
+    const chunks = renderer.renderEvent(
+      event('approval.requested', {
+        toolCallId: 'call-install',
+        reason: 'dependency and lockfile changes',
+        approvalKey: 'approval:test',
+      }),
+      { ...plain, interactive: true },
+    );
+    expect(join(chunks).endsWith('\n')).toBe(false);
+    expect(join(chunks)).toContain('Approve [y] once / [s] session / [n] deny > ');
+  });
+
+  it('uses LAST CHECK instead of VERIFIED when the Turn failed', () => {
+    const renderer = new DefaultEventRenderer();
+    requestCommand(renderer);
+    renderer.renderEvent(
+      event('tool.completed', {
+        result: {
+          toolCallId: 'call-1',
+          toolName: 'run_command',
+          status: 'completed',
+          summary: 'Command completed.',
+          metadata: { exitCode: 0, durationMs: 1000, stdout: '# pass 1\n# fail 0\n', stderr: '' },
+        },
+        durationMs: 1000,
+      }),
+      plain,
+    );
+    const failed: AgentResult = {
+      sessionId: completed.sessionId,
+      turnId: completed.turnId,
+      status: 'failed',
+      stopReason: 'policy_denied',
+      steps: completed.steps,
+      toolCalls: completed.toolCalls,
+    };
+    const text = join(renderer.renderResult(failed, plain));
+    expect(text).toContain('-- Run failed ');
+    expect(text).toContain('REASON     | policy_denied');
+    expect(text).toContain('LAST CHECK | pnpm test | exit 0 | 1.0 s');
+    expect(text).not.toContain('VERIFIED');
+    expect(text).not.toContain('stdout');
+  });
+
+  it('uses ANSI only on labels or status words and defensively redacts personal paths and secrets', () => {
     const renderer = new DefaultEventRenderer({
       homeDirectory: 'C:\\Users\\private-name',
       secrets: ['sk-secret-demo-key'],
@@ -327,86 +415,140 @@ describe('DefaultEventRenderer', () => {
       goal: 'read C:\\Users\\private-name\\secret.txt with sk-secret-demo-key',
     });
 
-    expect(renderer.renderEvent(unsafe, plain)[0]?.text).toBe(
-      'ECHO   read <home>\\secret.txt with [REDACTED]\n',
+    expect(join(renderer.renderEvent(unsafe, plain))).toBe(
+      'ECHO       | read <home>\\secret.txt with [REDACTED]\n',
     );
-    expect(renderer.renderEvent(unsafe, { ...plain, color: true })[0]?.text).toContain('\u001B[');
-    expect(renderer.renderEvent(unsafe, plain)[0]?.text).not.toContain('\u001B[');
-    expect(renderer.renderEvent(unsafe, plain)[0]?.text).not.toContain('private-name');
-    expect(renderer.renderEvent(unsafe, plain)[0]?.text).not.toContain('sk-secret-demo-key');
+    const colored = join(renderer.renderEvent(unsafe, colorOn));
+    expect(colored).toContain('\u001B[');
+    expect(colored).toContain('read <home>\\secret.txt with [REDACTED]');
+    expect(join(renderer.renderEvent(unsafe, plain))).not.toContain('\u001B[');
+    expect(join(renderer.renderEvent(unsafe, plain))).not.toContain('private-name');
+    expect(join(renderer.renderEvent(unsafe, plain))).not.toContain('sk-secret-demo-key');
   });
 
   it('shows command stderr when a non-zero exit has no test summary', () => {
     const renderer = new DefaultEventRenderer();
     requestCommand(renderer, 'call-build', 'pnpm build');
-    const rendered = renderer.renderEvent(
-      event('tool.completed', {
-        result: {
-          toolCallId: 'call-build',
-          toolName: 'run_command',
-          status: 'completed',
-          summary: 'Command exited with code 1 after 400 ms.',
-          metadata: {
-            exitCode: 1,
-            durationMs: 400,
-            stdout: '',
-            stderr: 'error TS2304: Cannot find name Demo',
-            stdoutTruncated: false,
-            stderrTruncated: true,
-            stdoutOriginalChars: 0,
-            stderrOriginalChars: 4000,
+    const text = join(
+      renderer.renderEvent(
+        event('tool.completed', {
+          result: {
+            toolCallId: 'call-build',
+            toolName: 'run_command',
+            status: 'completed',
+            summary: 'Command exited with code 1 after 400 ms.',
+            metadata: {
+              exitCode: 1,
+              durationMs: 400,
+              stdout: '',
+              stderr: 'error TS2304: Cannot find name Demo',
+              stdoutTruncated: false,
+              stderrTruncated: true,
+              stdoutOriginalChars: 0,
+              stderrOriginalChars: 4000,
+            },
+            truncated: true,
           },
-          truncated: true,
-        },
-        durationMs: 400,
-      }),
-      plain,
+          durationMs: 400,
+        }),
+        plain,
+      ),
     );
-    const text = rendered.map((chunk) => chunk.text).join('');
-    expect(text).toContain('FAIL   exit 1 · 400ms');
+    expect(text).toContain('RESULT     | FAIL | exit 1 | 400 ms');
     expect(text).toContain('stderr: error TS2304: Cannot find name Demo');
     expect(text).toContain('output truncated: yes');
   });
 
   it('marks a truncated apply_patch diff without treating the tool as the Turn result', () => {
     const renderer = new DefaultEventRenderer();
-    const rendered = renderer.renderEvent(
-      event('tool.completed', {
-        result: {
-          toolCallId: 'call-patch',
-          toolName: 'apply_patch',
-          status: 'completed',
-          summary: 'Applied 1 edits.',
-          metadata: {
-            path: 'src/parse-report.ts',
-            additions: 1,
-            deletions: 1,
-            omittedDiffChars: 80,
-            diff: '--- a/src/parse-report.ts\n+++ b/src/parse-report.ts\n',
+    const text = join(
+      renderer.renderEvent(
+        event('tool.completed', {
+          result: {
+            toolCallId: 'call-patch',
+            toolName: 'apply_patch',
+            status: 'completed',
+            summary: 'Applied 1 edits.',
+            metadata: {
+              path: 'src/parse-report.ts',
+              additions: 1,
+              deletions: 1,
+              omittedDiffChars: 80,
+              diff: '--- a/src/parse-report.ts\n+++ b/src/parse-report.ts\n',
+            },
+            truncated: true,
           },
-          truncated: true,
-        },
-        durationMs: 9,
-      }),
-      plain,
+          durationMs: 9,
+        }),
+        plain,
+      ),
     );
-    const text = rendered.map((chunk) => chunk.text).join('');
-    expect(text).toContain('OK     src/parse-report.ts · +1 -1');
+    expect(text).toContain('RESULT     | OK | 1 file changed | +1 -1');
     expect(text).toContain('diff truncated');
-    expect(text).not.toContain('DONE');
+    expect(text).not.toContain('Run completed');
+  });
+
+  it('wraps CJK command text on the body column and stacks on a narrow terminal', () => {
+    const renderer = new DefaultEventRenderer();
+    const longCommand = '检查当前测试失败并修复问题，然后继续运行完整质量门以确保没有回归。';
+    const wrapped = join(
+      renderer.renderEvent(
+        event('tool.requested', {
+          call: { id: 'call-cjk', name: 'run_command', arguments: { command: longCommand } },
+          normalizedInput: { command: longCommand },
+        }),
+        { ...plain, columns: 42 },
+      ),
+    );
+    expect(wrapped).toContain('COMMAND    |');
+    expect(wrapped).toMatch(/ {11}\| /u);
+
+    const stacked = join(
+      renderer.renderEvent(
+        event('tool.requested', {
+          call: { id: 'call-narrow', name: 'run_command', arguments: { command: longCommand } },
+          normalizedInput: { command: longCommand },
+        }),
+        narrow,
+      ),
+    );
+    expect(stacked).toContain('TOOL\n');
+    expect(stacked).toContain('run_command');
+    expect(stacked).toContain('COMMAND\n');
+    expect(stacked).not.toContain('TOOL       |');
+  });
+
+  it('uses Unicode separators when enabled and ASCII otherwise', () => {
+    const renderer = new DefaultEventRenderer();
+    expect(join(renderer.renderEvent(event('turn.started', { goal: 'fix tests' }), unicode))).toBe(
+      'ECHO       │ fix tests\n',
+    );
+    expect(join(renderer.renderEvent(event('step.started', { step: 6 }), unicode))).toContain(
+      '── Step 6 ',
+    );
+  });
+
+  it('labels Chat final replies on stderr and titles the summary as a Turn', () => {
+    const renderer = new DefaultEventRenderer({}, 'chat');
+    const result = renderer.renderResult(completed, plain);
+    expect(result.some((chunk) => chunk.channel === 'stdout')).toBe(false);
+    const text = join(result);
+    expect(text).toContain('ECHO       | final answer');
+    expect(text).toContain('-- Turn completed ');
+    expect(text).not.toContain('-- Run completed ');
   });
 });
 
 describe('render helpers', () => {
   it('formats durations and extracts node:test summaries', () => {
-    expect(formatDuration(25)).toBe('25ms');
-    expect(formatDuration(2400)).toBe('2.4s');
+    expect(formatDuration(25)).toBe('25 ms');
+    expect(formatDuration(2400)).toBe('2.4 s');
     expect(extractTestEvidence('# tests 2\n# pass 1\n# fail 1\n', '')).toBe('1 test failed');
     expect(extractTestEvidence('# tests 12\n# pass 12\n# fail 0\n', '')).toBe('12 tests passed');
     expect(extractTestEvidence('ℹ pass 2\nℹ fail 0\n', '')).toBe('2 tests passed');
   });
 
-  it('does not change P0 output for frozen P1 session events', () => {
+  it('does not change run output for frozen P1 session events', () => {
     const renderer = new DefaultEventRenderer();
     expect(
       renderer.renderEvent(

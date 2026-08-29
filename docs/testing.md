@@ -52,7 +52,7 @@ P1-0 只增加契约与矩阵测试，不改变 `run` 行为。矩阵每一行�
 | P1-2B | `/models` 发现、缓存、失败不阻断已配置模型 |
 | P1-1A | `ApplicationService` 与 Session 查询；`run` 经服务执行且 P0 退出码不变 |
 | P1-1B | Chat 恢复、Slash、Ctrl+C、bracketed paste 一次粘贴至多一个 Turn |
-| P1-3 | 分组时间线渲染；非 TTY/`--no-color` 契约保持 |
+| P1-3 | 分组时间线、窄宽度/CJK、Chat 启动摘要与状态条：`tests/unit/cli/event-renderer.test.ts`、`tests/unit/cli/render-layout.test.ts`、`tests/unit/cli/chat-view.test.ts`；非 TTY/`--no-color` 与 stdout/stderr 契约保持 |
 
 `ECHO_API_KEY` 仍不得进入 CI、事件或测试快照。`<artifact-root>/config/echo.config.json` 是 P1 唯一持久配置路径。
 

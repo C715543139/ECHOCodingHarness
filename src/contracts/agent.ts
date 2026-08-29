@@ -21,4 +21,5 @@ export interface AgentResult {
   readonly steps: number;
   readonly toolCalls: number;
   readonly error?: EchoError;
+  readonly verification?: Readonly<{ command: string; exitCode: number }>;
 }

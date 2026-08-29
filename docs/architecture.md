@@ -2,14 +2,15 @@
 
 > 状态：Accepted
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-28
+> 最后更新：2026-08-29
 
 ## 1. 文档目的
 
-本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实
-Provider 验收已与本文对齐；后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实 Provider 验收已与 1.0 边界对齐。P1-0 冻结的配置、应用服务与事件边界见
+[ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)
+和 [contracts.md](./contracts.md) 1.1。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -35,9 +36,11 @@ ECHO 表示：
 
 ### 2.2 次级目标（P1）
 
-- 增加交互式 `chat` 与配置辅助命令；
-- 改进上下文压缩、交互审批和会话恢复体验；
-- 完善执行差异摘要和错误诊断。
+- 增加交互式 `chat`、固定产物配置 `config` 和单 Provider 模型目录；
+- 抽出 `run`/`chat` 共用的应用服务、可恢复 Session 与 Session 查询；
+- 按冻结的分组式时间线改进 CLI 展示，不引入 TUI。
+
+P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文件为 `<artifact-root>/config/echo.config.json`。`ECHO_API_KEY` 仍是唯一秘密环境变量。
 
 ### 2.3 非目标（P2 或明确排除）
 
@@ -63,10 +66,13 @@ ECHO 表示：
 User / Demo Script
         |
         v
-  echo-harness CLI
+  echo-harness CLI  (parser, paste adapter, renderer)
         |
         v
-  Agent Orchestrator <------ Session Event Store (JSONL)
+  Application service
+        |
+        v
+  Agent Orchestrator <------ Session repository (JSONL)
      |      |      |
      |      |      +------> Context Projector
      |      |
@@ -75,7 +81,7 @@ User / Demo Script
      +--------------------> Model Provider -> OpenAI-compatible API
 ```
 
-核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由 CLI 渲染。
+P1-1A 之前，`run` 仍直接构造 Orchestrator；P1-0 已冻结上述目标边界。核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由 CLI 渲染。
 
 ## 5. 模块划分
 
@@ -123,6 +129,10 @@ User / Demo Script
 - 将工具结果反馈给模型；
 - 判断完成、失败、取消、步数上限与重复调用；
 - 生成最终 `AgentResult`。
+
+### 5.5 Application service
+
+P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。实现任务为 P1-1A；配置加载与 Chat 输入适配器分别属于 P1-2A 与 P1-1B。
 
 ## 6. Turn、Step 与 Agent Loop
 
@@ -263,15 +273,17 @@ Context Projector 按优先级构建上下文：
 
 ## 13. CLI 边界
 
-首版命令优先级：
+命令优先级：
 
 1. `echo-harness run <goal>`：在指定工作区完成单次目标；
-2. `echo-harness chat`：可选的多轮交互模式；
-3. `echo-harness config`：可选的配置检查与初始化辅助。
+2. `echo-harness chat`：P1 多轮交互；通过应用服务复用同一 Agent Loop；
+3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`。
 
-CLI 负责参数解析、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
+CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
-具体视觉语义、无颜色行为、审批展示、最终摘要与测试要求见 [cli-ux.md](./cli-ux.md)。
+P1-2A 之前，`run` 仍使用 P0 配置合并。P1-3 只改变表现层。
+
+具体视觉语义见 [cli-ux.md](./cli-ux.md)（P0）与 [p1-cli.md](./plans/p1-cli.md) 第 5 节（P1 分组时间线）。
 
 ## 14. 测试边界
 
@@ -299,11 +311,15 @@ ECHO 可以借鉴公开项目中通用的软件设计思想，例如显式循环
 ## 17. 实现状态与剩余验证
 
 P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JSONL 事件存储和
-`echo-harness run` 已按上述边界实现。当前目录以 `src/provider/`、`src/context/`、
+`echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵，但尚未改
+`loadConfig`、实现 artifact-root 解析、配置文件校验或 Chat 输入解析，也尚未把 `run` 接到应用服务。
+
+当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI
-只通过公开事件和 `AgentResult` 观察循环。
+只通过公开事件和 `AgentResult` 观察循环。P1 类型位于 `src/contracts/application.ts`、
+`src/contracts/config.ts` 与 `src/contracts/chat-input.ts`。
 
 已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 20,000 字符、
 32,000 近似 token 上下文（其中预留 4,000 输出 token），以及同一规范化工具调用第三次
-出现时终止。会话恢复仍不进入 P0。固定失败测试故事已在一个受控 OpenAI-compatible
+出现时终止。会话恢复在 P1-1A/P1-1B 落地；P0 仍只做 JSONL 终态补偿。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。

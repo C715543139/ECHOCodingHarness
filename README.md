@@ -60,8 +60,10 @@ pnpm build
 
 ## Configure
 
-Credentials are read from the process environment. ECHO does not automatically load `.env` files,
-and a project configuration file cannot provide an API key.
+The current `echo-harness run` still uses the P0 merge order: CLI arguments, environment
+variables, project configuration, user configuration, then built-in defaults. Credentials are
+read from the process environment. ECHO does not automatically load `.env` files, and a
+configuration file cannot provide an API key.
 
 ```powershell
 $env:ECHO_BASE_URL = 'https://provider.example/v1'
@@ -81,8 +83,10 @@ Non-secret defaults may instead be placed in `echo.config.json` or `.echo-config
 }
 ```
 
-Resolution order is CLI arguments, environment variables, project configuration, user
-configuration, then built-in defaults.
+P1-2A replaces that lookup with a single file at `<artifact-root>/config/echo.config.json`.
+`artifact-root` is derived from the CLI module or executable, never `process.cwd()`. After that
+cutover, `ECHO_API_KEY` remains the only supported secret environment variable; `ECHO_BASE_URL`,
+`ECHO_MODEL`, and `ECHO_SAFETY_MODE` are removed. See [ADR-0002](docs/decisions/0002-p1-config-artifact-root.md).
 
 ## Run
 
@@ -146,6 +150,8 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
 - [Demo guide](docs/demo.md)
 - [Testing and evals](docs/testing.md)
 - [ADR-0001: project foundation](docs/decisions/0001-project-foundation.md)
+- [ADR-0002: P1 config and artifact-root](docs/decisions/0002-p1-config-artifact-root.md)
+- [ADR-0003: application service and recoverable sessions](docs/decisions/0003-p1-application-service-session.md)
 - [P1 CLI plan](docs/plans/p1-cli.md)
 - [P2 local WebUI plan](docs/plans/p2-webui.md)
 
@@ -153,8 +159,9 @@ Fake Provider and never receives a real API key. Details and the coverage matrix
 
 - ECHO is not an operating-system sandbox. Approved PowerShell commands can still access network
   or files permitted to the current user.
-- The current release does not provide Web UI, MCP, multi-agent execution, session resume, or a
-  general rollback system.
+- The current release does not provide Web UI, MCP, multi-agent execution, or a
+  general rollback system. Session resume and `chat` are frozen for P1 but not implemented until
+  P1-1A/P1-1B.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

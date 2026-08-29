@@ -5,6 +5,7 @@ import type {
   EchoEvent,
   EchoEventPayloads,
   EchoEventType,
+  EndpointFingerprint,
   RenderCapabilities,
 } from '../../../src/contracts/index.js';
 import {
@@ -403,5 +404,45 @@ describe('render helpers', () => {
     expect(extractTestEvidence('# tests 2\n# pass 1\n# fail 1\n', '')).toBe('1 test failed');
     expect(extractTestEvidence('# tests 12\n# pass 12\n# fail 0\n', '')).toBe('12 tests passed');
     expect(extractTestEvidence('ℹ pass 2\nℹ fail 0\n', '')).toBe('2 tests passed');
+  });
+
+  it('does not change P0 output for frozen P1 session events', () => {
+    const renderer = new DefaultEventRenderer();
+    expect(
+      renderer.renderEvent(
+        event('session.resumed', {
+          eventSchemaVersion: 2,
+          provider: {
+            kind: 'openai-compatible',
+            name: 'openai-compatible',
+            endpointFingerprint: 'fp:example.test' as EndpointFingerprint,
+          },
+          model: 'example-model',
+          safetyMode: 'balanced',
+          turnCount: 3,
+        }),
+        plain,
+      ),
+    ).toEqual([]);
+    expect(
+      renderer.renderEvent(
+        event('model.changed', {
+          model: 'next-model',
+          previousModel: 'example-model',
+          source: 'slash',
+        }),
+        plain,
+      ),
+    ).toEqual([]);
+    expect(
+      renderer.renderEvent(
+        event('safety.changed', {
+          safetyMode: 'auto',
+          previousSafetyMode: 'balanced',
+          source: 'slash',
+        }),
+        plain,
+      ),
+    ).toEqual([]);
   });
 });

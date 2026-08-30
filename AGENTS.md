@@ -27,6 +27,7 @@ The following documents are the Accepted P0/P1 implementation baseline and P2 de
 - `docs/plans/p1-cli.md`
 - `docs/plans/p1-5-reasoning-context.md`
 - `docs/plans/p2-webui.md`
+- `docs/plans/p2-5-webui.md`
 - `docs/plans/p2-acceptance-matrix.md`
 - `docs/web-api.md`
 - `docs/web-ui.md`

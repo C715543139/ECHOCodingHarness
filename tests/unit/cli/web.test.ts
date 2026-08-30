@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../../../src/cli/create-cli.js';
 import { WEB_OPEN_ERROR_CODES } from '../../../src/cli/open-loopback-url.js';
-import { runWeb } from '../../../src/cli/web.js';
+import { runWeb, WEB_CONNECTION_NOTICE } from '../../../src/cli/web.js';
 import {
   WEB_ASSET_SUBDIRECTORY,
   type CreateWebServerOptions,
@@ -83,7 +83,7 @@ describe('Web CLI launch contract', () => {
     expect(server.close).toHaveBeenCalledTimes(1);
   });
 
-  it('prints the exact URL and never calls the opener with --no-open', async () => {
+  it('prints the exact URL with its single-use notice and never opens with --no-open', async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), 'echo-web-cli-no-open-'));
     const opened = vi.fn();
     const written: string[] = [];
@@ -107,7 +107,8 @@ describe('Web CLI launch contract', () => {
 
     expect(outcome).toEqual({ exitCode: 0 });
     expect(opened).not.toHaveBeenCalled();
-    expect(written).toEqual([`${BOOTSTRAP_URL}\n`]);
+    expect(written).toEqual([`${BOOTSTRAP_URL}\n${WEB_CONNECTION_NOTICE}`]);
+    expect(WEB_CONNECTION_NOTICE).not.toContain(TOKEN);
   });
 
   it('rejects a non-loopback URL, closes the server, and hides the token', async () => {

@@ -34,6 +34,9 @@ export interface WebCommandOutcome {
   readonly errorCode?: WebOpenErrorCode;
 }
 
+export const WEB_CONNECTION_NOTICE =
+  'Note: This bootstrap URL is single-use. Reopening it or opening a second live tab may show disconnected; restart this command for a new browser connection.\n';
+
 export async function runWeb(options: WebCommandOptions): Promise<WebCommandOutcome> {
   const workspaceRoot = await resolveWorkspace(options.workspace ?? options.cwd ?? process.cwd());
   const createServer = options.createServer ?? createWebServer;
@@ -75,7 +78,7 @@ export async function runWeb(options: WebCommandOptions): Promise<WebCommandOutc
     }
   }
 
-  writeOutput(`${verified.url}\n`);
+  writeOutput(`${verified.url}\n${WEB_CONNECTION_NOTICE}`);
   try {
     if (!options.signal.aborted) {
       await new Promise<void>((resolvePromise) => {

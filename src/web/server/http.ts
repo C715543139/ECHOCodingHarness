@@ -58,12 +58,19 @@ export function sendError(
   code: WebErrorCode,
   message: string,
   retryable = false,
-): void {
+  fields?: Readonly<Record<string, string>>,
+): ApiErrorResponse {
   const body: ApiErrorResponse = {
-    error: { code, message, retryable },
+    error: {
+      code,
+      message,
+      retryable,
+      ...(fields === undefined || Object.keys(fields).length === 0 ? {} : { fields }),
+    },
     requestId: requestIdOf(request),
   };
   void reply.status(status).header('Cache-Control', 'no-store').send(body);
+  return body;
 }
 
 export function isMutating(method: string): boolean {

@@ -174,13 +174,15 @@ The script requires all three Provider settings, disables retries, limits output
 model response. Remove the API key from the shell environment after the check. This path is local
 acceptance only and is not part of CI. It does not read `.env.test`.
 
-## P2 Web quality plan (Phase A implemented)
+## P2 Web quality plan (Phase A implemented; B1 route module landed)
 
 P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
 unit-test run install or launch a browser. Phase A provides `pnpm test:web`, `pnpm build:web`,
 `pnpm smoke:web-artifact`, pinned test dependencies, Fastify injection tests, and the React shell
-with Fake transport. The remaining live API, Playwright, and isolated-package artifact evidence in
-this section remains a target contract until its owning B/C task lands.
+with Fake transport. P2-B1 adds an independently assembled Session/Turn/approval/SSE route module
+under `src/web/server/session-api.ts` with Fastify injection and race tests; C1 still owns wiring
+it into `register-routes.ts`. Remaining Playwright and isolated-package artifact evidence in this
+section remains a target contract until its owning B/C task lands.
 
 ### Fast unit and integration layer
 
@@ -199,16 +201,23 @@ this section remains a target contract until its owning B/C task lands.
   routes remain a later integration task;
 - Fastify injection tests cover the Phase A assembled routes without opening a product TCP client;
   `tests/integration/web/routes.test.ts` proves the packaged shell is served and no export route
-  is registered;
+  is registered. P2-B1 independently assembles Session API routes in
+  `tests/integration/web/session-api-harness.ts`;
 - authentication tests cover one-time bootstrap, cookie attributes, exact Host/Origin, no CORS,
   content type, body limits, CSP, and no-store;
 - process-wide active-Turn tests cover two Sessions and prove the second cannot submit or mutate
-  runtime state while one Turn runs;
-- idempotency tests repeat Turn, cancel, approval, and config requests, assert one side effect and
-  reject the same requestId with a different request fingerprint;
+  runtime state while one Turn runs (`tests/unit/application/active-turn-coordinator.test.ts`,
+  `tests/integration/web/turns.test.ts`);
+- idempotency tests repeat Turn, cancel, approval, and create-session requests, assert one side
+  effect and reject the same requestId with a different request fingerprint
+  (`tests/integration/web/idempotency.test.ts`);
 - SSE tests cover the discriminated payload union, one stream per process authentication Cookie,
   ordered backlog plus live handoff, duplicate seq, disconnect, terminal events, heartbeat that
-  does not advance seq, and `resync_required`;
+  does not advance seq, `resync_required`, subscribe-buffer-snapshot-drain races, and concurrent
+  `409 STREAM_ACTIVE` before hijack (`tests/unit/web/sse-hub.test.ts`,
+  `tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts`,
+  `tests/integration/web/sse-resync.test.ts`). These prove the independently assembled B1 module;
+  production `register-routes.ts` wiring remains C1;
 - Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order.
   P2 does not implement session export.
 

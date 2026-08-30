@@ -10,3 +10,10 @@ export {
   type StartedWebServer,
 } from './create-web-server.js';
 export { registerWebRoutes, type WebRouteDependencies } from './register-routes.js';
+export {
+  registerSessionApiRoutes,
+  type SessionApiDependencies,
+  type SessionApiState,
+} from './session-api.js';
+export { createSessionEventHub, type SessionEventHub, type StreamLease } from '../sse-hub.js';
+export { registerWebRequestGuards, type WebGuardState } from './request-guards.js';

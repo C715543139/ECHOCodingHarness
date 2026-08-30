@@ -22,7 +22,7 @@ import {
 
 export interface WebSseOwner {
   readonly reply: FastifyReply;
-  readonly timer: NodeJS.Timeout;
+  timer: ReturnType<typeof setInterval> | undefined;
 }
 
 export interface WebAdapterState {
@@ -120,6 +120,8 @@ export async function registerWebRoutes(
       );
       return;
     }
+    const owner: WebSseOwner = { reply, timer: undefined };
+    state.sseOwner = owner;
     void reply.hijack();
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -129,21 +131,24 @@ export async function registerWebRoutes(
       'X-Content-Type-Options': 'nosniff',
     });
     const release = (): void => {
-      if (state.sseOwner?.reply === reply) {
-        clearInterval(state.sseOwner.timer);
-        state.sseOwner = undefined;
-      }
+      if (state.sseOwner !== owner) return;
+      if (owner.timer !== undefined) clearInterval(owner.timer);
+      owner.timer = undefined;
+      state.sseOwner = undefined;
     };
     const writeHeartbeat = (): void => {
       if (reply.raw.destroyed || reply.raw.writableEnded) {
         release();
         return;
       }
-      reply.raw.write('event: heartbeat\ndata: {}\n\n');
+      try {
+        reply.raw.write('event: heartbeat\ndata: {}\n\n');
+      } catch {
+        release();
+      }
     };
     writeHeartbeat();
-    const timer = setInterval(writeHeartbeat, heartbeatIntervalMs);
-    state.sseOwner = { reply, timer };
+    owner.timer = setInterval(writeHeartbeat, heartbeatIntervalMs);
     request.raw.once('close', release);
     request.raw.once('aborted', release);
     request.raw.socket?.once('close', release);

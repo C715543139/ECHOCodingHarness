@@ -1,8 +1,8 @@
 # P2 需求、测试与验收证据矩阵
 
-> 状态：Accepted plan（阶段 A 与 P2-B1/B2/B3 独立模块证据已落地，生产根装配仍待 C1；B4 与阶段 C 尚未实现）
+> 状态：Accepted plan（阶段 A 与 P2-B1/B2/B3/B4 独立模块证据已落地，生产根装配与阶段 C 仍待完成）
 >
-> 版本：1.6
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
@@ -39,19 +39,19 @@
 
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`（B2 分页/恢复已落地），`tests/integration/web/session-view.test.ts`（B1 API 已落地）；浏览器流程仍待 B4/C1 | Partial (API + component accepted) |
+| P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`（B2），`tests/integration/web/session-view.test.ts`（B1），`tests/e2e/web/session-flow.spec.ts`（B4 Fake 夹具）；生产装配仍待 C1 | Partial (API + component + fixture accepted) |
 | P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`；生产装配仍待 C1 | Partial (coordinator + component accepted) |
-| P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`（B2 已落地）；刷新浏览器流程仍待 B4/C1 | Partial (projection accepted) |
-| P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；长流浏览器压力仍待 B4/C1 | Partial (component accepted) |
-| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；浏览器流程仍待 B4/C1 | Partial (component accepted) |
+| P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`（B2 已落地）；生产刷新浏览器流程仍待 C1 | Partial (projection accepted) |
+| P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；生产长流浏览器压力仍待 C1 | Partial (component accepted) |
+| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；生产浏览器流程仍待 C1 | Partial (component accepted) |
 | P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/integration/web/turns.test.ts`（B1 API）与 `tests/unit/web/composer.test.tsx`（B2 UI）；生产装配仍待 C1 | Partial (API + UI accepted) |
 | P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/integration/web/turns.test.ts`（B1 API）与 `tests/unit/web/approval.test.tsx`（B2 UI）；生产浏览器流程仍待 C1 | Partial (API + component accepted) |
 | P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/integration/web/runtime-capabilities.test.ts`, `tests/unit/web/composer.test.tsx`；生产装配仍待 C1 | Partial (API + component accepted) |
 | P2-2-09 | Provider 设置只有一个导航页并共用配置服务；发现列表只读且只有默认模型可写 | component / browser | `tests/unit/web/provider-settings.test.tsx`（B2 Fake 发现/校验已落地）；真实配置服务 HTTP 装配仍待 C1 | Partial (component accepted) |
-| P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/unit/web/provider-settings.test.tsx`（B2 DOM 投影已落地）；浏览器与扫描证据仍待 B4/C1 | Partial (component accepted) |
+| P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/unit/web/provider-settings.test.tsx`（B2），`tests/e2e/web/provider-secret.spec.ts` 与 `scripts/scan-web-artifacts.mjs`（B4 Fake 夹具）；生产装配仍待 C1 | Partial (component + fixture accepted) |
 | P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`（文字状态与恢复）与 `tests/integration/web/session-view.test.ts`（HTTP DTO） | Partial (rail + API accepted; C1 assembly pending) |
-| P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`（B2 确认停止与运行时禁用已落地）；浏览器流程仍待 B4/C1 | Partial (composer accepted) |
-| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`（壳层）与 B1 SSE API；真实浏览器重连仍待 B4/C1 | Partial (header + API accepted) |
+| P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`（B2 确认停止与运行时禁用已落地）；生产浏览器流程仍待 C1 | Partial (composer accepted) |
+| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`（壳层）、B1 SSE API 与 `tests/e2e/web/reconnect.spec.ts`（B4 Fake 夹具）；生产装配仍待 C1 | Partial (header + API + fixture accepted) |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
@@ -74,14 +74,14 @@
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
 | P2-4-01 | 空、加载、断线、resync 和全部终态明确 | component | `tests/unit/web/states.test.tsx`（B2 已覆盖空/加载/断线/resync/失败/取消/运行/审批）；真实 HTTP 失败态仍待 C1 | Partial (component accepted) |
-| P2-4-02 | 键盘完成核心流程，焦点与模态返回正确 | component / browser | `tests/e2e/web/keyboard.spec.ts` | Planned |
-| P2-4-03 | 状态不只依赖颜色，live region 不逐 token 播报 | accessibility | `tests/e2e/web/accessibility.spec.ts` | Planned |
-| P2-4-04 | 200% 缩放、窄屏抽屉和 reduced motion 可用 | browser | `tests/e2e/web/responsive.spec.ts` | Planned |
+| P2-4-02 | 键盘完成核心流程，焦点与模态返回正确 | component / browser | `tests/e2e/web/keyboard.spec.ts`（B4 Fake 夹具已通过；生产装配仍待 C1） | Partial (fixture accepted) |
+| P2-4-03 | 状态不只依赖颜色，live region 不逐 token 播报 | accessibility | `tests/e2e/web/accessibility.spec.ts`（B4 Fake 夹具已通过；生产装配仍待 C1） | Partial (fixture accepted) |
+| P2-4-04 | 200% 缩放、窄屏抽屉和 reduced motion 可用 | browser | `tests/e2e/web/responsive.spec.ts`（B4 Fake 夹具已通过；生产装配仍待 C1） | Partial (fixture accepted) |
 | P2-4-05 | 构建产物包含 CLI 与 `dist/web/` 静态资源 | artifact | `scripts/smoke-web-artifact.mjs` | Accepted |
-| P2-4-06 | 非仓库 cwd 可启动、认证、创建 Session 并关闭 | Windows artifact | `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-4-06 | 非仓库 cwd 可启动、认证、创建 Session 并关闭 | Windows artifact | `scripts/smoke-web-isolated-artifact.mjs`（启动、认证、静态/API、关闭已落地；B1 `POST /api/v1/sessions` 的生产装配仍待 C1，脚本记录 pending-wiring） | Partial (lifecycle accepted) |
 | P2-4-07 | P0/P1 `run`、`chat`、`config` 与 Session 不退化 | regression | existing suite + `pnpm check` | Accepted |
 | P2-4-08 | CI 不使用真实 Key/付费 Provider | workflow / scan | `.github/workflows/ci.yml`, scan tests | Accepted |
-| P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | Web artifact scan step | Planned |
+| P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | `scripts/scan-web-artifacts.mjs`（独立扫描已落地：含 error-context、fail-closed zip/超限、绝对路径与 reasoning 字段）；CI 仅上传扫描通过的产物，接线仍待 C1 | Partial (scanner accepted) |
 | P2-4-10 | 受控真实 Provider 完成 Chat、刷新与 Trace | local acceptance | `scripts/accept-web-provider.mjs` | Planned |
 | P2-4-11 | 最终交付树不含临时示意图或说明；权威文档不再依赖这些视觉资产 | docs / review | 收尾提交确认临时 PNG 与说明已移除 | Planned |
 

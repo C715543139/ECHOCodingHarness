@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.8
+> 版本：1.9
 >
 > 最后更新：2026-08-30
 
@@ -312,7 +312,7 @@ Context Projector 按优先级构建上下文：
 1. `echo-harness run <goal>`：在指定工作区完成单次目标；
 2. `echo-harness chat`：P1 多轮交互；通过应用服务复用同一 Agent Loop；
 3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`；
-4. `echo-harness web`：P2 Phase A 已落地的固定工作区 loopback 控制台；默认打开服务器实际生成且已验证的 loopback bootstrap URL，`--no-open` 只打印同一地址。业务 Session/Turn API 仍待阶段 B。
+4. `echo-harness web`：P2 Phase A 已落地的固定工作区 loopback 控制台；默认打开服务器实际生成且已验证的 loopback bootstrap URL，`--no-open` 只打印同一地址。B1 Session/Turn API 模块已经实现，生产路由装配仍待 C1。
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
@@ -376,6 +376,9 @@ P2 已完成计划、ADR、API 与 UI 契约冻结。A1 已把有界 Web DTO/Sch
 事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。A3 已落地 Fastify loopback
 生命周期、一次性 bootstrap Cookie、Host/Origin/CSP 与单 SSE 所有权。A4 已落地 React 主壳与 Fake
 transport。A5 已统一路由装配、`dist/web/` 构建顺序、`pnpm test:web` / `pnpm smoke:web-artifact`
-与 CI 证据。B2 已把 Session rail、Chat 聚合/审批/输入区和 Provider 设置接到冻结 DTO 与 Fake
-transport；真实 HTTP 前端、根装配和 Playwright 仍待 B1/B4/C1。实现状态只能在
+与 CI 证据。B1 已实现 Session/Turn/审批/SSE 路由模块；B2 已把 Session rail、Chat 聚合/审批/输入区和
+Provider 设置接到冻结 DTO 与 Fake transport；B3 已实现 Trace 投影、Inspector 与有界列表；B4 已落地
+独立 Fake Provider Web 场景、Fastify 安全夹具、Playwright Fake 入口、隔离产物 smoke（最小子进程环境）
+与 fail-closed Web 产物隐私扫描。共享路由、真实 HTTP 页面、package scripts 与 CI 接线留给 C1，且 C1
+只上传扫描通过的 Playwright 产物。实现状态只能在
 对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。

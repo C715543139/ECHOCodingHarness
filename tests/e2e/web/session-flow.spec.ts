@@ -35,11 +35,41 @@ test.describe('bootstrap and first Session', () => {
     const after = await rail.boundingBox();
     expect(after?.width).toBeGreaterThan(before.width + 70);
 
-    const viewport = await page.evaluate(() => ({
-      height: window.innerHeight,
-      documentHeight: document.documentElement.scrollHeight,
-    }));
-    expect(viewport.documentHeight).toBe(viewport.height);
+    const viewport = await page.evaluate(() => {
+      const chat = document.querySelector<HTMLElement>('[data-testid="chat-scroll"]');
+      const root = document.querySelector<HTMLElement>('#root');
+      return {
+        height: window.innerHeight,
+        documentHeight: document.documentElement.scrollHeight,
+        htmlOverflow: getComputedStyle(document.documentElement).overflow,
+        bodyOverflow: getComputedStyle(document.body).overflow,
+        rootOverflow: root === null ? undefined : getComputedStyle(root).overflow,
+        chatOverflowX: chat === null ? undefined : getComputedStyle(chat).overflowX,
+        chatOverflowY: chat === null ? undefined : getComputedStyle(chat).overflowY,
+      };
+    });
+    expect(viewport).toEqual({
+      height: viewport.height,
+      documentHeight: viewport.height,
+      htmlOverflow: 'hidden',
+      bodyOverflow: 'hidden',
+      rootOverflow: 'hidden',
+      chatOverflowX: 'hidden',
+      chatOverflowY: 'auto',
+    });
+
+    const modelSelect = page.getByLabel('模型');
+    const safetySelect = page.getByLabel('安全模式');
+    for (const select of [modelSelect, safetySelect]) {
+      expect(
+        await select.evaluate((element) => ({
+          height: getComputedStyle(element).height,
+          lineHeight: getComputedStyle(element).lineHeight,
+          paddingBottom: getComputedStyle(element).paddingBottom,
+          paddingTop: getComputedStyle(element).paddingTop,
+        })),
+      ).toEqual({ height: '32px', lineHeight: 'normal', paddingBottom: '0px', paddingTop: '0px' });
+    }
 
     await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '获取模型' }).click();

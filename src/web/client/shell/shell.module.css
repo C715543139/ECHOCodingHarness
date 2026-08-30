@@ -160,7 +160,8 @@
 .shell {
   display: grid;
   grid-template-columns: var(--echo-rail-width) minmax(0, 1fr);
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--echo-color-bg);
 }
@@ -245,17 +246,10 @@
 }
 
 .workspaceRow {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--echo-space-2);
+  display: block;
   min-width: 0;
   padding: 0 var(--echo-space-1);
   color: var(--echo-color-text);
-  font-size: var(--echo-text-base);
-}
-
-.workspaceRow .glyph {
-  margin-top: 0.1875rem;
 }
 
 .workspaceBlock {
@@ -267,14 +261,21 @@
 .workspaceCaption {
   margin: 0;
   color: var(--echo-color-muted);
-  font-size: var(--echo-text-xs);
+  font-size: var(--echo-text-sm);
+  font-weight: 500;
   letter-spacing: 0.04em;
+}
+
+.workspaceName,
+.sessionTitle {
+  font-size: var(--echo-text-lg);
+  line-height: 1.4;
+  font-weight: 600;
 }
 
 .workspaceName {
   margin: 0;
   overflow-wrap: anywhere;
-  font-weight: 600;
 }
 
 .railSectionLabel {
@@ -293,7 +294,9 @@
   gap: var(--echo-space-1);
   margin: 0;
   padding: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
 }
 
@@ -322,7 +325,6 @@
 
 .sessionTitle {
   overflow: hidden;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -437,7 +439,9 @@
   flex: 1;
   min-height: 0;
   padding: var(--echo-space-5);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* ---------- chat ---------- */
@@ -637,12 +641,13 @@
 }
 
 .composerControls .field select {
-  min-height: 0;
-  height: auto;
-  padding: 0.25rem var(--echo-space-2);
+  height: 2rem;
+  min-height: 2rem;
+  padding-block: 0;
+  padding-inline: var(--echo-space-2);
   border-radius: var(--echo-radius-pill);
   font-size: var(--echo-text-sm);
-  line-height: 1.25;
+  line-height: normal;
 }
 
 .contextUsage {
@@ -667,13 +672,15 @@
 .newContent,
 .newEvents {
   position: absolute;
-  bottom: var(--echo-space-2);
+  bottom: var(--echo-space-5);
   left: 50%;
-  min-height: var(--echo-target-min);
+  min-height: var(--echo-target-primary);
+  padding: 0 var(--echo-space-4);
   transform: translateX(-50%);
   border-color: var(--echo-color-border-strong);
+  border-radius: var(--echo-radius-pill);
   box-shadow: var(--echo-shadow-raised);
-  font-size: var(--echo-text-sm);
+  font-size: var(--echo-text-base);
   white-space: nowrap;
 }
 
@@ -1084,14 +1091,26 @@
   .shellRailCollapsed,
   .shellRailCollapsed.shellWithInspector {
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .shell,
+  .shellRailCollapsed {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .shellWithInspector,
+  .shellRailCollapsed.shellWithInspector {
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .rail {
     height: auto;
-    overflow: visible;
+    min-height: 0;
+    max-height: min(22rem, 42vh);
+    overflow: hidden;
   }
 
   .railResizer {
@@ -1103,13 +1122,13 @@
   }
 
   .workspace {
-    height: auto;
-    min-height: 60vh;
+    height: 100%;
+    min-height: 0;
   }
 
   .inspector {
-    height: auto;
-    min-height: auto;
+    height: 100%;
+    min-height: 0;
     border-top: 0.0625rem solid var(--echo-color-border);
     border-left: 0;
   }

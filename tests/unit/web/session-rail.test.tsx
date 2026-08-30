@@ -37,6 +37,10 @@ describe('Session rail', () => {
     expect(screen.getByText(/ · Idle · /)).toBeTruthy();
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.getByTitle('Active coding session')).toBeTruthy();
+    expect(screen.getByText('当前工作区')).toBeTruthy();
+    const workspaceName = screen.getByTestId('workspace-name');
+    expect(workspaceName.textContent).toBe('echo-harness');
+    expect(workspaceName.parentElement?.parentElement?.querySelector('svg')).toBeNull();
   });
 
   it('creates a session from the primary rail action', async () => {

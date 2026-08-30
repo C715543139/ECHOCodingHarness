@@ -21,6 +21,19 @@ test.describe('large Trace list', () => {
     await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
 
     await list.evaluate((element) => {
+      element.scrollTop = 120;
+      element.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    const backToLatest = page.getByRole('button', { name: '回到最新' });
+    await expect(backToLatest).toBeVisible();
+    expect(
+      await backToLatest.evaluate((element) => ({
+        bottom: getComputedStyle(element).bottom,
+        fontSize: getComputedStyle(element).fontSize,
+        height: element.getBoundingClientRect().height,
+      })),
+    ).toEqual({ bottom: '24px', fontSize: '15px', height: 36 });
+    await list.evaluate((element) => {
       element.scrollTop = 0;
       element.dispatchEvent(new Event('scroll', { bubbles: true }));
     });

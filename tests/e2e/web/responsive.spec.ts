@@ -23,5 +23,12 @@ test.describe('responsive zoom and reduced motion', () => {
     await expect(page.getByRole('button', { name: '新会话', exact: true })).toBeVisible();
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Session' })).toBeVisible();
+    expect(
+      await page.evaluate(() => ({
+        documentHeight: document.documentElement.scrollHeight,
+        overflow: getComputedStyle(document.documentElement).overflow,
+        viewportHeight: window.innerHeight,
+      })),
+    ).toEqual({ documentHeight: 844, overflow: 'hidden', viewportHeight: 844 });
   });
 });

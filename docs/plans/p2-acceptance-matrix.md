@@ -53,7 +53,7 @@
 | P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
-| P2-2-15 | 桌面侧栏可有界调宽；文档不整体滚动；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts` | Accepted |
+| P2-2-15 | 侧栏可有界调宽；文档根节点不滚动；Chat/Trace 只纵向滚动；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts`, `tests/e2e/web/responsive.spec.ts` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
 
@@ -109,10 +109,11 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 
 ## 7. 最终签收记录
 
-- 本地候选：2026-08-31，Windows 10；当前改动未提交，因此没有可填写的合并 SHA 或远程 CI URL；
-- `pnpm check`：117 个测试文件、637 项测试通过；
-- 覆盖率：statements 85.01%、branches 76.94%、functions 89.04%、lines 86.80%；
-- Web E2E：Playwright Chromium 9/9 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
+- 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
+  时补录；
+- `pnpm check`：117 个测试文件、642 项测试通过；
+- 覆盖率：statements 85.02%、branches 76.94%、functions 89.15%、lines 86.82%；
+- Web E2E：Playwright Chromium 10/10 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
   断线恢复、审批、Provider 秘密与 200 条 Trace；
 - Windows 非仓库 cwd 隔离产物 smoke：通过；
 - 离线评测与 demo smoke：12/12 通过；

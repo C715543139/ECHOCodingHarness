@@ -82,9 +82,8 @@ export function SessionRail({
 
   const workspaceRow = (
     <div className={styles.workspaceRow}>
-      <Glyph name="folder" />
       <div className={styles.workspaceBlock}>
-        <p className={styles.workspaceCaption}>工作区</p>
+        <p className={styles.workspaceCaption}>当前工作区</p>
         <p className={styles.workspaceName} data-testid="workspace-name" title={workspace.name}>
           {workspace.name}
         </p>

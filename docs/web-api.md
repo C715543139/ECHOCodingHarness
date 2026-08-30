@@ -1,6 +1,6 @@
 # ECHO Harness 本地 Web API 契约
 
-> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结，HTTP 路由尚未实现）
+> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结；A3 已实现 loopback 传输、bootstrap 认证与请求防护，业务路由尚未实现）
 >
 > 版本：1.2
 >

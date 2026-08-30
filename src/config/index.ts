@@ -45,3 +45,17 @@ export {
 } from './write-config.js';
 export { loadRuntimeConfig, type RuntimeConfigInput } from './runtime-config.js';
 export { resolveNewSessionSetting, resolveResumeSessionSetting } from './session-settings.js';
+export {
+  clearProviderConfigDiscoverCache,
+  createProviderConfigService,
+  normalizeConfigWriteLockKey,
+  redactConfigIssues,
+  type CreateProviderConfigServiceOptions,
+  type DiscoveredModels,
+  type ListProviderModelsInput,
+  type ProviderConfigResult,
+  type ProviderConfigService,
+  type ProviderConfigSnapshot,
+  type ProviderDiscoverResult,
+  type ProviderSettingsDraft,
+} from './config-service.js';

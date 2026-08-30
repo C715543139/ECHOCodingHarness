@@ -477,7 +477,10 @@ P2 Web adapter 是 `ApplicationService`、Session 查询和共享配置服务的
 - 固定工作区来自服务启动参数，不接受浏览器路径；
 - 整个 Web 服务进程同时只允许一个活动 Turn；
 - Session 创建、恢复、取消、审批、模型和安全模式继续调用本节接口；
-- Provider 配置复用 CLI 背后的 Schema、artifact-root 和原子写入，不调用或解析 CLI；
+- Provider 配置通过 `createProviderConfigService` 复用 CLI 背后的 Schema、artifact-root、写锁
+  和原子写入，不调用或解析 CLI；Web 只使用受限的 `saveProviderSettings` merge，CLI wizard 只使用
+  完整校验后的 `replacePersistentConfig`；API Key 仍只来自 `ECHO_API_KEY`，`discoverModels` 不会
+  自动保存；merge 在读取或 Schema 失败时必须拒绝并保持原文件不变；
 - Web DTO 是内部领域对象的有界脱敏投影，不直接序列化类实例或原始 JSONL；
 - Chat 历史只投影聚合 `model.text`，Trace 不把 chunk 或 `model.reasoning` 作为记录；
 - P2 新 Writer 的每种 `PolicyDecision` 都携带稳定 rule ID，并把 rule ID 与原因写入相应授权、审批

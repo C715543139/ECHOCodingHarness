@@ -183,8 +183,11 @@ and artifact evidence in this section is a target contract until its owning task
 ### Fast unit and integration layer
 
 - Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
-- shared Provider config service tests prove CLI/Web use the same schema, artifact root, locking,
-  atomic replacement, and redacted errors;
+- shared Provider config service tests in `tests/unit/config/config-service.test.ts` prove Web
+  `saveProviderSettings` is a restricted Provider merge, CLI `replacePersistentConfig` is a full
+  validated replace, artifact-root locking is case-normalized on win32, discovery does not
+  auto-save, and merge refuses to overwrite an unreadable or schema-invalid file; HTTP provider
+  routes remain a later integration task;
 - Fastify injection tests cover routes without opening a TCP port;
 - authentication tests cover one-time bootstrap, cookie attributes, exact Host/Origin, no CORS,
   content type, body limits, CSP, and no-store;

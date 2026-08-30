@@ -2,19 +2,21 @@ import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
 import { CLI_EXIT_CODES } from '../contracts/exit-codes.js';
-import type { EchoPersistentConfig, ModelCatalogConfig } from '../contracts/config.js';
+import {
+  CONFIG_ERROR_CODES,
+  type EchoPersistentConfig,
+  type ModelCatalogConfig,
+} from '../contracts/config.js';
 import type { SafetyMode } from '../contracts/safety.js';
 
 import {
   DEFAULT_MAX_APPROX_TOKENS,
   DEFAULT_MAX_OUTPUT_CHARS,
   DEFAULT_RESERVED_OUTPUT_TOKENS,
+  createProviderConfigService,
   inspectProviderUrl,
-  parsePersistentConfig,
   persistentConfigPath,
-  readPersistentConfigFile,
   SAFETY_MODES,
-  writePersistentConfigFile,
 } from '../config/index.js';
 
 export interface ConfigWizardIo {
@@ -185,15 +187,9 @@ async function promptConfirm(io: ConfigWizardIo, signal?: AbortSignal): Promise<
 }
 
 async function readExistingDraft(artifactRoot: string): Promise<EchoPersistentConfig | undefined> {
-  const file = await readPersistentConfigFile(artifactRoot);
-  if (file.status !== 'loaded') {
-    return undefined;
-  }
-  const parsed = parsePersistentConfig(file.raw);
-  if ('issues' in parsed) {
-    return undefined;
-  }
-  return parsed.config;
+  const service = createProviderConfigService({ artifactRoot, env: process.env });
+  const loaded = await service.read();
+  return loaded.ok ? loaded.value.persistent : undefined;
 }
 
 export async function runConfigWizard(
@@ -251,9 +247,17 @@ export async function runConfigWizard(
       return { exitCode: CLI_EXIT_CODES.success };
     }
 
-    const written = await writePersistentConfigFile(artifactRoot, draft);
-    io.write(`Wrote ${written.path}\n`);
-    return { exitCode: CLI_EXIT_CODES.success, configPath: written.path };
+    const service = createProviderConfigService({ artifactRoot, env: process.env });
+    const written = await service.replacePersistentConfig(draft);
+    if (!written.ok) {
+      const first = written.issues[0];
+      throw Object.assign(new Error(first?.message ?? 'Configuration write failed.'), {
+        code: first?.code ?? CONFIG_ERROR_CODES.invalid,
+      });
+    }
+    const dest = persistentConfigPath(artifactRoot);
+    io.write(`Wrote ${dest}\n`);
+    return { exitCode: CLI_EXIT_CODES.success, configPath: dest };
   } catch (error) {
     if (isAbortError(error) || signal?.aborted) {
       io.write('\nCancelled. No configuration file was written.\n');

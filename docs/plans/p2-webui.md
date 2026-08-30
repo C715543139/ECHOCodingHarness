@@ -268,8 +268,9 @@ echo-harness web
 2. **A1：Web 契约与 Policy Explain 事实**。冻结 DTO（含 `SessionViewDto`、能力状态表、写操作响应、
    完整 SSE 判别联合与扩展后的 `toolSummaries`）、错误码、幂等冲突语义和 Schema；为所有
    `PolicyDecision` 增加稳定 `ruleId`，旧 Session 可读。
-3. **A2：共享 Provider 配置服务**。抽出 CLI 背后的读取、校验、发现和原子写入；API Key 仍只来自
-   环境变量。
+3. **A2：共享 Provider 配置服务（已实现）**。已抽出 CLI/Web 共用的读取、严格校验、显式发现、
+   写锁与原子写入。Web 使用受限 Provider merge（`saveProviderSettings`），CLI wizard 使用完整
+   校验替换（`replacePersistentConfig`）；API Key 仍只来自环境变量。本任务不实现 HTTP 路由。
 4. **A3：Fastify 服务骨架**。固定工作区生命周期、bootstrap 认证、Host/Origin 防护、静态资源和
    可注入路由测试。
 5. **A4：React 页面骨架**。设计 token、Session/Chat/Trace 主壳、Provider 设置导航壳和组件测试

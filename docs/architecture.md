@@ -96,7 +96,8 @@ User / Browser / Demo Script
 ```
 
 P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由
-CLI 渲染。P2 Web adapter 将调用同一应用服务和查询投影，不能直接读取 JSONL 或解析 CLI 文本。
+CLI 渲染。P2 Web adapter 将调用同一应用服务、共享配置服务和查询投影，不能直接读取 JSONL 或解析
+CLI 文本。
 
 ## 5. 模块划分
 
@@ -151,6 +152,17 @@ CLI 渲染。P2 Web adapter 将调用同一应用服务和查询投影，不能�
 ### 5.5 Application service
 
 P1 增加应用服务，作为 CLI 与 P2 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。P1-1B 已实现 Chat 输入适配器、Slash 与 `--resume`；Chat 通过可注入的模型目录端口列出 `/model` 候选项，不自行实现第二套 `GET /models` 发现。
+
+### 5.6 Shared config service
+
+P2-A2 将 CLI 配置向导背后的读取、严格 Schema 校验、显式模型发现、进程内写锁和原子保存抽成
+`createProviderConfigService`。Web Provider 设置只调用 `saveProviderSettings`：在现有配置合法时
+仅合并 `baseUrl` / `catalog` / `defaultModel`，并完整保留 safety、context 及其他已知持久字段；
+文件不存在时创建合法配置且默认 `safetyMode: balanced`；读取、JSON 或 Schema 失败则拒绝写入并
+保持原字节不变。CLI `echo-harness config` 只调用 `replacePersistentConfig`，对完整持久配置做
+校验后整体替换，因此可以修复损坏文件。两套入口不得靠对象形状隐式选择。`ECHO_API_KEY` 仍只从
+环境变量读取，`discoverModels` 只有显式调用才访问 Provider 且不会自动写盘。HTTP 路由、Web DTO、
+Policy Explain 和页面不属于本服务。
 
 ## 6. Turn、Step 与 Agent Loop
 
@@ -355,5 +367,6 @@ CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部�
 `chat` 恢复、Slash 与粘贴适配器接到同一应用服务。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。
 
-P2 已完成计划、ADR、API 与 UI 契约冻结，但 `echo-harness web`、Fastify adapter、React 页面和浏览器
-测试尚未实现。实现状态只能在对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后更新。
+P2 已完成计划、ADR、API 与 UI 契约冻结，并抽出共享 Provider 配置服务；`echo-harness web`、
+Fastify adapter、React 页面和浏览器测试尚未实现。实现状态只能在对应自动化、Windows 产物 smoke
+和受控真实 Provider 验收完成后更新。

@@ -113,6 +113,29 @@ describe('runConfigWizard', () => {
     expect(scripted.output()).toContain('No configuration file was written');
   });
 
+  it('repairs a damaged file through explicit full replacement, not Provider merge', async () => {
+    const artifactRoot = await makeTempDir();
+    const dest = persistentConfigPath(artifactRoot);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.writeFile(dest, '{ not json', 'utf8');
+    const scripted = scriptedIo([
+      'https://provider.example/v1',
+      '1',
+      'repaired-model',
+      'safe',
+      'y',
+    ]);
+
+    const outcome = await runConfigWizard({ artifactRoot, io: scripted.io });
+    expect(outcome.exitCode).toBe(0);
+    expect(JSON.parse(await fs.readFile(dest, 'utf8'))).toMatchObject({
+      baseUrl: 'https://provider.example/v1',
+      model: 'repaired-model',
+      modelCatalog: { source: 'discover' },
+      safetyMode: 'safe',
+    });
+  });
+
   it('keeps an existing file when a later abort happens', async () => {
     const artifactRoot = await makeTempDir();
     await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });

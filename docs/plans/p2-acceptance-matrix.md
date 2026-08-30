@@ -83,7 +83,7 @@
 | P2-4-08 | CI 不使用真实 Key/付费 Provider | workflow / scan | `.github/workflows/ci.yml`, scan tests | Accepted |
 | P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | `scripts/scan-web-artifacts.mjs`, `.github/workflows/ci.yml`（失败证据只在 fail-closed 扫描成功后上传） | Accepted |
 | P2-4-10 | 受控真实 Provider 完成 Chat、刷新与 Trace | local acceptance | `scripts/accept-web-provider.mjs`, 2026-08-31 `deepseek/deepseek-v4-flash` | Accepted |
-| P2-4-11 | 最终交付树不含临时示意图或说明；权威文档不再依赖这些视觉资产 | docs / review | `docs/assets/echo-web-console.png`, `README.md`; 临时 PNG 与说明及全部引用已移除 | Accepted |
+| P2-4-11 | 最终交付树不含临时示意图或说明；权威文档不再依赖这些视觉资产 | docs / review | `docs/assets/echo-web-console.png`, `README.md`；说明与引用在 C3 移除，`docs/plans/p2-webui-demo/` 的三张 PNG 在 P2.5 视觉重构完成后删除 | Accepted |
 
 ## 6. 全局门禁
 

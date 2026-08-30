@@ -48,6 +48,21 @@ function openSse(
   });
 }
 
+async function openSseAfterRelease(
+  url: string,
+  cookie: string,
+): Promise<Awaited<ReturnType<typeof openSse>>> {
+  // The server releases ownership when it observes the socket close, which can
+  // lag behind the client-side close event.
+  const deadline = Date.now() + 2000;
+  for (;;) {
+    const attempt = await openSse(url, cookie);
+    if (attempt.status !== 409 || Date.now() >= deadline) return attempt;
+    attempt.request.destroy();
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 describe('Web SSE ownership', () => {
   it('allows one stream per process cookie and heartbeats without an id', async () => {
     const harness = await startTestWebServer({ heartbeatIntervalMs: 15 });
@@ -83,7 +98,7 @@ describe('Web SSE ownership', () => {
         winner.request.once('close', () => resolve());
       });
 
-      const reconnect = await openSse(url, cookie);
+      const reconnect = await openSseAfterRelease(url, cookie);
       expect(reconnect.status).toBe(200);
       expect(reconnect.text).toContain('event: heartbeat');
       expect(reconnect.text).not.toMatch(/id:[^\n]*\nevent: heartbeat/u);

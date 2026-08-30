@@ -1,8 +1,8 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（尚未实现）
+> 状态：Accepted plan（A0 基线已实现，其余尚未实现）
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-30
 
@@ -261,9 +261,10 @@ echo-harness web
 
 ### 阶段 A：契约与骨架
 
-1. **A0：依赖与构建骨架**（先串行）。锁定 React 19、Vite 8、Fastify 5 的精确版本；把 Node 下限
-   收紧为 `>=22.12.0 <23`；同步 [AGENTS.md](../../AGENTS.md) 的运行时表述；建立 `src/web/server`、
-   `src/web/client` 与对应测试入口。
+1. **A0：依赖与构建骨架（已实现）**（先串行）。已锁定 React 19、Vite 8、Fastify 5 的精确版本；
+   Node 下限已收紧为 `>=22.12.0 <23`；[AGENTS.md](../../AGENTS.md) 已同步；`src/web/server`、
+   `src/web/client`、分层测试目录、`pnpm test:web` 与写入 `dist/web/` 的 `pnpm build:web` 已建立。
+   A0 只交付可验证的最小壳层，不声称 Fastify API、产品页面或浏览器流程已经实现。
 2. **A1：Web 契约与 Policy Explain 事实**。冻结 DTO（含 `SessionViewDto`、能力状态表、写操作响应、
    完整 SSE 判别联合与扩展后的 `toolSummaries`）、错误码、幂等冲突语义和 Schema；为所有
    `PolicyDecision` 增加稳定 `ruleId`，旧 Session 可读。

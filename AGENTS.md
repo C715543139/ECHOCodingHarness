@@ -5,10 +5,10 @@ repository. Read it together with the documents under `docs/` before changing co
 
 ## Project baseline
 
-- Runtime: Node.js 22.
+- Runtime: Node.js `>=22.12.0 <23`.
 - Package manager: the exact pnpm version declared in `package.json`; use Corepack.
 - Language: TypeScript in strict mode, ESM modules, LF line endings.
-- Build and tests: tsup, Vitest, ESLint, and Prettier.
+- Build and tests: tsup, Vite, Vitest, Testing Library, Playwright, ESLint, and Prettier.
 - Supported development platform: Windows with PowerShell as a first-class environment.
 - CLI executable: `echo-harness`.
 
@@ -57,7 +57,9 @@ until its targeted tests and the full quality gate pass.
 Use these commands:
 
 - `pnpm test` for the fast test suite.
+- `pnpm test:web` for the Web unit and integration baseline.
 - `pnpm test:coverage` for coverage thresholds.
+- `pnpm build:web` for the packaged static Web assets under `dist/web/`.
 - `pnpm check` for formatting, linting, type checking, coverage, build, and CLI smoke checks.
 
 Tests must be deterministic and must not require a paid API, network access, personal files, or a

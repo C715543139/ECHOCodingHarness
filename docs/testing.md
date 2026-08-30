@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.4
+> 版本：1.5
 >
 > 最后更新：2026-08-30
 
@@ -18,6 +18,8 @@ Useful focused commands:
 ```powershell
 pnpm test
 pnpm test:coverage
+pnpm test:web
+pnpm build:web
 pnpm eval
 pnpm eval:offline
 pnpm smoke:demo
@@ -171,11 +173,12 @@ The script requires all three Provider settings, disables retries, limits output
 model response. Remove the API key from the shell environment after the check. This path is local
 acceptance only and is not part of CI. It does not read `.env.test`.
 
-## P2 Web quality plan (accepted, not implemented)
+## P2 Web quality plan (A0 baseline implemented)
 
 P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
-unit-test run install or launch a browser. The exact script names are frozen before implementation;
-until those scripts exist, this section is a target contract rather than an available command list.
+unit-test run install or launch a browser. A0 provides `pnpm test:web`, `pnpm build:web`, the pinned
+test dependencies, and minimal React/server-boundary tests. The remaining API, component, browser,
+and artifact evidence in this section is a target contract until its owning task lands.
 
 ### Fast unit and integration layer
 
@@ -258,5 +261,6 @@ export sessions from the WebUI.
   multi-line paste atomicity. Chat `/model` consumes the catalog port rather than a second
   `GET /models` implementation.
 - P1 does not include Web UI, MCP, multi-agent execution, TUI, or multi-Provider profiles.
-- P2 Web scripts, browser dependencies, adapter, UI, and artifact smoke are planned but do not yet
-  exist; documentation acceptance must not be reported as implementation acceptance.
+- P2 A0 Web scripts, pinned dependencies, source directories, and minimal tests exist. The Fastify
+  adapter, product UI, executable browser flows, and Web artifact smoke remain planned; A0
+  acceptance must not be reported as full P2 implementation acceptance.

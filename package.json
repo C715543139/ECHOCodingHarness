@@ -8,20 +8,26 @@
     "echo-harness": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist/*.js",
+    "dist/*.js.map",
+    "dist/*.d.ts",
+    "dist/web"
   ],
   "engines": {
-    "node": ">=22.0.0 <23"
+    "node": ">=22.12.0 <23"
   },
   "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "build": "tsup",
+    "build": "pnpm build:node && pnpm build:web",
+    "build:node": "tsup",
+    "build:web": "vite build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm smoke && pnpm scan",
     "dev": "tsx src/cli.ts",
+    "dev:web": "vite",
     "eval": "vitest run tests/evals",
     "eval:offline": "node scripts/eval-offline.mjs",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
     "lint": "eslint . --max-warnings 0",
     "scan": "pnpm scan:secrets && pnpm scan:identity && pnpm scan:self-test",
     "scan:identity": "node scripts/scan-identity.mjs",
@@ -34,25 +40,39 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:web": "vitest run tests/unit/web tests/integration/web",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/static": "8.3.0",
     "commander": "15.0.0",
-    "openai": "6.21.0"
+    "fastify": "5.12.1",
+    "openai": "6.21.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.6",
     "@types/node": "22.20.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.1",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.9.1",
     "eslint-config-prettier": "10.1.8",
     "globals": "17.11.0",
+    "jsdom": "27.4.0",
     "prettier": "3.9.6",
     "tsup": "8.5.1",
     "tsx": "4.23.12",
     "typescript": "5.9.3",
     "typescript-eslint": "8.68.0",
+    "vite": "8.2.2",
     "vitest": "4.1.11"
   }
 }

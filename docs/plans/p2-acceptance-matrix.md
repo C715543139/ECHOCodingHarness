@@ -1,6 +1,6 @@
 # P2 需求、测试与验收证据矩阵
 
-> 状态：Accepted plan（阶段 A 已实现；P2-B1 路由模块已实现但未装配进生产 `register-routes.ts`，矩阵对应项仅标 Partial / route module accepted；其余阶段 B/C 尚未实现）
+> 状态：Accepted plan（阶段 A 已实现；P2-B1 路由模块与 B2 组件证据已落地，生产根装配仍待 C1；B3/B4 与阶段 C 尚未实现）
 >
 > 版本：1.6
 >
@@ -39,19 +39,19 @@
 
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts` | Planned |
-| P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/e2e/web/global-active-turn.spec.ts` | Planned |
-| P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`, `tests/e2e/web/refresh.spec.ts` | Planned |
-| P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`, `tests/e2e/web/long-stream.spec.ts` | Planned |
-| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/e2e/web/chat-scroll.spec.ts` | Planned |
-| P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/e2e/web/cancel.spec.ts` | Planned |
-| P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/e2e/web/approval.spec.ts` | Planned |
-| P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/e2e/web/runtime-settings.spec.ts` | Planned |
-| P2-2-09 | Provider 设置只有一个导航页并共用配置服务；发现列表只读且只有默认模型可写 | component / browser | `tests/unit/web/provider-settings.test.tsx`, `tests/e2e/web/provider-settings.spec.ts` | Planned |
-| P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/e2e/web/provider-secret.spec.ts` | Planned |
-| P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`（文字状态已落地）；`tests/integration/web/session-view.test.ts`（HTTP `SessionViewDto` 已落地，C1 装配仍待） | Partial (rail + API accepted) |
-| P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`（A4 壳层已落地）；浏览器流程仍待 B2：`tests/e2e/web/runtime-settings.spec.ts` | Partial (composer accepted) |
-| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`（A4 壳层已落地）；真实 SSE 重连仍待 B2：`tests/e2e/web/reconnect.spec.ts` | Partial (header accepted) |
+| P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`（B2 分页/恢复已落地），`tests/integration/web/session-view.test.ts`（B1 API 已落地）；浏览器流程仍待 B4/C1 | Partial (API + component accepted) |
+| P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`；生产装配仍待 C1 | Partial (coordinator + component accepted) |
+| P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`（B2 已落地）；刷新浏览器流程仍待 B4/C1 | Partial (projection accepted) |
+| P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；长流浏览器压力仍待 B4/C1 | Partial (component accepted) |
+| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`（B2 已落地）；浏览器流程仍待 B4/C1 | Partial (component accepted) |
+| P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/integration/web/turns.test.ts`（B1 API）与 `tests/unit/web/composer.test.tsx`（B2 UI）；生产装配仍待 C1 | Partial (API + UI accepted) |
+| P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/integration/web/turns.test.ts`（B1 API）与 `tests/unit/web/approval.test.tsx`（B2 UI）；生产浏览器流程仍待 C1 | Partial (API + component accepted) |
+| P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/integration/web/runtime-capabilities.test.ts`, `tests/unit/web/composer.test.tsx`；生产装配仍待 C1 | Partial (API + component accepted) |
+| P2-2-09 | Provider 设置只有一个导航页并共用配置服务；发现列表只读且只有默认模型可写 | component / browser | `tests/unit/web/provider-settings.test.tsx`（B2 Fake 发现/校验已落地）；真实配置服务 HTTP 装配仍待 C1 | Partial (component accepted) |
+| P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/unit/web/provider-settings.test.tsx`（B2 DOM 投影已落地）；浏览器与扫描证据仍待 B4/C1 | Partial (component accepted) |
+| P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`（文字状态与恢复）与 `tests/integration/web/session-view.test.ts`（HTTP DTO） | Partial (rail + API accepted; C1 assembly pending) |
+| P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`（B2 确认停止与运行时禁用已落地）；浏览器流程仍待 B4/C1 | Partial (composer accepted) |
+| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`（壳层）与 B1 SSE API；真实浏览器重连仍待 B4/C1 | Partial (header + API accepted) |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
@@ -67,13 +67,13 @@
 | P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Planned |
 | P2-3-08 | Verified 只来源于真实命令终态且不夸大退出码含义 | projection / browser | `tests/unit/web/verification-detail.test.ts` | Planned |
 | P2-3-09 | 大型 Trace 分页、虚拟化且上滚不跳动 | component / performance | `tests/e2e/web/trace-large-session.spec.ts` | Planned |
-| P2-3-10 | 不注册 Session 导出路由或页面入口 | API / component | `tests/integration/web/routes.test.ts`（A5 已证明无导出路由）；页面入口仍待 B2：`tests/unit/web/session-actions.test.tsx` | Partial (API accepted) |
+| P2-3-10 | 不注册 Session 导出路由或页面入口 | API / component | `tests/integration/web/routes.test.ts`（A5 已证明无导出路由）；`tests/unit/web/session-actions.test.tsx`（B2 已证明无页面入口） | Accepted |
 
 ## 5. P2-4：体验、产物与回归
 
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| P2-4-01 | 空、加载、断线、resync 和全部终态明确 | component | `tests/unit/web/states.test.tsx`（空/断线/运行/审批壳层已落地）；resync 与真实失败态仍待 B2 | Partial (shell accepted) |
+| P2-4-01 | 空、加载、断线、resync 和全部终态明确 | component | `tests/unit/web/states.test.tsx`（B2 已覆盖空/加载/断线/resync/失败/取消/运行/审批）；真实 HTTP 失败态仍待 C1 | Partial (component accepted) |
 | P2-4-02 | 键盘完成核心流程，焦点与模态返回正确 | component / browser | `tests/e2e/web/keyboard.spec.ts` | Planned |
 | P2-4-03 | 状态不只依赖颜色，live region 不逐 token 播报 | accessibility | `tests/e2e/web/accessibility.spec.ts` | Planned |
 | P2-4-04 | 200% 缩放、窄屏抽屉和 reduced motion 可用 | browser | `tests/e2e/web/responsive.spec.ts` | Planned |

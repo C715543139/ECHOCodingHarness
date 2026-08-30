@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.7
+> 版本：1.8
 >
 > 最后更新：2026-08-30
 
@@ -225,9 +225,18 @@ section remains a target contract until its owning B/C task lands.
 
 Vitest, Testing Library, `user-event`, and a DOM environment cover:
 
-- Session rail paging, new Session, restore, and process-wide active state;
-- Chat aggregate rendering, streaming upsert, paused tail-follow, cancel, and approval;
-- model/safety controls and Provider settings validation;
+- Session rail paging, new Session, restore, and process-wide active state
+  (`tests/unit/web/session-rail.test.tsx`, `tests/unit/web/fake-transport.test.ts`);
+- Chat aggregate rendering, streaming upsert, paused tail-follow, cancel, and approval
+  (`tests/unit/web/chat-projection.test.ts`, `tests/unit/web/chat-stream.test.tsx`,
+  `tests/unit/web/approval.test.tsx`, `tests/unit/web/composer.test.tsx`,
+  `tests/unit/web/console-isolation.test.tsx`);
+- Web Chat/settings extras are injected as a Fake-agnostic `WebConsoleActions` /
+  `WebConsoleView` pair. There is no module-level controller; A4 `App.tsx` omits these
+  props and controller-owned buttons stay disabled until C1 wires the root;
+- model/safety controls and Provider settings validation
+  (`tests/unit/web/composer.test.tsx`, `tests/unit/web/provider-settings.test.tsx`);
+- no Session export entry (`tests/unit/web/session-actions.test.tsx`);
 - persistent header connection text/state dot and reconnect transitions;
 - Trace rows, Inspector ownership, bounded code/diff sections, and `Not verified`;
 - keyboard operation, focus return, accessible names, live regions, and reduced motion classes;

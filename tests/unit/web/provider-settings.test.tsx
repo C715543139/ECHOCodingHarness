@@ -10,6 +10,7 @@ import {
   createIdleSession,
   createRunningSession,
 } from '../../../src/web/client/transport/fake-transport.js';
+import { SettingsHarness } from './web-console-harness.js';
 
 describe('Provider settings modal', () => {
   afterEach(() => {
@@ -114,5 +115,42 @@ describe('Provider settings modal', () => {
     expect(screen.getByText('活动 Turn 存在时设置只读。')).toBeTruthy();
     expect(screen.getByLabelText('Base URL')).toHaveProperty('readOnly', true);
     expect(screen.getByRole('button', { name: '保存' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: '获取模型' })).toHaveProperty('disabled', true);
+  });
+
+  it('discovers models without saving and never mounts an API key value', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+    });
+    render(<SettingsHarness transport={transport} />);
+    await user.click(screen.getByRole('button', { name: '获取模型' }));
+
+    expect(screen.getByRole('list', { name: '发现的模型' }).textContent).toContain('echo-fast');
+    expect(screen.getByText('发现结果只读，不会自动保存。')).toBeTruthy();
+    expect(transport.getSnapshot().lastDiscoveredAt).toBe('2026-08-30T11:00:00.000Z');
+    await user.click(screen.getByRole('button', { name: '取消' }));
+    expect(transport.getSnapshot().bootstrap.provider.catalog).toEqual({
+      source: 'discover',
+      cachedModels: ['echo-model'],
+    });
+    expect(document.body.innerHTML).not.toMatch(/sk-[A-Za-z0-9]|ECHO_API_KEY|apiKey=/i);
+  });
+
+  it('validates Provider fields near the control and keeps the modal open', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+    });
+    render(<SettingsHarness transport={transport} />);
+    await user.clear(screen.getByLabelText('Base URL'));
+    await user.type(screen.getByLabelText('Base URL'), 'not-a-url');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    expect(screen.getByRole('dialog', { name: 'Provider' })).toBeTruthy();
+    expect(screen.getByText('请修正 Provider 设置中的错误。')).toBeTruthy();
+    expect(screen.getByText('Base URL 无效')).toBeTruthy();
   });
 });

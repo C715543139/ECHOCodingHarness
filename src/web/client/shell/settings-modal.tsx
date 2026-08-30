@@ -1,6 +1,13 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import type { ProviderConfigDto } from '../../../contracts/web.js';
+import {
+  EMPTY_WEB_CONSOLE_VIEW,
+  hasWebConsoleActions,
+  type WebConsoleActions,
+  type WebConsoleView,
+} from '../view-model/console-controller.js';
+import { catalogModels } from '../view-model/provider-catalog.js';
 import styles from './shell.module.css';
 
 const FOCUSABLE_SELECTOR =
@@ -18,20 +25,27 @@ export function SettingsModal({
   onClose,
   onSave,
   returnFocusTo,
+  actions,
+  view = EMPTY_WEB_CONSOLE_VIEW,
 }: {
   readonly provider: ProviderConfigDto;
   readonly onChange: (draft: ProviderConfigDto) => void;
   readonly onClose: () => void;
   readonly onSave: () => void;
   readonly returnFocusTo: HTMLElement | null;
+  readonly actions?: WebConsoleActions;
+  readonly view?: WebConsoleView;
 }) {
   const titleId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [manualName, setManualName] = useState('');
   const readOnly = !provider.writable;
   const catalogSource = provider.catalog.source;
-  const models =
-    provider.catalog.source === 'manual' ? provider.catalog.models : provider.catalog.cachedModels;
+  const models = catalogModels(provider);
+  const wired = hasWebConsoleActions(actions);
+  const fieldErrors = view.fieldErrors;
+  const errorSummary = view.errorSummary;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -86,9 +100,13 @@ export function SettingsModal({
             Provider
           </h2>
           {readOnly ? <p className={styles.errorSummary}>活动 Turn 存在时设置只读。</p> : null}
+          {errorSummary === undefined ? null : (
+            <p className={styles.errorSummary}>{errorSummary}</p>
+          )}
           <label className={styles.field}>
             Base URL
             <input
+              aria-invalid={fieldErrors?.baseUrl !== undefined}
               onChange={(event) => {
                 onChange({ ...provider, baseUrl: event.target.value });
               }}
@@ -96,6 +114,9 @@ export function SettingsModal({
               value={provider.baseUrl}
             />
           </label>
+          {fieldErrors?.baseUrl === undefined ? null : (
+            <p className={styles.blockReason}>{fieldErrors.baseUrl}</p>
+          )}
           <fieldset className={styles.field}>
             <legend>模型目录模式</legend>
             <label>
@@ -131,25 +152,86 @@ export function SettingsModal({
           </fieldset>
           {catalogSource === 'discover' ? (
             <div>
-              <button className={styles.secondaryButton} disabled={readOnly} type="button">
+              <button
+                className={styles.secondaryButton}
+                disabled={readOnly || !wired}
+                onClick={() => {
+                  actions?.discoverModels();
+                }}
+                type="button"
+              >
                 获取模型
               </button>
-              <ul>
+              {view.lastDiscoveredAt === undefined ? null : (
+                <p className={styles.muted}>发现结果只读，不会自动保存。</p>
+              )}
+              <ul aria-label="发现的模型">
                 {models.map((model) => (
                   <li key={model}>{model}</li>
                 ))}
               </ul>
             </div>
           ) : (
-            <ul>
-              {models.map((model) => (
-                <li key={model}>{model}</li>
-              ))}
-            </ul>
+            <div>
+              <label className={styles.field}>
+                添加模型
+                <input
+                  onChange={(event) => {
+                    setManualName(event.target.value);
+                  }}
+                  readOnly={readOnly}
+                  value={manualName}
+                />
+              </label>
+              <button
+                className={styles.secondaryButton}
+                disabled={readOnly || manualName.trim().length === 0}
+                onClick={() => {
+                  const name = manualName.trim();
+                  if (name.length === 0 || models.includes(name)) {
+                    setManualName('');
+                    return;
+                  }
+                  onChange({
+                    ...provider,
+                    catalog: { source: 'manual', models: [...models, name] },
+                  });
+                  setManualName('');
+                }}
+                type="button"
+              >
+                添加
+              </button>
+              <ul aria-label="手动模型">
+                {models.map((model) => (
+                  <li key={model}>
+                    {model}{' '}
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={readOnly}
+                      onClick={() => {
+                        const next = models.filter((item) => item !== model);
+                        onChange({
+                          ...provider,
+                          catalog: { source: 'manual', models: next },
+                          ...(provider.defaultModel === model
+                            ? { defaultModel: next[0] ?? '' }
+                            : {}),
+                        });
+                      }}
+                      type="button"
+                    >
+                      {`删除 ${model}`}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <label className={styles.field}>
             默认模型
             <select
+              aria-invalid={fieldErrors?.defaultModel !== undefined}
               disabled={readOnly}
               onChange={(event) => {
                 onChange({ ...provider, defaultModel: event.target.value });
@@ -163,6 +245,9 @@ export function SettingsModal({
               ))}
             </select>
           </label>
+          {fieldErrors?.defaultModel === undefined ? null : (
+            <p className={styles.blockReason}>{fieldErrors.defaultModel}</p>
+          )}
           <p data-testid="api-key-status">
             {provider.apiKeyConfigured ? '已通过环境变量配置' : '未配置'}
           </p>

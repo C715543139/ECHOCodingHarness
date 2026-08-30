@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.7
+> 版本：1.8
 >
 > 最后更新：2026-08-30
 
@@ -13,8 +13,8 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳，不表示
-完整 Web Chat/Trace 已经交付。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳，B2 已把
+Session/Chat/设置接到 Fake transport，不表示真实 HTTP 或 Trace 已经交付。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -375,5 +375,6 @@ P2 已完成计划、ADR、API 与 UI 契约冻结。A1 已把有界 Web DTO/Sch
 事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。A3 已落地 Fastify loopback
 生命周期、一次性 bootstrap Cookie、Host/Origin/CSP 与单 SSE 所有权。A4 已落地 React 主壳与 Fake
 transport。A5 已统一路由装配、`dist/web/` 构建顺序、`pnpm test:web` / `pnpm smoke:web-artifact`
-与 CI 证据。业务 Session/Turn/审批 API、真实 HTTP 前端和 Playwright 流程仍待阶段 B。实现状态只能在
+与 CI 证据。B2 已把 Session rail、Chat 聚合/审批/输入区和 Provider 设置接到冻结 DTO 与 Fake
+transport；真实 HTTP 前端、根装配和 Playwright 仍待 B1/B4/C1。实现状态只能在
 对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。

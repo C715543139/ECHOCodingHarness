@@ -2,15 +2,15 @@
 
 > 状态：Accepted design contract（尚未实现）
 >
-> 版本：1.0
+> 版本：1.1
 >
 > 最后更新：2026-08-30
 
 ## 1. 产品定位
 
 ECHO WebUI 是**启动工作区内的图形化 Coding Agent 控制台**。它覆盖新建与恢复 Session、Web Chat、
-审批、模型和安全模式切换、执行记录检查、Provider 配置及脱敏导出；它不是跨项目 IDE、远程服务
-或原始日志浏览器。
+审批、模型和安全模式切换、执行记录检查与 Provider 配置；它不是跨项目 IDE、远程服务、原始日志
+浏览器或 Session 导出工具。
 
 浏览器只投影 [web-api.md](./web-api.md) 定义的 DTO。任何页面不得解析 CLI 输出、直接读取
 `.echo/sessions/*.jsonl`、复算 Policy、推断验证结论或展示 API Key。
@@ -25,11 +25,21 @@ ECHO WebUI 是**启动工作区内的图形化 Coding Agent 控制台**。它覆
 Session rail | Session workspace
 ```
 
-Session workspace 顶部固定显示工作区脱敏名称、当前 Session、模型、安全模式和连接状态；主体提供：
+Session workspace 顶部只显示当前 Session 名称、双视图切换与常驻连接状态，不显示工作区名、模型
+或安全模式：
 
 ```text
-Chat | Trace
+当前 Session 名称
+Chat | Trace | ● 已连接 / ● 未连接
 ```
+
+连接状态必须同时使用文字和状态点：已连接使用绿点与“已连接”，未连接使用红点与“未连接”，颜色
+不得成为唯一线索。bootstrap 已认证且本地 API 可达时显示“已连接”；选中 Session 后还要求认证 SSE
+处于打开状态。无 Session 时不因尚无 SSE 而显示未连接。SSE 中断或 API 不可达时显示“未连接”，
+重连期间可以附加“正在重连”的辅助文案。该状态不代表 Provider、Agent 或工具执行成功。
+
+工作区脱敏名称只出现在 Session rail。当前模型、安全模式和近似上下文用量的固定摘要只出现在
+输入区；历史 Context 事件及其预算/裁剪详情仍可出现在 Trace 与 Inspector。
 
 在 Trace 选中记录或 Chat 展开结构化工具详情时，右侧按需出现 Inspector：
 
@@ -51,7 +61,8 @@ Session rail | Chat or Trace | Inspector
 
 - 使用克制的中性背景和单一强调色，危险、警告、成功使用语义 token；
 - 文本、边框和图标的对比度目标遵循 WCAG 2.2 AA；
-- 状态使用“文字 + 图标/形状”，颜色不作为唯一线索；
+- 状态使用文字，颜色不作为唯一线索；Session 列表只使用文字状态，不加状态图标。其它控件若使用
+  图标，必须同时具有可见文字、tooltip 或可访问名称；
 - 正文使用易读的 UI 字体，代码、参数、命令和 diff 使用等宽字体；
 - 事件列表保持紧凑但不压缩到日志查看器密度；默认行高允许两行摘要；
 - 所有可操作图标具有可见文本、tooltip 或可访问名称；
@@ -59,6 +70,13 @@ Session rail | Chat or Trace | Inspector
 - 动画只用于抽屉、状态过渡和流式提示，并遵循 `prefers-reduced-motion`。
 
 公开产品只作为布局与渐进披露参考。ECHO 不复刻其品牌、颜色、图标、文案、组件代码或插件结构。
+
+桌面信息架构的临时视觉参考是 [p2-webui-demo.md](./plans/p2-webui-demo.md) 与
+[p2-webui-demo/](./plans/p2-webui-demo/) 中的三张示意图。示意图只确认两栏/三栏、侧栏、
+`对话 / 轨迹` 和输入区位置；安全模式文案、上下文上限、发送按钮可用态、Session 文字状态、
+Inspector 区块和审批/空态均以本文与 [web-api.md](./web-api.md) 为准，不以图为准。消息复制可作为
+非阻塞增强；消息刷新不进入 P2。这些图是非最终视觉稿，P2 完成后必须删除，见
+[p2-webui-demo.md](./plans/p2-webui-demo.md) 的删除条款。
 
 ## 4. Session rail
 
@@ -71,9 +89,11 @@ Session 条目显示：
 
 - 脱敏标题或短 ID；
 - 更新时间；
-- `Idle`、`Running`、`Completed`、`Failed`、`Cancelled` 或 `Limited`；
-- 当前模型的短标签；
-- 活动 Turn 使用文字和非颜色状态标记。
+- 文字状态：`Idle`、`Running`、`Completed`、`Failed`、`Cancelled` 或 `Limited`；
+- 当前模型的短标签。
+
+状态只用文字，不加状态图标。颜色和高亮不能作为唯一线索。活动 Turn 所属 Session 的文字状态为
+`Running`。
 
 列表按更新时间降序，首屏 30 条，滚动到底按 cursor 加载。长标题单行截断，悬停或聚焦时显示完整
 脱敏标题。
@@ -101,8 +121,11 @@ Chat 按 Turn 显示用户输入、聚合代理正文、工具摘要、审批与
 - 完整工具参数和长输出；
 - 内部重试和 HTTP 诊断。
 
-工具摘要显示名称、状态和一行结果；用户主动展开时复用 Inspector 的结构化内容。`Verified` 只来自
-服务端对真实 `run_command` 终态的结构化投影，模型文字中的“测试通过”不能生成成功标记。
+工具摘要只显示名称、状态和一行结果，状态取
+`running` / `awaiting_approval` / `completed` / `failed` / `denied` / `cancelled`。Chat 工具行
+不得使用 `Verified`。`Verified` 只出现在验证记录或 Inspector，且只来自服务端对真实
+`run_command` 终态的结构化投影；模型文字中的“测试通过”不能生成成功标记。用户主动展开工具摘要时
+复用 Inspector 的结构化内容。
 
 ### 5.2 输入区
 
@@ -110,20 +133,28 @@ Chat 按 Turn 显示用户输入、聚合代理正文、工具摘要、审批与
 
 - 可自动增高的多行文本输入；
 - 当前模型选择；
-- 当前安全模式选择；
-- 主操作：空闲时发送，运行时停止；
+- 当前安全模式选择，展示名与领域值相同：`safe`、`balanced`、`auto`；
+- 只读的近似上下文用量，格式为 `used / limit`，只投影 `SessionRuntimeDto.context`，前端不得自行
+  估算。未配置覆盖时上限为 256,000 近似 token（另预留 16,000 输出 token）；示意图中的 `128k`
+  不是默认上限；
+- 发送按钮；
+- 活动 Turn 提示条上的停止按钮；
 - Provider、断线或全局活动 Turn 导致不可提交时的明确原因。
+
+发送与停止是两个控件，不是同一按钮的切换。空闲时发送可用、停止不出现。运行时发送禁用，停止出现
+在运行提示条；`Escape` 不取消 Turn。停止必须再次确认目标 Session，不依赖页面关闭。示意图里运行中
+仍为蓝色发送按钮，实现不得照做。
 
 键盘语义：
 
 - `Enter` 发送；
 - `Shift+Enter` 换行；
 - 运行时发送不可用，不实现排队或 steer；
-- `Escape` 只关闭当前弹层，不取消 Turn；
-- 停止必须使用可见按钮并再次确认目标 Session，不依赖页面关闭。
+- `Escape` 只关闭当前弹层，不取消 Turn。
 
-模型和安全模式选择复用 CLI `/model`、`/safety` 的领域语义。活动 Turn 期间禁用切换；切换只影响
-当前 Session 的下一个 Turn，不写回 Provider 默认配置。
+模型和安全模式选择复用 CLI `/model`、`/safety` 的领域语义，不引入 `Workspace Write` 等第三方权限
+标签。示意图中的 `Workspace Write` 不是安全模式。活动 Turn 期间禁用切换；切换只影响当前 Session
+的下一个 Turn，不写回 Provider 默认配置。
 
 ### 5.3 审批
 
@@ -180,7 +211,8 @@ Turn 和 Step 使用轻量分隔线分组，默认从旧到新排列。
 5. 关联：对应审批、工具调用、验证或 Turn 终态。
 
 无内容的区块不显示。长文本、命令、JSON 和 diff 使用有界代码视图，可复制已经脱敏的内容；默认
-折叠超长结果，并明确标记截断。Inspector 不提供原始 JSONL 和隐藏 reasoning 开关。
+折叠超长结果，并明确标记截断。Inspector 不提供原始 JSONL 和隐藏 reasoning 开关。示意图可能只画出
+元数据、参数与结果，实现仍必须按上述五类区块投影。
 
 ### 6.3 特殊投影
 
@@ -206,9 +238,9 @@ Provider 页面包含：
 
 - Base URL 输入；
 - 模型目录模式：自动发现或手动维护，二选一；
-- 自动发现的显式“获取模型”操作和结果列表；
+- 自动发现的显式“获取模型”操作和只读结果列表，不用单选把发现结果写成当前 Session 模型；
 - 手动模型的添加、去重与删除；
-- 默认模型选择；
+- 唯一可写的默认模型选择；当前 Session 模型只在输入区修改；
 - API Key 状态：`已通过环境变量配置` 或 `未配置`；
 - 保存与取消。
 
@@ -228,16 +260,15 @@ Provider 页面包含：
 - SSE 重连；
 - 需要完整 resync；
 - Session 损坏或 Provider 不匹配；
-- Turn 失败、取消、受限和完成；
-- 导出成功或失败。
+- Turn 失败、取消、受限和完成。
 
 错误消息说明“发生了什么、哪些内容未改变、用户可以做什么”。网络错误不得被显示为 Agent 失败，
 审批失败不得被显示为工具已执行。
 
-## 9. 脱敏导出
+## 9. 明确不做的导出
 
-Session 菜单提供 Markdown 和 JSON 导出。下载前由服务端生成并扫描；浏览器不根据当前 DOM 拼接
-导出。导出按钮显示进行中和失败状态，但不展示服务端绝对临时路径。
+P2 不提供导出会话。不实现 Session 菜单、Markdown/JSON 下载、浏览器拼接导出或对应 API。需要复盘时
+继续使用 CLI 与 `.echo/sessions` 的既有能力，不在 WebUI 增加第二条导出路径。
 
 ## 10. 无障碍与键盘验收
 
@@ -264,9 +295,8 @@ Session 菜单提供 Markdown 和 JSON 导出。下载前由服务端生成并�
 7. Context、Policy、diff 与验证证据来自服务端事实；
 8. SSE 断线补齐与 resync 不重复 Turn；
 9. Provider 设置与 CLI 使用同一 Schema，API Key 不进入 DOM；
-10. Markdown/JSON 导出不包含秘密、绝对路径或 reasoning；
-11. 键盘完成 Session 切换、发送、审批、Trace 检查和设置保存；
-12. Windows 构建产物在非仓库工作目录启动并打开可用页面。
+10. 键盘完成 Session 切换、发送、审批、Trace 检查和设置保存；
+11. Windows 构建产物在非仓库工作目录启动并打开可用页面。
 
 ## 12. 明确不做
 
@@ -276,4 +306,7 @@ Session 菜单提供 Markdown 和 JSON 导出。下载前由服务端生成并�
 - Session 删除、fork、分支对话或跨工作区搜索；
 - 顶部图形时间线、逐 chunk 日志和思维链查看器；
 - 浏览器端 API Key 管理；
-- 远程访问、账号系统、域名部署或多用户权限。
+- 远程访问、账号系统、域名部署或多用户权限；
+- 导出会话（Markdown、JSON 或其它下载）；
+- 消息刷新操作，以及把发现模型列表当作当前 Session 模型选择器；
+- 用 `Workspace Write` 或其它第三方权限名替代 `safe` / `balanced` / `auto`。

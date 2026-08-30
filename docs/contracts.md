@@ -484,7 +484,8 @@ P2 Web adapter 是 `ApplicationService`、Session 查询和共享配置服务的
   或拒绝事件；旧事件字段缺失时只标记不可用；
 - Policy 与 Verification 结论来自结构化领域事实，前端不得重新判断；命令退出码 0 只证明命令成功
   退出，不自动证明修改正确；
-- HTTP 幂等、SSE 恢复和浏览器认证属于 [web-api.md](./web-api.md)，不能改变 Agent Loop 语义。
+- HTTP 幂等、SSE 恢复和浏览器认证属于 [web-api.md](./web-api.md)，不能改变 Agent Loop 语义；
+- P2 不提供 Session 导出接口；复盘继续使用 CLI 与 Session JSONL。
 
 P2 实现若需要扩大 `ApplicationService`，必须在 `src/contracts/application.ts` 增加最小、客户端无关的
 能力并同时补充 CLI 回归测试；不得为 WebUI 创建只在浏览器路径成立的第二套 Session 状态机。

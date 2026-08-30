@@ -2,7 +2,7 @@
 
 > 状态：Accepted design contract（尚未实现）
 >
-> 版本：1.0
+> 版本：1.1
 >
 > 最后更新：2026-08-30
 
@@ -58,13 +58,25 @@ HttpOnly; SameSite=Strict; Path=/api/v1
 ### 2.3 通用请求规则
 
 - 除 bootstrap 外，所有 API 和 SSE 请求必须携带有效认证 Cookie；
-- 改变状态的请求必须使用 `application/json`，并携带 `X-Echo-Request-Id`；
+- 除一次性 bootstrap 兑换外，改变状态的请求必须使用 `application/json`，并携带
+  `X-Echo-Request-Id`；
 - `requestId` 是 16–128 字符的随机不透明字符串，不包含身份或路径；
 - 默认请求体上限 1 MiB；各字段继续受领域 Schema 的更小限制；
 - 默认不启用 CORS，不接受 `Origin: null`、跨源 Origin 或宽松 Host；
 - API 响应使用 `Cache-Control: no-store`；
 - 所有时间为 ISO 8601 UTC 字符串，所有耗时为非负毫秒整数；
 - 所有工作区文件路径均为 `/` 分隔的相对路径。
+
+### 2.4 幂等
+
+幂等键作用域为当前认证 Web 进程中的 `HTTP method + 规范化 route + requestId`。服务端在进程生命
+周期内保存已验证请求体与 route 参数的指纹及第一次终态响应：
+
+- 相同键与相同请求指纹重放时，返回第一次的 HTTP 状态和响应体，不再次触发领域副作用；
+- 第一请求仍在执行时，重复请求与其合并并等待同一接受/拒绝结果；
+- 相同键用于不同请求指纹时返回 `409 IDEMPOTENCY_CONFLICT`；
+- 服务重启后不恢复幂等记录；Session 与领域标识仍必须独立拒绝重复审批或已终止 Turn；
+- bootstrap token 自身是一次性凭据，不进入该幂等记录。
 
 ## 3. 公共信封
 
@@ -117,6 +129,7 @@ STREAM_ACTIVE
 APPROVAL_DUPLICATE
 APPROVAL_EXPIRED
 APPROVAL_NOT_PENDING
+IDEMPOTENCY_CONFLICT
 CONFIG_INVALID
 PROVIDER_UNAVAILABLE
 RESYNC_REQUIRED
@@ -145,9 +158,20 @@ interface RuntimeCapabilitiesDto {
   readonly canCreateSession: boolean;
   readonly canSubmitTurn: boolean;
   readonly canChangeRuntime: boolean;
+  readonly canCancelTurn: boolean;
+  readonly canRespondToApproval: boolean;
   readonly activeSessionId?: string;
   readonly activeTurnId?: string;
+  readonly createSessionBlockedReason?: RuntimeBlockReason;
+  readonly submitTurnBlockedReason?: RuntimeBlockReason;
+  readonly changeRuntimeBlockedReason?: RuntimeBlockReason;
 }
+
+type RuntimeBlockReason =
+  | 'turn_active'
+  | 'provider_unavailable'
+  | 'session_unavailable'
+  | 'service_stopping';
 
 interface SessionSummaryDto {
   readonly id: string;
@@ -160,12 +184,28 @@ interface SessionSummaryDto {
   readonly safetyMode: 'safe' | 'balanced' | 'auto';
 }
 
+interface ApprovalRequestDto {
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly approvalKey: string;
+  readonly actionSummary: string;
+  readonly riskReason: string;
+  readonly allowedChoices: readonly ['deny', 'allow_once', 'allow_session'];
+}
+
 interface SessionRuntimeDto extends SessionSummaryDto {
   readonly context: {
     readonly usedApproxTokens: number;
     readonly limitApproxTokens: number;
   };
   readonly pendingApproval?: ApprovalRequestDto;
+}
+
+interface SessionViewDto {
+  readonly session: SessionRuntimeDto;
+  readonly capabilities: RuntimeCapabilitiesDto;
 }
 
 interface ProviderConfigDto {
@@ -181,6 +221,19 @@ interface ProviderConfigDto {
 
 `WorkspaceSummaryDto.name` 只能是工作区目录的脱敏显示名；`fingerprint` 是不可逆标识。不得返回绝对
 路径。Session title 来自脱敏用户目标或短 ID，不包含模型生成的未经检查身份信息。
+
+`RuntimeCapabilitiesDto` 是服务端对当前选中 Session 和进程状态的事实投影，前端不得自行推导权限：
+
+| 状态 | `canCreateSession` | `canSubmitTurn` | `canChangeRuntime` | `canCancelTurn` | `canRespondToApproval` |
+| --- | --- | --- | --- | --- | --- |
+| Provider 与当前 Session 可用且无活动 Turn | `true` | `true` | `true` | `false` | `false` |
+| 当前 Session 拥有活动 Turn | `true` | `false` | `false` | `true` | 仅等待审批时为 `true` |
+| 其它 Session 拥有活动 Turn | `true` | `false` | `false` | `false` | `false` |
+| 服务正在关闭 | `false` | `false` | `false` | `false` | `false` |
+
+Provider 或当前 Session 不可用时，相应能力为 `false` 并提供稳定 `*BlockedReason`。活动 Turn 本身不
+阻止创建空 Session，因此该场景不得把 `canCreateSession` 设为 `false`。`ApprovalRequestDto` 的摘要
+必须有界并已脱敏，不返回原始敏感工具参数。
 
 ## 5. 启动与配置 API
 
@@ -257,12 +310,13 @@ interface CreateSessionRequest {
 }
 ```
 
-省略字段时使用配置值。成功返回 `201` 和 `SessionRuntimeDto`。若进程当前存在活动 Turn，仍允许
-创建空 Session，但该 Session 的 `canSubmitTurn` 为 false。
+省略字段时使用配置值。成功返回 `201` 和 `SessionViewDto`。`capabilities` 是进程级能力，不是
+单个 Session 的私有字段。若进程当前存在活动 Turn，仍允许创建空 Session，但
+`capabilities.canSubmitTurn` 与 `capabilities.canChangeRuntime` 为 false。
 
 ### 6.3 `GET /api/v1/sessions/:sessionId`
 
-恢复并返回 `SessionRuntimeDto`。损坏、Provider 不匹配或跨工作区 Session 使用现有恢复错误语义，
+恢复并返回 `SessionViewDto`。损坏、Provider 不匹配或跨工作区 Session 使用现有恢复错误语义，
 不得部分展示成可继续会话。
 
 ### 6.4 `GET /api/v1/sessions/:sessionId/chat?cursor=<cursor>&limit=<1..100>`
@@ -282,7 +336,14 @@ interface ChatTurnDto {
   readonly toolSummaries: readonly {
     readonly toolCallId: string;
     readonly name: string;
-    readonly status: 'completed' | 'failed' | 'denied' | 'cancelled';
+    readonly status:
+      | 'running'
+      | 'awaiting_approval'
+      | 'completed'
+      | 'failed'
+      | 'denied'
+      | 'cancelled';
+    readonly resultSummary?: string;
   }[];
   readonly status: Exclude<SessionPhase, 'idle' | 'running'> | 'running';
   readonly stopReason?: string;
@@ -303,7 +364,7 @@ interface UpdateSessionRuntimeRequest {
 ```
 
 语义与 CLI `/model`、`/safety` 相同，仅改变当前 Session，成功后追加相同领域事件。任意活动 Turn
-存在时返回 `409 TURN_ACTIVE`。
+存在时返回 `409 TURN_ACTIVE`。成功返回更新后的 `SessionViewDto`。
 
 ## 7. Turn、取消与审批
 
@@ -326,8 +387,17 @@ interface AcceptedTurnDto {
 
 ### 7.2 `POST /api/v1/sessions/:sessionId/turns/:turnId/cancel`
 
-无业务请求体。第一次有效取消返回 `202`；已到终态返回 `409 TURN_NOT_ACTIVE`。取消传播到 Provider、
-工具进程树和 Session 终态，不能只停止 SSE。
+无业务字段，请求体必须是 `{}`。第一次有效取消返回 `202`；已到终态返回
+`409 TURN_NOT_ACTIVE`。取消传播到 Provider、工具进程树和 Session 终态，不能只停止 SSE。
+`202` 响应体为：
+
+```ts
+interface AcceptedCancellationDto {
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly state: 'cancelling';
+}
+```
 
 ### 7.3 `POST /api/v1/sessions/:sessionId/approvals/:approvalKey`
 
@@ -340,7 +410,20 @@ interface ApprovalDecisionRequest {
 ```
 
 服务端必须把 URL `approvalKey` 与请求中的 Session、Turn 和 `toolCallId` 一起提交到应用服务。结果
-映射为 `accepted`、`duplicate`、`expired` 或 `not_pending`；任何不匹配都不得执行工具。
+映射为 `accepted`、`duplicate`、`expired` 或 `not_pending`；任何不匹配都不得执行工具。首次
+`accepted` 返回 `202` 和：
+
+```ts
+interface AcceptedApprovalDto {
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly toolCallId: string;
+  readonly outcome: 'accepted';
+}
+```
+
+同一 requestId 的重放返回同一 `202`；使用新 requestId 重复提交领域决定分别返回
+`409 APPROVAL_DUPLICATE`、`409 APPROVAL_EXPIRED` 或 `409 APPROVAL_NOT_PENDING`。
 
 ## 8. Trace 与 Inspector API
 
@@ -404,17 +487,58 @@ decision、rule ID、原因和最终执行状态，旧 Session 缺少新增字�
 
 ### 9.1 `GET /api/v1/sessions/:sessionId/events?after=<seq>`
 
-响应 `text/event-stream`。事件格式：
+响应 `text/event-stream`。每个持久 Session `seq` 最多对应一个业务 SSE 事件，SSE `id` 等于该
+`seq`。事件数据使用以下判别联合：
+
+```ts
+interface ProjectionDeltaDto {
+  readonly view: SessionViewDto;
+  readonly chatTurn?: ChatTurnDto;
+  readonly traceRecords?: readonly TraceRecordDto[];
+}
+
+type WebStreamEvent =
+  | {
+      readonly type: 'session.updated' | 'record.upsert';
+      readonly sessionId: string;
+      readonly seq: number;
+      readonly delta: ProjectionDeltaDto;
+    }
+  | {
+      readonly type: 'approval.pending';
+      readonly sessionId: string;
+      readonly seq: number;
+      readonly approval: ApprovalRequestDto;
+      readonly delta: ProjectionDeltaDto;
+    }
+  | {
+      readonly type: 'turn.terminal';
+      readonly sessionId: string;
+      readonly seq: number;
+      readonly turnId: string;
+      readonly status: 'completed' | 'failed' | 'cancelled' | 'limited';
+      readonly stopReason?: string;
+      readonly delta: ProjectionDeltaDto;
+    }
+  | {
+      readonly type: 'resync.required';
+      readonly sessionId: string;
+      readonly lastAvailableSeq: number;
+      readonly reason: 'history_gap' | 'projection_version_changed';
+    };
+```
+
+传输格式示例：
 
 ```text
 id: <session-seq>
 event: record.upsert
-data: {"sessionId":"...","record":{...}}
+data: {"type":"record.upsert","sessionId":"...","seq":42,"delta":{...}}
 ```
 
-同一认证浏览器上下文最多保持一个 Session SSE。存在活动 Turn 时，该流必须绑定活动 Turn 所属
-Session；浏览其他历史 Session 使用普通 GET。没有活动 Turn 时，客户端可以把流切换到当前选中
-Session。第二条并发流返回 `409 STREAM_ACTIVE` 且不影响已有流。
+同一进程级认证 Cookie 最多保持一个 Session SSE，因此多个标签页也共享这一限制。存在活动 Turn
+时，该流必须绑定活动 Turn 所属 Session；浏览其他历史 Session 使用普通 GET。没有活动 Turn 时，
+客户端可以把流切换到当前选中 Session。第二条并发流返回 `409 STREAM_ACTIVE` 且不影响已有流。
 
 允许事件：
 
@@ -427,8 +551,10 @@ resync.required
 heartbeat
 ```
 
-进行中的 Agent 或工具记录通过相同 `record.id` 的 `record.upsert` 更新，不生成 chunk 行。heartbeat
-不携带业务数据。客户端按 `id` 去重，只把更高版本应用到本地投影。
+每个业务事件的数据必须符合 `WebStreamEvent` 对应分支。`ProjectionDeltaDto` 可以在一个 Session
+`seq` 中同时更新 Chat Turn、Trace 记录与能力快照，避免为同一 `seq` 发送多个相互竞争的事件。
+进行中的 Agent 或工具记录通过稳定 record/Turn ID 原位更新，不生成 chunk 行。heartbeat 不携带
+业务数据、不设置 SSE `id`，也不推进 Session `seq`。客户端按数值 `seq` 去重，只应用更大的值。
 
 断线恢复顺序：
 
@@ -438,19 +564,10 @@ heartbeat
 4. 无法连续补齐时发送 `resync.required` 并关闭流；
 5. 客户端重新读取 Chat、Trace 与 Session 快照，不重新 POST Turn。
 
-## 10. 导出
+## 10. 明确不做的导出
 
-`GET /api/v1/sessions/:sessionId/export?format=markdown|json` 返回下载流。导出内容至少包含 Session
-摘要、Chat、Trace、文件变化、Policy 决定、审批、验证证据和终态，并再次经过脱敏、绝对路径过滤、
-秘密扫描与身份扫描。
-
-导出不得包含：
-
-- `model.reasoning` 或 Provider-specific reasoning details；
-- API Key、认证 Cookie、bootstrap token、Authorization；
-- 本机绝对路径或环境变量转储；
-- 原始未截断敏感工具参数；
-- 浏览器内草稿、未提交表单或 SSE chunk。
+P2 不提供 `GET /api/v1/sessions/:sessionId/export` 或任何等价的 Session 下载接口。浏览器不得拼接
+Chat/Trace DOM 生成导出文件。复盘继续使用 CLI 与 Session JSONL。
 
 ## 11. 生命周期与关闭
 
@@ -462,6 +579,6 @@ heartbeat
 - 所有路由使用 Schema 校验并覆盖成功、边界和拒绝路径；
 - Fastify 注入测试覆盖认证、Host、Origin、content-type、body limit 和错误脱敏；
 - 幂等测试证明重复 Turn、审批、取消和配置写入不产生第二次副作用；
-- SSE 测试覆盖有序补齐、重复、断线、resync 和终态；
+- SSE 测试覆盖判别联合、单流所有权、有序补齐、重复、断线、heartbeat、resync 和终态；
 - DTO 快照不得包含绝对路径、秘密或隐藏推理；
 - API 契约变化必须同步本文、类型、测试与 [web-ui.md](./web-ui.md)。

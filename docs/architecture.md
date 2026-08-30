@@ -58,7 +58,7 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 
 - 不实现多智能体、插件市场、Skill、MCP、LSP 或向量数据库；
 - 不追求完整 IDE、容器沙箱或操作系统级安全隔离；
-- 不实现域名部署、远程访问、账号系统、页面内工作区浏览或多个并发 Turn；
+- 不实现域名部署、远程访问、账号系统、页面内工作区浏览、多个并发 Turn 或导出会话；
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
@@ -318,9 +318,10 @@ P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已�
 ## 15. P2 Web 扩展边界
 
 P2 按 [ADR-0007](./decisions/0007-local-web-console.md) 增加 Fastify loopback adapter 和 React/Vite
-页面。WebUI 只依赖公开应用服务、共享配置服务和有界 DTO；UI 状态不得反向侵入 Agent Loop。工作区
-在启动时固定，Provider API Key 不进入浏览器，进程同时只允许一个活动 Turn。远程展示页、多用户、
-跨工作区控制台和第二种 Session 存储仍不属于当前承诺。
+页面。实现落点为 `src/web/server` 与 `src/web/client`，静态资源写入 `dist/web/`。WebUI 只依赖公开
+应用服务、共享配置服务和有界 DTO；UI 状态不得反向侵入 Agent Loop。工作区在启动时固定，Provider
+API Key 不进入浏览器，进程同时只允许一个活动 Turn。远程展示页、多用户、跨工作区控制台、第二种
+Session 存储和导出会话仍不属于当前承诺。
 
 ## 16. 独立实现与原创边界
 

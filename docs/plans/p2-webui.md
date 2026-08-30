@@ -2,7 +2,7 @@
 
 > 状态：Accepted plan（尚未实现）
 >
-> 版本：1.0
+> 版本：1.1
 >
 > 最后更新：2026-08-30
 
@@ -10,7 +10,7 @@
 
 P2 在 P0/P1/P1.5 已交付的 CLI、应用服务、Session 查询、事件聚合、配置和安全策略之上，增加一个
 固定工作区的本地 Web 控制台。用户可以在浏览器内新建和恢复 Session、进行 Chat、处理审批、切换
-Session 模型与安全模式、检查结构化执行记录、维护 Provider 非秘密配置并导出脱敏证据。
+Session 模型与安全模式、检查结构化执行记录，并维护 Provider 非秘密配置。P2 不提供导出会话。
 
 P2 不重新实现 Agent。CLI 与 WebUI 必须共享 Provider、Agent Loop、Context Projector、工具注册表、
 安全策略、配置服务、Session repository 与 `ApplicationService`。
@@ -41,7 +41,24 @@ P2 的产品语义是“针对启动工作区的图形化 Coding Agent 控制台
 - 固定工作区内可以创建、列出、恢复和浏览多个 Session；
 - 整个 Web 服务进程同时只允许一个活动 Turn；
 - 活动 Turn 期间可只读浏览其他 Session，但不可并发提交或修改运行时；
-- TUI、远程服务、域名部署、多用户、Skill、插件、MCP、多智能体和子代理均不属于 P2。
+- TUI、远程服务、域名部署、多用户、Skill、插件、MCP、多智能体、子代理和导出会话均不属于 P2。
+
+源码与测试落点固定为：
+
+```text
+src/web/server     Fastify adapter、认证、路由与 DTO
+src/web/client     React/Vite 页面
+tests/unit/web
+tests/integration/web
+tests/e2e/web
+```
+
+A3/A4 不得另起包名或第二套目录。生产静态资源仍写入 `dist/web/`。
+
+桌面 IA 临时视觉参考见 [p2-webui-demo.md](./p2-webui-demo.md)。图只确认布局气质；安全模式、默认
+上下文上限、连接状态、发送可用态、Session 文字状态和 Inspector 区块以
+[web-ui.md](../web-ui.md) 与 [web-api.md](../web-api.md) 为准。这些图是非最终视觉稿，P2 完成后必须删除整个
+`docs/plans/p2-webui-demo/` 目录及说明文档，并去掉所有引用。
 
 ## 3. 技术基线
 
@@ -93,10 +110,10 @@ echo-harness web [--workspace <path>] [--port <port>] [--no-open]
 3. 从 CLI 配置向导抽出共享配置读写服务，保持 artifact-root、Schema、原子写入和错误语义；
 4. 实现 Fastify 生命周期、静态资源、精确 Host/Origin、CSP 和请求体上限；
 5. 实现一次性 bootstrap token 与进程级 `HttpOnly` Cookie；
-6. 实现 bootstrap、Provider、Session、Turn、取消、审批、Trace、导出 API；
+6. 实现 bootstrap、Provider、Session、Turn、取消、审批和 Trace API；不实现导出 API；
 7. 实现进程级单活动 Turn 仲裁；
-8. 实现每浏览器上下文一个 Session SSE；活动 Turn 时保持绑定其 Session，并支持 seq 补齐、去重和
-   `resync_required`；
+8. 实现每个进程级认证 Cookie 一个 Session SSE；活动 Turn 时保持绑定其 Session，并支持 seq 补齐、
+   去重和 `resync_required`；
 9. 为状态改变请求实现 `requestId` 幂等记录；
 10. 把内部错误映射为稳定、脱敏的 Web 错误，不返回堆栈或磁盘路径。
 
@@ -113,15 +130,18 @@ echo-harness web [--workspace <path>] [--port <port>] [--no-open]
 ### 6.1 主界面
 
 默认两栏：Session rail 与当前 Session 主视图。Session 内提供 `Chat` / `Trace`。Inspector 只在
-选中结构化详情时展开，不保留空白第三栏。
+选中结构化详情时展开，不保留空白第三栏。顶栏只保留 Session 名称、`对话 / 轨迹` 与常驻连接状态。
+连接状态使用“绿点 + 已连接”或“红点 + 未连接”；工作区名只在侧栏；当前模型、安全模式和上下文
+用量的固定摘要只在输入区，历史 Context 详情仍由 Trace/Inspector 展示。
 
 Session rail 支持：
 
 - 新建 Session；
 - 分页列出固定工作区 Session；
 - 恢复并切换 Session；
-- 显示脱敏标题、更新时间、模型和运行状态；
-- 活动 Turn 期间浏览其他 Session，并明确禁用并发提交。
+- 显示脱敏标题、更新时间、模型，以及不加图标的文字状态；
+- 活动 Turn 期间浏览其他 Session，并明确禁用并发提交。活动 Turn 时仍可新建，但新 Session
+  输入区禁用并说明“另一会话正在运行”。
 
 P2 不实现删除、fork、跨工作区搜索或批量管理。
 
@@ -129,7 +149,8 @@ P2 不实现删除、fork、跨工作区搜索或批量管理。
 
 - 显示用户输入、聚合 `model.text`、工具摘要、审批和 Turn 终态；
 - 当前直播使用 SSE 更新同一条记录，刷新只读聚合 Session 事实；
-- 固定输入区提供发送/停止、模型选择和安全模式选择；
+- 固定输入区提供模型、`safe` / `balanced` / `auto`、只读上下文用量、发送按钮，以及运行提示条上的
+  停止按钮；发送与停止是两个控件，运行时发送禁用；
 - 活动 Turn 期间禁止切换模型/安全模式和提交其他 Session；
 - 审批提供拒绝、仅本次、本 Session 三种明确动作；
 - 用户上滚后暂停自动跟随，使用“有新内容”恢复尾随；
@@ -140,8 +161,8 @@ P2 不实现删除、fork、跨工作区搜索或批量管理。
 设置采用可扩展的左侧导航形式，但 P2 只包含 `Provider` 页面：
 
 - Base URL；
-- 自动发现或手动模型目录，二选一；
-- 默认模型；
+- 自动发现或手动模型目录，二选一；发现结果是只读列表，不作为当前 Session 模型选择器；
+- 默认模型；当前 Session 模型只在输入区修改；
 - API Key 是否由环境变量配置；
 - 与 CLI 共用校验和保存服务。
 
@@ -151,6 +172,7 @@ API Key 不提供输入、读取、复制或清除。自动发现是显式动作
 ### 6.4 完成标准
 
 - 无 Session、新建、恢复、运行、审批、断线、失败和取消状态均有明确 UI；
+- 顶栏常驻的“已连接 / 未连接”与本地 API、所选 Session 的认证 SSE 状态一致，文字与状态点同时存在；
 - CLI 与 WebUI 对模型、安全模式、审批和配置产生同一领域结果；
 - 页面刷新不产生重复 Turn，不显示 reasoning，不丢失已聚合正文；
 - Session 列表和历史使用 cursor 分页，大量数据不阻塞输入。
@@ -181,18 +203,16 @@ Trace 不使用顶部图形时间线。记录按 Session seq 从旧到新排列�
 
 默认不展示 `model.reasoning`，也不把它当作完成或验证证据。前端不得根据命令文本自行判断 Policy。
 
-### 7.3 导出
+### 7.3 明确不做的导出
 
-支持服务端生成 Markdown 和 JSON。导出包含 Session 摘要、Chat、Trace、文件变化、Policy、审批、验证
-证据与终态；继续通过脱敏、绝对路径、秘密和身份扫描，不含 reasoning 或浏览器临时状态。
+P2-3 不实现 Session Markdown/JSON 导出或对应下载入口。
 
 ### 7.4 完成标准
 
 - Trace 顺序在直播、刷新、补页和恢复后稳定；
 - 长 Session 分页并虚拟化；上滚时不被新事件抢夺位置；
-- Inspector 内容与选中 record ID 精确对应；
-- `Verified` 只能由实际 `run_command` 终态产生，且只表示退出码成功；无证据显示 `Not verified`；
-- 导出与页面使用同一服务端事实，且隐私扫描通过。
+- Inspector 内容与选中 record ID 精确对应，并按契约投影元数据、参数、结果、限制与关联；
+- `Verified` 只能由实际 `run_command` 终态产生，且只表示退出码成功；无证据显示 `Not verified`。
 
 ## 8. P2-4：体验、测试、产物与验收
 
@@ -215,7 +235,7 @@ Trace 不使用顶部图形时间线。记录按 Session seq 从旧到新排列�
 - SSE 顺序、补齐、重复、断线和 resync；
 - Turn、取消和审批竞态及幂等；
 - React 组件、状态投影、键盘和焦点；
-- Playwright Chat、审批、Trace、设置、导出关键流程；
+- Playwright Chat、审批、Trace 和设置关键流程；
 - 大型 Session 分页/虚拟化和直播滚动；
 - 秘密、身份、绝对路径与 reasoning 泄露扫描；
 - Windows 构建产物从非仓库目录启动的 Web smoke；
@@ -241,18 +261,29 @@ echo-harness web
 
 ### 阶段 A：契约与骨架
 
-1. 冻结 Web DTO、错误码、API Schema 与验收矩阵；
-2. 抽出共享配置服务；
-3. 建立 Fastify 生命周期、认证与静态资源骨架；
-4. 建立 React/Vite、设计 token、主壳和测试环境。
+1. **A0：依赖与构建骨架**（先串行）。锁定 React 19、Vite 8、Fastify 5 的精确版本；把 Node 下限
+   收紧为 `>=22.12.0 <23`；同步 [AGENTS.md](../../AGENTS.md) 的运行时表述；建立 `src/web/server`、
+   `src/web/client` 与对应测试入口。
+2. **A1：Web 契约与 Policy Explain 事实**。冻结 DTO（含 `SessionViewDto`、能力状态表、写操作响应、
+   完整 SSE 判别联合与扩展后的 `toolSummaries`）、错误码、幂等冲突语义和 Schema；为所有
+   `PolicyDecision` 增加稳定 `ruleId`，旧 Session 可读。
+3. **A2：共享 Provider 配置服务**。抽出 CLI 背后的读取、校验、发现和原子写入；API Key 仍只来自
+   环境变量。
+4. **A3：Fastify 服务骨架**。固定工作区生命周期、bootstrap 认证、Host/Origin 防护、静态资源和
+   可注入路由测试。
+5. **A4：React 页面骨架**。设计 token、Session/Chat/Trace 主壳、Provider 设置导航壳和组件测试
+   环境；顶栏、侧栏和输入区按 [web-ui.md](../web-ui.md) 落位。
+6. **A5：Phase A 集成门禁**。统一路由装配、前端入口、package scripts 与 CI；跑全量测试并同步
+   文档状态。
 
-Web DTO 与配置服务属于共享边界，阶段 A 完成前不得并行实现相互竞争的私有类型。
+A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。Web DTO 与配置服务属于共享边界，
+阶段 A 完成前不得并行实现相互竞争的私有类型。
 
 ### 阶段 B：可并行核心
 
 - B1：Session/Turn/审批 API、单活动 Turn 与 SSE；
 - B2：Session rail、Chat、输入区和 Provider 设置；
-- B3：Trace 投影、Inspector DTO 与导出；
+- B3：Trace 投影与 Inspector DTO；
 - B4：安全、浏览器测试夹具和产物构建管线。
 
 B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。共享路由装配和主壳由集成任务
@@ -265,7 +296,9 @@ B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。�
 3. 完成大型 Session、无障碍和隐私验收；
 4. 完成 Windows 产物 smoke 和 P0/P1 回归；
 5. 使用受控真实 Provider 完成一次 Web Chat 与恢复；
-6. 同步所有文档、演示说明和验收矩阵。
+6. 同步所有文档、演示说明和验收矩阵；
+7. 删除 [p2-webui-demo.md](./p2-webui-demo.md) 与 [p2-webui-demo/](./p2-webui-demo/) 全部 PNG，
+   并清除文档引用。不得把 demo 图留作产品截图。
 
 ## 10. 文档同步规则
 
@@ -288,13 +321,14 @@ P2 完成必须同时满足：
 - WebUI 与 CLI 共享应用服务、配置服务、Agent Loop、Policy 与 Session repository；
 - 固定工作区不可由页面更改，进程任意时刻只有一个活动 Turn；
 - 回环服务通过一次性 bootstrap、Cookie、Host、Origin 和 Schema 校验阻止跨站本地调用；
-- API Key、认证材料、reasoning 和绝对个人路径不进入前端、Session 或导出；
+- API Key、认证材料、reasoning 和绝对个人路径不进入前端或 Session；
 - Session 新建、列表、恢复、Chat、Trace、取消和审批在刷新/断线后保持一致；
 - Provider 设置与 CLI 配置使用同一 Schema 和原子写入；
 - Trace 以业务事件解释 Turn/Step、Context、工具、策略、审批、验证和停止原因；
 - 测试证据来自实际工具结果，不从模型声明推断；
 - 完整质量门、Playwright、Windows 产物 smoke、秘密扫描和身份扫描通过；
-- P0/P1/P1.5 的 `run`、`chat`、`config`、Session 与非交互行为不退化。
+- P0/P1/P1.5 的 `run`、`chat`、`config`、Session 与非交互行为不退化；
+- 临时 demo 示意图及说明已删除，文档不再引用它们。
 
 ## 12. 主要风险
 

@@ -187,11 +187,13 @@ until those scripts exist, this section is a target contract rather than an avai
   content type, body limits, CSP, and no-store;
 - process-wide active-Turn tests cover two Sessions and prove the second cannot submit or mutate
   runtime state while one Turn runs;
-- idempotency tests repeat Turn, cancel, approval, and config requests and assert one side effect;
-- SSE tests cover ordered backlog plus live handoff, duplicate seq, disconnect, terminal events,
-  heartbeat, and `resync_required`;
-- Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order;
-- export tests scan Markdown and JSON for secrets, identity, absolute paths, and reasoning.
+- idempotency tests repeat Turn, cancel, approval, and config requests, assert one side effect and
+  reject the same requestId with a different request fingerprint;
+- SSE tests cover the discriminated payload union, one stream per process authentication Cookie,
+  ordered backlog plus live handoff, duplicate seq, disconnect, terminal events, heartbeat that
+  does not advance seq, and `resync_required`;
+- Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order.
+  P2 does not implement session export.
 
 ### React component layer
 
@@ -200,6 +202,7 @@ Vitest, Testing Library, `user-event`, and a DOM environment cover:
 - Session rail paging, new Session, restore, and process-wide active state;
 - Chat aggregate rendering, streaming upsert, paused tail-follow, cancel, and approval;
 - model/safety controls and Provider settings validation;
+- persistent header connection text/state dot and reconnect transitions;
 - Trace rows, Inspector ownership, bounded code/diff sections, and `Not verified`;
 - keyboard operation, focus return, accessible names, live regions, and reduced motion classes;
 - empty, loading, offline, reconnect, resync, failed, cancelled, limited, and completed states.
@@ -215,8 +218,7 @@ Playwright Chromium runs a deliberately small set of critical flows against a bu
 5. Trace selection and matching Inspector details;
 6. Provider config save without an API Key entering the DOM;
 7. keyboard-only critical flow and 200% zoom smoke;
-8. Markdown/JSON export privacy checks;
-9. graceful shutdown with and without an active Turn.
+8. graceful shutdown with and without an active Turn.
 
 The Windows artifact smoke copies only the packaged `dist/` and required package metadata into a
 temporary directory outside the repository, starts `echo-harness web --no-open`, parses the actual
@@ -230,7 +232,8 @@ secret and identity scanning. P0/P1 CLI tests remain required in the same gate.
 
 P2 local real-Provider acceptance is explicit and non-CI: start the packaged Web console with a
 temporary authorized workspace, complete one bounded Chat Turn, refresh/resume it, inspect Trace,
-and verify the saved Session and export. The response body and key are not printed or committed.
+and verify the saved Session. The response body and key are not printed or committed. P2 does not
+export sessions from the WebUI.
 
 ## Known gaps
 

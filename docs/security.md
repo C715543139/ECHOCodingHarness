@@ -310,15 +310,17 @@ P2 Web adapter 必须同时执行：
 - API Key 只在服务端读取 `ECHO_API_KEY`，浏览器只获得 `apiKeyConfigured` 布尔值；
 - Provider 设置复用严格配置 Schema 和原子写入，活动 Turn 时只读；
 - 工作区由启动参数固定，API 不接受工作区路径；进程同时只允许一个活动 Turn；
-- 导出由服务端生成并再次执行秘密、身份、绝对路径和 reasoning 排除检查。
+- P2 不提供导出会话；浏览器不得拼接 DOM 生成下载文件。
 
 bootstrap token、Cookie、Authorization、Provider 响应头和 API Key 不得进入 URL query、应用日志、
-Session、错误详情、浏览器持久存储或导出。URL fragment 只用于首次 bootstrap；`--no-open` 打印的
+Session、错误详情或浏览器持久存储。URL fragment 只用于首次 bootstrap；`--no-open` 打印的
 fragment 是进程级短期访问材料，用户不应分享，成功兑换后即失效。
 
-SSE 只直播已经授权 Session 的有界投影。断线补齐使用 Session seq；无法连续恢复时要求客户端重新
-读取快照，不得通过重放 POST 修复。所有状态改变请求以 requestId 和领域标识保证幂等，重复审批仍
-精确绑定 Session、Turn、`toolCallId` 与 `approvalKey`。
+SSE 只直播已经授权 Session 的有界投影；同一进程级认证 Cookie 同时只允许一条流。断线补齐使用
+Session seq；无法连续恢复时要求客户端重新读取快照，不得通过重放 POST 修复。除 bootstrap 外，
+所有状态改变请求以 method、规范化 route、requestId 和请求指纹保证进程生命周期内幂等：相同请求
+重放第一次响应，不同请求复用同一键以 `IDEMPOTENCY_CONFLICT` 拒绝。审批的领域级重复仍精确绑定
+Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝。
 
 ## 17. 已知限制与后续增强
 
@@ -329,7 +331,8 @@ SSE 只直播已经授权 Session 的有界投影。断线补齐使用 Session s
 - 对本机恶意进程造成 TOCTOU 竞态的完全防护；
 - 凭据管理器或硬件密钥集成；
 - 完整快照、回滚和事务式文件系统；
-- 对所有第三方脚本副作用的静态证明。
+- 对所有第三方脚本副作用的静态证明；
+- P2 WebUI 导出会话。
 
 后续若增加容器隔离、受限令牌、命令 AST 分析或变更快照，应通过独立 ADR 评估复杂度与收益。
 

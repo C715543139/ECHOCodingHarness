@@ -8,7 +8,7 @@
 >
 > 决策者：项目维护者
 >
-> 修订：[ADR-0001](./0001-project-foundation.md) 中 P2 域名展示与范围条款
+> 修订：[ADR-0001](./0001-project-foundation.md) 中 P2 域名展示与范围条款；2026-08-30 明确顶栏范围、安全模式展示名，并排除导出会话
 
 ## 1. 背景
 
@@ -56,8 +56,12 @@ Phase A 必须把 `package.json` 的 Node 下限从 `22.0.0` 收紧为 `22.12.0`
 ### 2.3 页面结构
 
 主界面默认是两栏：Session 导航与当前视图。每个 Session 提供 `Chat` 和 `Trace` 两个视图。
-选中工具、策略、Context 或验证事件时，右侧按需展开结构化 Inspector，形成临时第三栏；未选中
-记录时不保留空白第三栏。
+顶栏只保留当前 Session 名称、`对话 / 轨迹` 与常驻连接状态。连接状态使用“绿点 + 已连接”或
+“红点 + 未连接”，不得只依赖颜色；重连期间仍属于未连接，可以附加“正在重连”。工作区脱敏名称
+只在侧栏；当前模型、安全模式和近似上下文用量的固定摘要只在输入区，历史 Context 事实仍可在
+Trace 与 Inspector 中查看。安全模式展示名与领域值相同：`safe`、`balanced`、`auto`。
+Session 行使用文字状态，不加状态图标。选中工具、策略、Context 或验证事件时，右侧按需展开
+结构化 Inspector，形成临时第三栏；未选中记录时不保留空白第三栏。P2 不提供导出会话。
 
 `Trace` 不绘制图形时间轴。它按持久事实的实际顺序，以 Turn/Step 分组展示用户、上下文、代理、
 工具、策略、审批、验证和 Turn 终态。流式正文只更新同一条进行中的代理记录；历史和刷新只读取
@@ -80,23 +84,25 @@ Phase A 必须把 `package.json` 的 Node 下限从 `22.0.0` 收紧为 `22.12.0`
 
 前端以一次 POST 兑换进程级、`HttpOnly`、`SameSite=Strict`、无持久过期时间的认证 Cookie，随后
 立即从地址栏移除 fragment；bootstrap token 只能成功使用一次。所有 `/api/v1/**` 请求均需有效
-Cookie，改变状态的请求还必须通过精确 Origin、Host、JSON content-type 和幂等键校验。页面、日志、
-Session 和导出不得保存 bootstrap token 或 Cookie。
+Cookie，改变状态的请求还必须通过精确 Origin、Host、JSON content-type 和幂等键校验。页面、日志和
+Session 不得保存 bootstrap token 或 Cookie。
 
 静态响应设置严格 CSP、`frame-ancestors 'none'`、`X-Content-Type-Options: nosniff` 和禁止缓存敏感
 API 响应的头。SSE 断开、页面关闭或刷新不触发批准、取消、重试或重新执行。
 
 ### 2.5 实时与幂等
 
-每个认证浏览器上下文同时最多保持一个 Session SSE：存在活动 Turn 时绑定其 Session；没有活动
-Turn 时可以绑定当前选中 Session。活动 Turn 期间浏览其他历史 Session 使用普通 GET，不切断活动
-流。SSE 的 `id` 使用所绑定 Session 的单调事件序号；客户端通过 `Last-Event-ID` 或 `after` 恢复。
+每个进程级认证 Cookie 同时最多保持一个 Session SSE，因此多个标签页也共享这一限制：存在活动
+Turn 时绑定其 Session；没有活动 Turn 时可以绑定当前选中 Session。活动 Turn 期间浏览其他历史
+Session 使用普通 GET，不切断活动流。SSE 的 `id` 使用所绑定 Session 的单调事件序号；客户端通过
+`Last-Event-ID` 或 `after` 恢复。
 服务器先从 Session 查询补齐已提交事件，再进入直播。若请求位置早于可提供窗口，返回显式
 `resync_required`，客户端重新获取聚合快照，不重新提交 Turn。
 
-创建 Session、提交 Turn、取消、审批和写配置都携带客户端生成的 `requestId`。同一个
-`requestId` 重放必须返回先前结果或稳定冲突，不得产生第二次工具副作用。审批仍精确绑定
-Session、Turn、`toolCallId` 与 `approvalKey`。
+创建 Session、提交 Turn、取消、审批、改变 Session 运行时和写配置都携带客户端生成的
+`requestId`。method、规范化 route、requestId 和请求指纹相同的重放必须返回第一次结果；同一键
+对应不同请求指纹时稳定冲突，不得产生第二次工具副作用。审批仍精确绑定 Session、Turn、
+`toolCallId` 与 `approvalKey`。
 
 ## 3. 选择理由
 

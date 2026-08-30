@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { ChatView } from './shell/chat-view.js';
 import { ConnectionStatus } from './shell/connection-status.js';
@@ -7,9 +7,11 @@ import { SessionRail } from './shell/session-rail.js';
 import { SettingsModal } from './shell/settings-modal.js';
 import styles from './shell/shell.module.css';
 import { TraceView } from './shell/trace-view.js';
-import { createFakeTransport, type FakeTransport } from './transport/fake-transport.js';
+import { createFakeTransport } from './transport/fake-transport.js';
+import type { WebConsoleTransport } from './transport/types.js';
+import { catalogModels } from './view-model/provider-catalog.js';
 
-export function App({ transport }: { readonly transport?: FakeTransport } = {}) {
+export function App({ transport }: { readonly transport?: WebConsoleTransport } = {}) {
   const [ownedTransport] = useState(() => transport ?? createFakeTransport());
   const snapshot = useSyncExternalStore(
     ownedTransport.subscribe,
@@ -20,6 +22,20 @@ export function App({ transport }: { readonly transport?: FakeTransport } = {}) 
   const selected = snapshot.sessions.find((session) => session.id === snapshot.selectedSessionId);
   const inspectorOpen = snapshot.inspectorDetail !== undefined;
   const shellClass = inspectorOpen ? `${styles.shell} ${styles.shellWithInspector}` : styles.shell;
+  const controllerView = {
+    catalogModels: catalogModels(snapshot.providerDraft),
+    loadingHistory: snapshot.loadingHistory,
+    resyncRequired: snapshot.resyncRequired,
+    hasMoreSessions: snapshot.hasMoreSessions,
+    lastDiscoveredAt: snapshot.lastDiscoveredAt,
+    fieldErrors: snapshot.providerFieldErrors,
+    errorSummary: snapshot.providerErrorSummary,
+    approvalError: snapshot.approvalError,
+  };
+
+  useEffect(() => {
+    void ownedTransport.start().catch(() => undefined);
+  }, [ownedTransport]);
 
   return (
     <div
@@ -56,6 +72,8 @@ export function App({ transport }: { readonly transport?: FakeTransport } = {}) 
         selectedSessionId={snapshot.selectedSessionId}
         sessions={snapshot.sessions}
         workspace={snapshot.bootstrap.workspace}
+        actions={ownedTransport}
+        view={controllerView}
       />
       <div className={styles.workspace}>
         <header className={styles.topBar}>
@@ -98,8 +116,10 @@ export function App({ transport }: { readonly transport?: FakeTransport } = {}) 
               onSubmit={() => {
                 ownedTransport.submitTurn();
               }}
+              actions={ownedTransport}
               session={snapshot.selectedRuntime}
               turns={snapshot.chatTurns}
+              view={controllerView}
             />
           ) : (
             <TraceView
@@ -133,6 +153,8 @@ export function App({ transport }: { readonly transport?: FakeTransport } = {}) 
           }}
           provider={snapshot.providerDraft}
           returnFocusTo={settingsButtonRef.current}
+          actions={ownedTransport}
+          view={controllerView}
         />
       ) : null}
       <div aria-live="polite" className={styles.live}>

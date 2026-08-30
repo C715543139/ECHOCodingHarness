@@ -45,6 +45,7 @@ import {
   type SessionProjectionContext,
 } from '../session-projection.js';
 import { formatSseEvent, type SessionEventHub } from '../sse-hub.js';
+import { projectTrace } from '../trace/index.js';
 
 import { WEB_CSP, requestIdOf, sendError } from './http.js';
 
@@ -94,6 +95,8 @@ const APPROVAL_CHOICES: Record<ApprovalChoiceDto, ApprovalChoice> = {
 
 const PAGE_SESSION_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.pageSessionSummary);
 const PAGE_CHAT_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.pageChatTurn);
+const PAGE_TRACE_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.pageTraceRecord);
+const TRACE_DETAIL_RESPONSE_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.traceRecordDetail);
 const SESSION_VIEW_RESPONSE_SCHEMA = WEB_JSON_SCHEMAS.sessionViewResponse;
 const ACCEPTED_TURN_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.acceptedTurn);
 const ACCEPTED_CANCEL_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.acceptedCancellation);
@@ -552,6 +555,56 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
     });
   });
 
+  app.get('/api/v1/sessions/:sessionId/trace', async (request, reply) => {
+    const { sessionId } = request.params as SessionParams;
+    if (!validateSessionId(reply, request, sessionId)) return;
+    const query = request.query as Record<string, unknown>;
+    const limit = parseLimit(query['limit'], 100, WEB_BOUNDS.tracePageMax);
+    const after = parseAfter(query['after'], '');
+    if (limit === undefined || after === undefined) {
+      errorResult(reply, request, 400, 'INVALID_REQUEST', 'The trace page request is invalid.');
+      return;
+    }
+    try {
+      const view = await loadView(sessionId);
+      const projected = projectTrace(view.events, redaction);
+      const following = projected.records.filter((record) => record.seq > after);
+      const items = following.slice(0, limit);
+      const last = items.at(-1);
+      const page: Page<(typeof items)[number]> = {
+        items,
+        ...(last !== undefined && following.length > items.length
+          ? { nextCursor: String(last.seq) }
+          : {}),
+      };
+      envelope(request, page, PAGE_TRACE_SCHEMA, 200, reply);
+    } catch (error) {
+      const mapped = mappedError(error);
+      errorResult(reply, request, mapped.status, mapped.code, mapped.message, mapped.retryable);
+    }
+  });
+
+  app.get('/api/v1/sessions/:sessionId/trace/:recordId', async (request, reply) => {
+    const { sessionId, recordId } = request.params as SessionParams & { readonly recordId: string };
+    if (!validateSessionId(reply, request, sessionId)) return;
+    if (!WEB_ID_PATTERN.test(recordId)) {
+      errorResult(reply, request, 400, 'INVALID_REQUEST', 'The trace record id is invalid.');
+      return;
+    }
+    try {
+      const view = await loadView(sessionId);
+      const detail = projectTrace(view.events, redaction).details[recordId];
+      if (detail === undefined) {
+        errorResult(reply, request, 404, 'NOT_FOUND', 'The trace record was not found.');
+        return;
+      }
+      envelope(request, detail, TRACE_DETAIL_RESPONSE_SCHEMA, 200, reply);
+    } catch (error) {
+      const mapped = mappedError(error);
+      errorResult(reply, request, mapped.status, mapped.code, mapped.message, mapped.retryable);
+    }
+  });
+
   app.post('/api/v1/sessions/:sessionId/turns', async (request, reply) => {
     const { sessionId } = request.params as SessionParams;
     if (!validateSessionId(reply, request, sessionId)) return;
@@ -834,6 +887,7 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
           event,
           projectSessionView(prefixView, context),
           currentChatTurn(prefixView, context.redaction),
+          projectTrace(prefix, redaction).records.filter((record) => record.seq === event.sequence),
         ),
       );
     };

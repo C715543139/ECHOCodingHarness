@@ -25,6 +25,7 @@ import {
   parseCookie,
   sendError,
 } from './http.js';
+import { createProductionRuntime } from './production-runtime.js';
 import { registerWebRoutes, type WebAdapterState } from './register-routes.js';
 
 export {
@@ -74,13 +75,17 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
       env: options.env ?? process.env,
     });
   const workspace = workspaceSummary(options.workspaceRoot);
+  const runtime = await createProductionRuntime({
+    workspaceRoot: options.workspaceRoot,
+    env: options.env ?? process.env,
+    configService,
+  });
   const bootstrapToken = hexToken(32);
   const state: WebAdapterState = {
     advertisedPort: port,
     serviceState: 'running',
     tokenRedeemed: false,
     sessionSecret: undefined,
-    sseOwner: undefined,
   };
 
   const app = Fastify({
@@ -181,6 +186,7 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
     heartbeatIntervalMs,
     assetRoot: options.assetRoot,
     state,
+    sessionApi: runtime.sessionApi,
   });
 
   await app.listen({ host: WEB_SERVER_HOST, port });
@@ -197,11 +203,8 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
 
   const close = async (timeoutMs = WEB_SHUTDOWN_TIMEOUT_MS): Promise<void> => {
     state.serviceState = 'stopping';
-    if (state.sseOwner !== undefined) {
-      if (state.sseOwner.timer !== undefined) clearInterval(state.sseOwner.timer);
-      state.sseOwner.reply.raw.end();
-      state.sseOwner = undefined;
-    }
+    runtime.sessionApi.hub.closeStream();
+    await runtime.sessionApi.coordinator.shutdown(timeoutMs);
     app.server.closeIdleConnections?.();
     app.server.closeAllConnections?.();
     let timer: ReturnType<typeof setTimeout> | undefined;

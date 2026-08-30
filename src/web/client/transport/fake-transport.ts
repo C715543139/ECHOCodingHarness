@@ -1,11 +1,8 @@
 import type {
-  ApprovalChoiceDto,
   ApprovalRequestDto,
-  BootstrapDto,
   ChatTurnDto,
   ProviderConfigDto,
   RuntimeCapabilitiesDto,
-  SafetyModeDto,
   SessionRuntimeDto,
   SessionSummaryDto,
   TraceRecordDetailDto,
@@ -14,40 +11,16 @@ import type {
 } from '../../../contracts/web.js';
 import { projectChatTurns, upsertChatTurn } from '../view-model/chat-projection.js';
 import { catalogModels } from '../view-model/provider-catalog.js';
+import type {
+  ConnectionState,
+  ConsoleSnapshot,
+  WebConsoleTransport,
+  WorkspaceView,
+} from './types.js';
 
 export { catalogModels } from '../view-model/provider-catalog.js';
-
-export type ConnectionState = 'connected' | 'disconnected' | 'reconnecting';
-export type WorkspaceView = 'chat' | 'trace';
+export type { CommandError, ConnectionState, ConsoleSnapshot, WorkspaceView } from './types.js';
 export type FakeTurnScript = 'complete' | 'running' | 'approval' | 'stream' | 'fail' | 'limited';
-
-export interface CommandError {
-  readonly code: WebErrorCode;
-  readonly message: string;
-}
-
-export interface ConsoleSnapshot {
-  readonly connection: ConnectionState;
-  readonly bootstrap: BootstrapDto;
-  readonly sessions: readonly SessionSummaryDto[];
-  readonly selectedSessionId: string | undefined;
-  readonly view: WorkspaceView;
-  readonly settingsOpen: boolean;
-  readonly selectedTraceRecordId: string | undefined;
-  readonly chatTurns: readonly ChatTurnDto[];
-  readonly traceRecords: readonly TraceRecordDto[];
-  readonly inspectorDetail: TraceRecordDetailDto | undefined;
-  readonly selectedRuntime: SessionRuntimeDto | undefined;
-  readonly composerText: string;
-  readonly providerDraft: ProviderConfigDto;
-  readonly lastCommandError?: CommandError | undefined;
-  readonly resyncRequired: boolean;
-  readonly loadingHistory: boolean;
-  readonly hasMoreSessions: boolean;
-  readonly providerFieldErrors?: Readonly<Record<string, string>> | undefined;
-  readonly providerErrorSummary?: string | undefined;
-  readonly lastDiscoveredAt?: string | undefined;
-}
 
 export interface FakeTransportOptions {
   readonly connection?: ConnectionState;
@@ -69,31 +42,13 @@ export interface FakeTransportOptions {
   readonly resyncRequired?: boolean;
 }
 
-export interface FakeTransport {
-  readonly getSnapshot: () => ConsoleSnapshot;
-  readonly subscribe: (listener: () => void) => () => void;
-  createSession(): void;
-  selectSession(id: string): void;
-  setView(view: WorkspaceView): void;
+export interface FakeTransport extends WebConsoleTransport {
   setConnection(state: ConnectionState): void;
-  openSettings(): void;
-  closeSettings(): void;
-  selectTraceRecord(id: string | undefined): void;
-  setComposerText(text: string): void;
-  submitTurn(): void;
-  cancelTurn(): void;
-  setProviderDraft(draft: ProviderConfigDto): void;
-  saveProviderDraft(): void;
-  changeRuntime(update: { readonly model?: string; readonly safetyMode?: SafetyModeDto }): void;
-  respondToApproval(decision: ApprovalChoiceDto): void;
-  discoverModels(): void;
-  loadMoreSessions(): void;
   advanceStream(text: string): void;
   completeActiveTurn(
     status?: Extract<ChatTurnDto['status'], 'completed' | 'failed' | 'cancelled' | 'limited'>,
   ): void;
   requireResync(): void;
-  resyncFromSnapshot(): void;
 }
 
 const DEFAULT_PROVIDER: ProviderConfigDto = {
@@ -452,6 +407,12 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
       return () => {
         listeners.delete(listener);
       };
+    },
+    async start(): Promise<void> {
+      return Promise.resolve();
+    },
+    dispose(): void {
+      listeners.clear();
     },
     createSession(): void {
       if (!snapshot.bootstrap.capabilities.canCreateSession) {

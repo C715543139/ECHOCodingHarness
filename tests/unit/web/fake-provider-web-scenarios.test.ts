@@ -6,7 +6,6 @@ import {
   createWebScenarioTransport,
   WEB_SCENARIO_NAMES,
 } from '../../web-fixtures/fake-provider-web-scenarios.js';
-import { P2_B4_PENDING_WIRING } from '../../web-fixtures/pending-wiring.js';
 import { findWebPrivacyLeaks, serializedWebValue } from '../../web-fixtures/web-privacy.js';
 
 const request = {
@@ -52,12 +51,11 @@ describe('Fake Provider Web scenarios', () => {
     expect(process.env.ECHO_RUN_PROVIDER_SMOKE).not.toBe('1');
   });
 
-  it('keeps the approval scenario as DTO state until B2 renders action buttons', () => {
+  it('keeps the approval scenario as deterministic DTO state for wired action tests', () => {
     const snapshot = createWebScenarioTransport('approval').getSnapshot();
     expect(snapshot.chatTurns[0]?.toolSummaries[0]?.status).toBe('awaiting_approval');
     expect(snapshot.traceRecords.some((record) => record.type === 'approval')).toBe(true);
-    expect(snapshot.bootstrap.capabilities.canRespondToApproval).toBe(false);
-    expect(P2_B4_PENDING_WIRING.some((item) => item.id === 'chat-approval-actions')).toBe(true);
+    expect(snapshot.bootstrap.capabilities.canRespondToApproval).toBe(true);
   });
 
   it('disconnects without offering submit, and large Trace stays within the frozen cap', () => {

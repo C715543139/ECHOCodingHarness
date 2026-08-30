@@ -1,10 +1,10 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（阶段 A 与 P2-B1/B2/B3/B4 独立模块及测试证据已实现；真实 HTTP 根装配与阶段 C 尚未实现）
+> 状态：Accepted implementation
 >
-> 版本：1.7
+> 版本：2.0
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## 1. 目标
 
@@ -55,10 +55,9 @@ tests/e2e/web
 
 A3/A4 不得另起包名或第二套目录。生产静态资源仍写入 `dist/web/`。
 
-桌面 IA 临时视觉参考见 [p2-webui-demo.md](./p2-webui-demo.md)。图只确认布局气质；安全模式、默认
-上下文上限、连接状态、发送可用态、Session 文字状态和 Inspector 区块以
-[web-ui.md](../web-ui.md) 与 [web-api.md](../web-api.md) 为准。这些图是非最终视觉稿，P2 完成后必须删除整个
-`docs/plans/p2-webui-demo/` 目录及说明文档，并去掉所有引用。
+最终实现截图见 [echo-web-console.png](../assets/echo-web-console.png)；安全模式、默认上下文上限、连接
+状态、发送可用态、Session 文字状态和 Inspector 区块仍以 [web-ui.md](../web-ui.md) 与
+[web-api.md](../web-api.md) 为准。实现前临时视觉资产及其说明已在 C3 删除。
 
 ## 3. 技术基线
 
@@ -270,7 +269,7 @@ echo-harness web
    （Page/ApiResponse 由统一工厂生成，长度与数组上限集中定义）、错误码、幂等终态语义和三层
    Policy Explain 事实。`PolicyDecision` 携带稳定 `ruleId`，新 Writer 写入授权/审批/拒绝事件，旧 Session
    缺少字段时按可选兼容读取，不提升 Session schema。DTO 脱敏约束已冻结。B3 已落地 `projectTrace`
-   投影器，P2-1-05 仍因 HTTP 装配未接而保持 Partial。本任务不实现 HTTP 路由或页面。
+   投影器；C1 已完成 HTTP 装配并关闭 P2-1-05。
 3. **A2：共享 Provider 配置服务（已实现）**。已抽出 CLI/Web 共用的读取、严格校验、显式发现、
    写锁与原子写入。Web 使用受限 Provider merge（`saveProviderSettings`），CLI wizard 使用完整
    校验替换（`replacePersistentConfig`）；API Key 仍只来自环境变量。本任务不实现 HTTP 路由。
@@ -280,32 +279,31 @@ echo-harness web
    和组件测试环境；顶栏、侧栏和输入区按 [web-ui.md](../web-ui.md) 落位。使用 Fake transport，不连接
    真实 API。
 6. **A5：Phase A 集成门禁（已实现）**。已统一 Fastify 路由装配、React 根组件、package scripts、
-   `dist/web/` 构建顺序与 CI；`pnpm test:web` 与 `pnpm smoke:web-artifact` 进入质量门。业务
-   Session/Turn API 与 Playwright 流程仍待阶段 B。
+   `dist/web/` 构建顺序与 CI；`pnpm test:web` 与 `pnpm smoke:web-artifact` 进入质量门。阶段 B/C
+   随后完成业务 Session/Turn API、Playwright、生产 transport 与最终验收。
 
 A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。Web DTO 与配置服务属于共享边界，
 阶段 A 完成前不得并行实现相互竞争的私有类型。
 
 ### 阶段 B：可并行核心
 
-- B1：Session/Turn/审批 API、单活动 Turn 与 SSE（路由模块已实现，C1 装配）；
-- B2：Session rail、Chat、输入区和 Provider 设置（已实现：冻结 DTO + Fake transport 组件层，动作为显式窄接口注入，无模块级全局 controller；真实 HTTP 与根装配留 C1）；
-- B3：Trace 投影与 Inspector DTO（已实现独立 `src/web/trace` 投影、稳定 seq/upsert、Inspector 与有界列表；未改 App/路由装配）；
-- B4：安全、浏览器测试夹具和产物构建管线（已实现独立 Fake 夹具、fail-closed 产物扫描与隔离 smoke 最小环境；package scripts / CI 接线留给 C1，C1 只上传扫描通过的产物）。
+- B1：Session/Turn/审批 API、单活动 Turn 与 SSE（路由模块已实现并由 C1 装配）；
+- B2：Session rail、Chat、输入区和 Provider 设置（冻结 DTO 与显式窄接口已由 C1 接入真实 HTTP/SSE transport，Fake transport 仅用于确定性测试）；
+- B3：Trace 投影与 Inspector DTO（`src/web/trace` 投影、稳定 seq/upsert、Inspector、有界列表与生产 Trace API 已由 C1 装配）；
+- B4：安全、浏览器测试夹具和产物构建管线（Playwright、隔离 smoke 与 fail-closed 产物扫描已由 C1 接入 package scripts / CI；失败证据只在扫描通过后上传）。
 
 B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。共享路由装配和主壳由集成任务
 统一合并。
 
 ### 阶段 C：集成验收
 
-1. 连接真实 Web adapter 与前端；
-2. 完成断线、刷新、审批、取消和跨 Session 浏览；
+1. **C1（已实现）**：连接真实 Web adapter、Provider/Session/Trace 路由与 React HTTP/SSE transport；
+2. **C1（已实现）**：完成断线 resync、刷新、审批、取消和跨 Session 浏览的生产状态接线；
 3. 完成大型 Session、无障碍和隐私验收；
 4. 完成 Windows 产物 smoke 和 P0/P1 回归；
 5. 使用受控真实 Provider 完成一次 Web Chat 与恢复；
 6. 同步所有文档、演示说明和验收矩阵；
-7. 删除 [p2-webui-demo.md](./p2-webui-demo.md) 与 [p2-webui-demo/](./p2-webui-demo/) 全部 PNG，
-   并清除文档引用。不得把 demo 图留作产品截图。
+7. 删除全部临时示意 PNG、说明和引用，以经扫描的真实实现截图替代。
 
 ## 10. 文档同步规则
 
@@ -318,8 +316,7 @@ B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。�
 - 本计划的完成状态和验收证据。
 
 API、事件、工作区、认证、单活动 Turn、配置落点或技术基线变化属于架构决策，必须先修订 ADR。
-纯视觉调整不能改变领域语义。实现提交不得把 `Accepted design contract（尚未实现）` 静默改成已交付；
-只有完整验收通过后才更新实现状态。
+纯视觉调整不能改变领域语义。本文仅在完整验收通过后更新为 `Accepted implementation`。
 
 ## 11. 最终验收标准
 

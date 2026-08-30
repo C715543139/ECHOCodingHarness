@@ -2,11 +2,12 @@
 
 > 状态：Ready for recording
 >
-> 版本：1.0
+> 版本：2.0
 >
-> 最后更新：2026-08-28
+> 最后更新：2026-08-31
 
-本文描述两分钟视频可重复录制的失败测试修复故事。演示只使用 `echo-harness run` 的默认文本渲染，不为视频维护第二套输出。P0 不包含 `chat`、`config`、Web UI 或域名页。
+本文保留两分钟 CLI 失败测试修复故事，并补充 P2 本地 Web 控制台展示节拍。两者都使用真实产品
+输出，不为视频维护第二套渲染。
 
 ## 1. 一键 reset
 
@@ -99,3 +100,33 @@ node scripts/demo-accept.mjs
 ## 8. 已验证基线
 
 2026-08-29 在本机用 `.env.test` 注入的受控 OpenAI-compatible 服务上连续运行 3 次，均以退出码 0 完成，耗时分别约为 23.3 秒、16.9 秒和 16.1 秒。三轮都包含失败测试、`apply_patch`、成功复测与 `completed` 终态，且未发现 API Key、个人绝对路径或推理字段泄露。同日 `pnpm smoke:provider`（`ECHO_RUN_PROVIDER_SMOKE=1`）也通过。该结果证明当前命令与 fixture 可用于录制；最终视频仍须按第 6 节执行人工双盲检查。密钥未写入配置文件、未进入 CI、也未出现在本记录中。
+
+## 9. P2 Web 控制台展示
+
+先完成显式受控验收，再录制：
+
+```powershell
+pnpm build
+pnpm accept:web-provider
+node .\dist\cli.js web --workspace .
+```
+
+建议镜头依次覆盖：一次性 bootstrap 后的固定工作区；创建 Session；流式 Chat；运行中禁用发送与
+停止入口；三种审批；刷新后恢复聚合消息；Trace 的 user/agent/context/tool/policy/diff/
+verification/turn 八类记录；Inspector 的 bounded 参数、结果和关联；Provider 设置只显示
+`apiKeyConfigured`。不得展示 bootstrap token、Key、绝对用户路径、原始 JSONL 或隐藏推理。
+
+真实实现静态展示图是 [echo-web-console.png](./assets/echo-web-console.png)。2026-08-31 的受控 Web
+验收使用 `deepseek/deepseek-v4-flash`，Chat、SSE 终态、恢复和 Trace 在 4003 ms 内通过；记录不含
+Key 或模型响应正文。
+
+### English introduction
+
+> ECHO Harness is a local-first coding agent built from an explicit TypeScript agent loop rather
+> than an agent framework. Its Windows-first CLI and loopback-only Web console share the same
+> application service, safety policy, bounded tools, and redacted JSONL sessions. The Web console
+> adds resumable Chat, approvals, Provider settings, and an explainable Trace/Inspector view while
+> keeping API keys, absolute personal paths, raw reasoning, and unbounded tool output out of browser
+> DTOs. Deterministic Fake Provider tests, Playwright accessibility and stress scenarios, isolated
+> artifact smoke tests, fail-closed privacy scans, and an explicit non-CI real-Provider check make
+> the evidence reproducible without putting paid credentials into CI.

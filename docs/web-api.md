@@ -1,10 +1,10 @@
 # ECHO Harness 本地 Web API 契约
 
-> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结；A3/A5 已实现 loopback 传输、bootstrap 认证、请求防护与路由装配；B1 已实现独立可装配的 Session/Turn/审批/SSE 路由模块，共享 `register-routes.ts` 装配仍待 C1）
+> 状态：Accepted
 >
-> 版本：1.4
+> 版本：2.0
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## 1. 目的与适用范围
 

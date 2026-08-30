@@ -35,7 +35,11 @@ export interface TestWebServer {
 }
 
 export async function startTestWebServer(
-  overrides: { readonly heartbeatIntervalMs?: number; readonly withAssets?: boolean } = {},
+  overrides: {
+    readonly heartbeatIntervalMs?: number;
+    readonly withAssets?: boolean;
+    readonly env?: Record<string, string | undefined>;
+  } = {},
 ): Promise<TestWebServer> {
   const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'echo-web-ws-'));
   const artifactRoot = await mkdtemp(path.join(tmpdir(), 'echo-web-art-'));
@@ -56,7 +60,7 @@ export async function startTestWebServer(
     artifactRoot,
     ...(assetRoot === undefined ? {} : { assetRoot }),
     port: 0,
-    env: { ECHO_API_KEY: 'test-key' },
+    env: overrides.env ?? { ECHO_API_KEY: 'test-key' },
     heartbeatIntervalMs: overrides.heartbeatIntervalMs ?? 20,
   });
   const origin = `http://${WEB_SERVER_HOST}:${String(server.port)}`;

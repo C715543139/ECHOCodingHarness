@@ -5,9 +5,8 @@
 A lightweight, local-first autonomous coding agent built from scratch.
 
 ECHO Harness is a Windows-first TypeScript CLI that connects to an OpenAI-compatible model,
-runs an explicit Turn/Step agent loop, executes bounded workspace tools, and records redacted
-JSONL events. The P0 release focuses on one complete, inspectable coding loop instead of a broad
-feature surface.
+runs an explicit Turn/Step agent loop, executes bounded workspace tools, records redacted JSONL
+events, and exposes the same application service through a loopback-only Web console.
 
 ## Why it is worth inspecting
 
@@ -27,7 +26,7 @@ feature surface.
 ## Architecture
 
 ```text
-CLI / demo
+CLI / local Web console
    |
    v
 Agent Loop -----> Context Projector -----> OpenAI-compatible Provider
@@ -122,8 +121,14 @@ node .\dist\cli.js web --workspace . --no-open
 
 Phase A starts a `127.0.0.1` console for one fixed workspace. The default command opens the
 server-issued, verified loopback bootstrap URL. `--no-open` prints that same URL and does not
-open a browser. It does not yet provide live Session/Turn APIs or a connected Chat backend. See
-[ADR-0007](docs/decisions/0007-local-web-console.md).
+open a browser. The console provides live Session/Turn/approval APIs, aggregated Chat, SSE
+reconnection, Provider settings, and a bounded Trace/Inspector view. It shares configuration,
+application services, safety policy, and redacted Session storage with the CLI.
+
+![ECHO local Web console showing a pending command approval](docs/assets/echo-web-console.png)
+
+See [ADR-0007](docs/decisions/0007-local-web-console.md), the
+[Web API contract](docs/web-api.md), and the [WebUI specification](docs/web-ui.md).
 
 ## Resettable demonstration
 
@@ -158,12 +163,26 @@ pnpm check
 pnpm eval:offline
 pnpm smoke:demo
 pnpm smoke:artifact
+pnpm test:web:e2e
 ```
 
 `pnpm check` runs formatting, linting, strict type checking, coverage, build, CLI smoke, artifact
-cwd smoke, secret scan, identity scan, and generated malicious-sample self-tests. CI uses only the
-deterministic Fake Provider and never receives a real API key. Details and the coverage matrix are in
-[docs/testing.md](docs/testing.md).
+cwd and isolated Web smoke, secret scan, identity scan, Web artifact scan, and generated
+malicious-sample self-tests. Playwright covers keyboard, accessibility, 200% zoom, reconnection,
+approvals, Provider secrecy, and large Trace sessions. CI uses only the deterministic Fake Provider
+and never receives a real API key.
+
+Controlled local acceptance of the packaged Web console is explicit and non-CI:
+
+```powershell
+pnpm build
+pnpm accept:web-provider
+```
+
+The helper reads Provider credentials from the environment or gitignored `.env.test`, uses a
+temporary workspace, verifies Chat/SSE/recovery/Trace, prints no response body or key, and restores
+temporary configuration. Details and evidence are in [docs/testing.md](docs/testing.md) and the
+[P2 acceptance matrix](docs/plans/p2-acceptance-matrix.md).
 
 ## Documentation
 
@@ -189,8 +208,9 @@ deterministic Fake Provider and never receives a real API key. Details and the c
 
 - ECHO is not an operating-system sandbox. Approved PowerShell commands can still access network
   or files permitted to the current user.
-- The current release does not provide Web UI, MCP, multi-agent execution, or a
-  general rollback system. `echo-harness chat` reuses the same application service as `run`.
+- The current release does not provide MCP, multi-agent execution, remote Web access, Session
+  export, or a general rollback system. The CLI and local Web console reuse the same application
+  service.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

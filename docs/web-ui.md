@@ -1,10 +1,10 @@
 # ECHO Harness WebUI 产品与交互规格
 
-> 状态：Accepted design contract（A4 主壳、B2 Session/Chat/设置组件及 B3 Trace 投影、Inspector 与有界列表已落地；真实 HTTP 与根组件装配仍待 C1）
+> 状态：Accepted
 >
-> 版本：1.3
+> 版本：2.0
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## 1. 产品定位
 
@@ -71,12 +71,9 @@ Session rail | Chat or Trace | Inspector
 
 公开产品只作为布局与渐进披露参考。ECHO 不复刻其品牌、颜色、图标、文案、组件代码或插件结构。
 
-桌面信息架构的临时视觉参考是 [p2-webui-demo.md](./plans/p2-webui-demo.md) 与
-[p2-webui-demo/](./plans/p2-webui-demo/) 中的三张示意图。示意图只确认两栏/三栏、侧栏、
-`对话 / 轨迹` 和输入区位置；安全模式文案、上下文上限、发送按钮可用态、Session 文字状态、
-Inspector 区块和审批/空态均以本文与 [web-api.md](./web-api.md) 为准，不以图为准。消息复制可作为
-非阻塞增强；消息刷新不进入 P2。这些图是非最终视觉稿，P2 完成后必须删除，见
-[p2-webui-demo.md](./plans/p2-webui-demo.md) 的删除条款。
+最终实现见 [ECHO local Web console 截图](./assets/echo-web-console.png)。截图来自自动化浏览器中的已实现
+React 主壳与审批场景，并已通过 Web 产物隐私扫描；它只用于展示，不替代本文或
+[web-api.md](./web-api.md) 的行为契约。消息复制仍只是非阻塞增强；消息刷新不进入 P2。
 
 ## 4. Session rail
 

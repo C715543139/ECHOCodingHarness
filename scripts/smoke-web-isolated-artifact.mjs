@@ -407,7 +407,6 @@ export async function runIsolatedWebArtifactSmoke() {
   const packageDir = path.join(tempRoot, 'package');
   const cwd = path.join(tempRoot, 'cwd');
   const workspace = path.join(tempRoot, 'workspace');
-  const pending = [];
   const pnpmEnv = buildIsolatedPnpmEnv(process.env);
   const webEnv = buildIsolatedWebEnv(process.env, ISOLATED_WEB_SMOKE_KEY);
   let runningChild;
@@ -507,11 +506,18 @@ export async function runIsolatedWebArtifactSmoke() {
       },
       body: JSON.stringify({}),
     });
-    if (created.status === 404) {
-      pending.push('POST /api/v1/sessions (B1/C1)');
-    } else if (created.status !== 200 && created.status !== 201) {
+    if (created.status !== 201) {
       child.kill('SIGTERM');
-      throw new Error(`Isolated session create returned unexpected ${String(created.status)}.`);
+      throw new Error(`Isolated session create expected 201, got ${String(created.status)}.`);
+    }
+    const createdPayload = await created.json();
+    if (
+      typeof createdPayload !== 'object' ||
+      createdPayload === null ||
+      typeof createdPayload.data?.session?.id !== 'string'
+    ) {
+      child.kill('SIGTERM');
+      throw new Error('Isolated session create did not return a SessionView DTO.');
     }
 
     const exitCode = await stopChild(child);
@@ -522,9 +528,6 @@ export async function runIsolatedWebArtifactSmoke() {
     }
 
     process.stdout.write('Isolated Web artifact smoke check passed.\n');
-    if (pending.length > 0) {
-      process.stdout.write(`pending-wiring: ${pending.join('; ')}\n`);
-    }
   } finally {
     try {
       runningChild?.kill();

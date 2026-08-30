@@ -9,6 +9,7 @@ import type {
   SessionRuntimeDto,
   SessionSummaryDto,
   SessionViewDto,
+  TraceRecordDto,
   TurnQuery,
   WebStreamEvent,
 } from '../contracts/index.js';
@@ -340,10 +341,12 @@ export function projectStreamEvent(
   event: EchoEvent,
   view: SessionViewDto,
   chatTurn: ChatTurnDto | undefined,
+  traceRecords: readonly TraceRecordDto[] = [],
 ): WebStreamEvent {
   const delta = {
     view,
     ...(chatTurn === undefined ? {} : { chatTurn }),
+    ...(traceRecords.length === 0 ? {} : { traceRecords }),
   };
   if (event.type === 'approval.requested' && view.session.pendingApproval !== undefined) {
     return {
@@ -372,7 +375,7 @@ export function projectStreamEvent(
     };
   }
   return {
-    type: 'session.updated',
+    type: traceRecords.length === 0 ? 'session.updated' : 'record.upsert',
     sessionId: event.sessionId,
     seq: event.sequence,
     delta,

@@ -82,7 +82,7 @@ describe('Fastify security fixture', () => {
     }
   });
 
-  it('does not register Session create and reports that gap instead of forging success', async () => {
+  it('registers Session create without weakening request guards or DTO privacy', async () => {
     const harness = await startSecurityFixture();
     try {
       const cookie = await redeemBootstrap(harness);
@@ -97,8 +97,14 @@ describe('Fastify security fixture', () => {
         cookies: cookie,
         payload: {},
       });
-      expect(created.statusCode).toBe(404);
-      expect(created.json()).toMatchObject({ error: { code: 'NOT_FOUND' } });
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({
+        data: {
+          session: { phase: 'idle' },
+          capabilities: { canSubmitTurn: true },
+        },
+      });
+      expect(findWebPrivacyLeaks(serializedWebValue(created.json()))).toEqual([]);
     } finally {
       await harness.server.close();
     }

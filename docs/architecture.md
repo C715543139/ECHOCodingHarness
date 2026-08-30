@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.9
+> 版本：2.0
 >
 > 最后更新：2026-08-30
 
@@ -13,9 +13,8 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳；B1 已提供
-Session/Turn/SSE 路由模块，B2 已把 Session/Chat/设置接到 Fake transport，B3 已提供独立的
-`src/web/trace` 业务记录投影与 Inspector。上述模块尚待 C1 完成真实 HTTP 与根组件装配。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+[web-ui.md](./web-ui.md)；Phase A 与 B1–B4 已落地契约及独立模块，C1 已将 Provider、Session、
+Turn、审批、Trace、SSE、React 根状态和真实 HTTP transport 统一装配到生产 Web 控制台。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -312,7 +311,7 @@ Context Projector 按优先级构建上下文：
 1. `echo-harness run <goal>`：在指定工作区完成单次目标；
 2. `echo-harness chat`：P1 多轮交互；通过应用服务复用同一 Agent Loop；
 3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`；
-4. `echo-harness web`：P2 Phase A 已落地的固定工作区 loopback 控制台；默认打开服务器实际生成且已验证的 loopback bootstrap URL，`--no-open` 只打印同一地址。B1 Session/Turn API 模块已经实现，生产路由装配仍待 C1。
+4. `echo-harness web`：P2-C1 已落地的固定工作区 loopback 控制台；默认打开服务器实际生成且已验证的 loopback bootstrap URL，`--no-open` 只打印同一地址。生产进程统一装配 Provider、Session/Turn/审批、Trace 与 SSE 路由。
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
@@ -372,13 +371,14 @@ CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部�
 `chat` 恢复、Slash 与粘贴适配器接到同一应用服务。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。
 
-P2 已完成计划、ADR、API 与 UI 契约冻结。A1 已把有界 Web DTO/Schema、幂等语义与 Policy Explain
+P2 已完成实现与最终验收。A1 已把有界 Web DTO/Schema、幂等语义与 Policy Explain
 事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。A3 已落地 Fastify loopback
 生命周期、一次性 bootstrap Cookie、Host/Origin/CSP 与单 SSE 所有权。A4 已落地 React 主壳与 Fake
-transport。A5 已统一路由装配、`dist/web/` 构建顺序、`pnpm test:web` / `pnpm smoke:web-artifact`
-与 CI 证据。B1 已实现 Session/Turn/审批/SSE 路由模块；B2 已把 Session rail、Chat 聚合/审批/输入区和
-Provider 设置接到冻结 DTO 与 Fake transport；B3 已实现 Trace 投影、Inspector 与有界列表；B4 已落地
+transport。A5 已统一基础路由装配与 `dist/web/` 构建顺序。B1 已实现 Session/Turn/审批/SSE 路由模块；
+B2 已把 Session rail、Chat 聚合/审批/输入区和 Provider 设置接到冻结 DTO；B3 已实现 Trace 投影、
+Inspector 与有界列表；B4 已落地
 独立 Fake Provider Web 场景、Fastify 安全夹具、Playwright Fake 入口、隔离产物 smoke（最小子进程环境）
-与 fail-closed Web 产物隐私扫描。共享路由、真实 HTTP 页面、package scripts 与 CI 接线留给 C1，且 C1
-只上传扫描通过的 Playwright 产物。实现状态只能在
-对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。
+与 fail-closed Web 产物隐私扫描。C1 完成共享生产路由、真实 HTTP/SSE 页面 transport、package scripts
+与 CI 接线；Playwright 失败产物只在隐私扫描通过后上传。C2 已通过完整 Windows/Chromium 门禁、隔离
+产物 smoke 与受控真实 Provider 的 Chat、SSE 终态、恢复和 Trace 验收。C3 已移除临时示意资产并以
+经扫描的真实实现截图和最终证据矩阵收尾。Web API、UI 与本节状态均为已交付。

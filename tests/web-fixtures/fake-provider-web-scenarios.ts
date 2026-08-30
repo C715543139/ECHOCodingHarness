@@ -160,6 +160,7 @@ export function createWebScenarioTransport(name: WebScenarioName): FakeTransport
       return createFakeTransport({
         sessions: [running, createIdleSession()],
         selectedSessionId: running.id,
+        pendingApproval: FAKE_WEB_APPROVAL,
         chatTurns: [createApprovalChatTurn()],
         traceRecords: [
           createSampleTraceRecord({ id: 'rec_user_ask', seq: 1, parameterSummary: '运行测试' }),

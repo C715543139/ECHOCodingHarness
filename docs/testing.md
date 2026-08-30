@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.9
+> 版本：2.0
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## Automated quality gate
 
@@ -174,7 +174,7 @@ The script requires all three Provider settings, disables retries, limits output
 model response. Remove the API key from the shell environment after the check. This path is local
 acceptance only and is not part of CI. It does not read `.env.test`.
 
-## P2 Web quality plan (Phase A and B1-B4 modules implemented)
+## P2 Web quality plan (C1 production assembly implemented)
 
 P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
 unit-test run install or launch a browser. Phase A provides `pnpm test:web`, `pnpm build:web`,
@@ -186,9 +186,9 @@ independent Fake Provider Web scenarios, a Fastify security fixture,
 Playwright Chromium specs under `tests/e2e/web/`, isolated-package Web artifact smoke, and
 screenshot/trace privacy scanning. The scanner reads `error-context.md` and other page artifacts,
 fail-closes `trace.zip` as `unscannable-archive`, and fail-closes files larger than 8 MiB as
-`oversized-artifact`. C1 may upload Playwright artifacts only after this scan passes.
-`pnpm test:web:e2e`, isolated smoke, and the Web artifact scan step stay unwired in package scripts
-and CI until C1.
+`oversized-artifact`. C1 wires `pnpm test:web:e2e`, isolated smoke, and the Web artifact scanner
+into package scripts and Windows CI. Playwright failure artifacts are uploaded only when the
+fail-closed scan step succeeds.
 
 ### Fast unit and integration layer
 
@@ -198,8 +198,8 @@ and CI until C1.
   deterministic fixtures and do not start HTTP routes or pages. Schema tests cover centralized
   bounds, absolute-path names, oversize strings/arrays, unknown fields, and forbidden secret
   properties. Idempotency tests prove concurrent waiters settle on the same terminal response
-  without a parameterless abort. P2-1-05 is Partial: B3 `projectTrace` redacts secrets,
-  reasoning and absolute paths, but HTTP response assembly remains C1;
+  without a parameterless abort. C1 production Trace HTTP assembly uses the same B3
+  `projectTrace` redaction for secrets, reasoning and absolute paths;
 - remaining Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
 - shared Provider config service tests in `tests/unit/config/config-service.test.ts` prove Web
   `saveProviderSettings` is a restricted Provider merge, CLI `replacePersistentConfig` is a full
@@ -223,13 +223,14 @@ and CI until C1.
   does not advance seq, `resync_required`, subscribe-buffer-snapshot-drain races, and concurrent
   `409 STREAM_ACTIVE` before hijack (`tests/unit/web/sse-hub.test.ts`,
   `tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts`,
-  `tests/integration/web/sse-resync.test.ts`). These prove the independently assembled B1 module;
-  production `register-routes.ts` wiring remains C1;
+  `tests/integration/web/sse-resync.test.ts`). C1 also exercises the production
+  `register-routes.ts` assembly through the shared security fixture;
 - Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order.
   B3 evidence: `tests/unit/web/trace-projector.test.ts`, `trace-privacy.test.ts`,
   `trace-redaction.test.ts`, `trace-upsert.test.ts`, `context-detail.test.ts`,
   `policy-detail.test.ts`, `diff-detail.test.ts`, `verification-detail.test.ts`,
-  `inspector.test.tsx`. HTTP and browser assembly remain C1.
+  `inspector.test.tsx`, plus C1 HTTP list/detail evidence in
+  `tests/integration/web/production-assembly.test.ts`.
   P2 does not implement session export.
 
 ### React component layer
@@ -280,9 +281,9 @@ pnpm and Web child processes receive an explicit Windows env allowlist (`PATH`, 
 controlled `ECHO_API_KEY`; other `ECHO_*` and common CI/cloud/token/key variables are not inherited.
 Windows invokes `pnpm.cmd` with a fixed argument array and `shell: false`. Temp cleanup failures are
 reported without expanding the delete scope beyond that `os.tmpdir()` tree. It does not use source,
-repository `node_modules`, `.env.test`, or a user profile workspace. Session create remains pending
-B1; the script records that gap instead of forging a Session. C1 wires the script into `pnpm check`
-/ CI. It must not rely on `.env.test`, a paid Provider, or a user profile path.
+repository `node_modules`, `.env.test`, or a user profile workspace. C1 requires the isolated
+`POST /api/v1/sessions` call to return `201 SessionViewDto` and wires the script into `pnpm check`
+/ CI. It does not rely on `.env.test`, a paid Provider, or a user profile path.
 
 CI installs the pinned Chromium version only in the Web E2E evidence step and caches it by the
 Playwright version. Browser failures save bounded screenshots/traces as CI artifacts only after
@@ -295,6 +296,24 @@ P2 local real-Provider acceptance is explicit and non-CI: start the packaged Web
 temporary authorized workspace, complete one bounded Chat Turn, refresh/resume it, inspect Trace,
 and verify the saved Session. The response body and key are not printed or committed. P2 does not
 export sessions from the WebUI.
+
+Run it only with authorized credentials:
+
+```powershell
+pnpm build
+pnpm accept:web-provider
+```
+
+The helper loads the environment or gitignored `.env.test`, writes a temporary non-secret
+artifact-root config, starts the packaged `dist/cli.js web`, authenticates through the one-time
+bootstrap flow, verifies SSE terminal delivery plus restored Chat and Trace DTOs, and restores the
+previous config and temporary workspace in `finally`.
+
+The 2026-08-31 C2 baseline passed `pnpm check` with 117 test files / 637 tests and coverage of
+85.01% statements, 76.94% branches, 89.04% functions, and 86.80% lines. Playwright Chromium was
+9/9; offline evals were 11/11 and demo smoke was 1/1. Controlled Provider acceptance used
+`deepseek/deepseek-v4-flash` and completed packaged Web Chat, SSE terminal delivery, Session
+recovery, and Trace in 4003 ms without recording the key or response body.
 
 ## Known gaps
 
@@ -318,9 +337,8 @@ export sessions from the WebUI.
 - Hosts without CSI `200~`/`201~` still submit one typed batch per Enter and cannot promise
   multi-line paste atomicity. Chat `/model` consumes the catalog port rather than a second
   `GET /models` implementation.
-- P1 does not include Web UI, MCP, multi-agent execution, TUI, or multi-Provider profiles.
-- P2 Phase A Web scripts, Fastify security skeleton, React shell, and `pnpm smoke:web-artifact`
-  exist. B4 landed independent Playwright Fake specs, isolated-package smoke with a min env
-  allowlist, and fail-closed Web artifact scanning;
-  live Session/Turn APIs and package/CI wiring remain C1. Phase A acceptance must not be reported as
-  full P2 implementation acceptance.
+- P2 does not include remote Web access, MCP, multi-agent execution, TUI, Session export, or
+  multi-Provider profiles.
+- P2 production assembly, live Session/Turn/Trace APIs, real HTTP/SSE transport, package/CI wiring,
+  complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
+  cleanup are complete.

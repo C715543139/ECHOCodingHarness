@@ -2,21 +2,21 @@
 
 > 状态：Accepted
 >
-> 版本：1.6
+> 版本：2.0
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## 1. 文档目的
 
 ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进程。本文件定义首个版本的威胁模型、信任边界与强制控制，目标是在开发工作区内提供可审查的自动化能力。
 
 ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
-[ADR-0007](./decisions/0007-local-web-console.md)。Phase A 已落地 loopback 传输、bootstrap 认证与
-请求防护；P2-B1 已实现独立可装配的 Session/Turn/审批/SSE 路由模块（Cookie/Host/Origin/no-store/
-幂等与关闭语义由测试装配覆盖），B2 Web Chat/设置只投影 `apiKeyConfigured`，不把密钥写入 DOM、日志或快照。
-B3 Trace 投影统一删除 reasoning、秘密与绝对路径；B4 增加独立 Fastify 安全夹具、fail-closed Web 产物
-隐私扫描与隔离产物 smoke 的最小子进程环境。共享 `register-routes.ts`、真实 HTTP transport、package 与
-CI 装配仍待 C1。
+[ADR-0007](./decisions/0007-local-web-console.md)。P2 已交付 loopback 传输、bootstrap 认证、请求
+防护、Session/Turn/审批/SSE 生产路由和真实 HTTP/SSE transport。Web Chat/设置只投影
+`apiKeyConfigured`，不把密钥写入 DOM、日志或快照；Trace 投影统一删除 reasoning、秘密与绝对路径。
+独立 Fastify 安全夹具、最小环境隔离产物 smoke、Playwright 和 fail-closed Web 产物扫描已进入
+package/CI，浏览器失败证据只有在扫描成功后才可上传。2026-08-31 受控真实 Provider 验收也通过
+同一 DTO 隐私断言，未记录 Key 或响应正文。
 
 ## 2. 需要保护的资产
 

@@ -53,7 +53,20 @@ describe('Web SSE ownership', () => {
     const harness = await startTestWebServer({ heartbeatIntervalMs: 15 });
     try {
       const cookie = await harness.bootstrap();
-      const url = `${harness.origin}/api/v1/sessions/session-1/events`;
+      const created = await harness.inject({
+        method: 'POST',
+        url: '/api/v1/sessions',
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': 'req_sse_owner_create',
+        },
+        cookies: cookie,
+        payload: {},
+      });
+      expect(created.statusCode).toBe(201);
+      const sessionId = (created.json() as { data: { session: { id: string } } }).data.session.id;
+      const url = `${harness.origin}/api/v1/sessions/${sessionId}/events`;
       const firstPromise = openSse(url, cookie);
       const secondPromise = openSse(url, cookie);
       const [first, second] = await Promise.all([firstPromise, secondPromise]);
@@ -62,7 +75,7 @@ describe('Web SSE ownership', () => {
       const winner = first.status === 200 ? first : second;
       const loser = first.status === 409 ? first : second;
       expect(winner.text).toContain('event: heartbeat');
-      expect(winner.text).not.toMatch(/^id:/mu);
+      expect(winner.text).not.toMatch(/id:[^\n]*\nevent: heartbeat/u);
       expect(loser.status).toBe(409);
 
       winner.request.destroy();
@@ -73,7 +86,7 @@ describe('Web SSE ownership', () => {
       const reconnect = await openSse(url, cookie);
       expect(reconnect.status).toBe(200);
       expect(reconnect.text).toContain('event: heartbeat');
-      expect(reconnect.text).not.toMatch(/^id:/mu);
+      expect(reconnect.text).not.toMatch(/id:[^\n]*\nevent: heartbeat/u);
       reconnect.request.destroy();
     } finally {
       await harness.server.close();

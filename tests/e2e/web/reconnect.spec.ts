@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-import { P2_B4_PENDING_WIRING } from '../../web-fixtures/pending-wiring.js';
-
 test.describe('disconnect reconnect resync', () => {
   test('flips Fake connection state without replaying a POST', async ({ page }) => {
     await page.goto('/?scenario=first-session');
@@ -32,7 +30,5 @@ test.describe('disconnect reconnect resync', () => {
     });
     await expect(page.getByText('正在重连')).toBeVisible();
     await expect(page.getByTestId('connection-status')).toContainText('未连接');
-
-    expect(P2_B4_PENDING_WIRING.some((item) => item.id === 'sse-resync')).toBeTruthy();
   });
 });

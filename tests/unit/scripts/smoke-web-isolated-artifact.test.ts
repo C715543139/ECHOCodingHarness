@@ -164,7 +164,9 @@ describe('smoke-web-isolated-artifact source contract', () => {
     expect(source).toContain('/api/v1/auth/bootstrap');
     expect(source).toContain('/api/v1/bootstrap');
     expect(source).toContain('/api/v1/sessions');
-    expect(source).toContain('pending-wiring');
+    expect(source).toContain('expected 201');
+    expect(source).toContain('SessionView DTO');
+    expect(source).not.toContain('pending-wiring');
     expect(source).toContain('stdin.end');
     expect(source).toContain("'.env.test'");
     expect(source).toContain('install --prod');

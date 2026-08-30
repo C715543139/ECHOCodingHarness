@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-import { P2_B4_PENDING_WIRING } from '../../web-fixtures/pending-wiring.js';
-
 test.describe('bootstrap and first Session', () => {
   test('creates the first Fake Provider session from an empty console', async ({ page }) => {
     expect(process.env.ECHO_RUN_PROVIDER_SMOKE).toBeFalsy();
@@ -15,7 +13,5 @@ test.describe('bootstrap and first Session', () => {
     await expect(page.getByText('开始对话。历史只投影聚合 Session 事实。')).toBeVisible();
     await expect(page.getByLabel('模型')).toBeVisible();
     await expect(page.getByTestId('connection-status')).toContainText('已连接');
-
-    expect(P2_B4_PENDING_WIRING.some((item) => item.id === 'http-console-transport')).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import path from 'node:path';
 
 import fastifyStatic from '@fastify/static';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 import type { ProviderConfigService } from '../../config/index.js';
 import { WEB_JSON_SCHEMAS, type BootstrapDto } from '../../contracts/index.js';
@@ -12,25 +12,20 @@ import { projectRuntimeCapabilities, type WebServiceState } from '../runtime-cap
 
 import {
   WEB_AUTH_COOKIE,
-  WEB_CSP,
   hexToken,
   isApiPath,
   requestIdOf,
   sendError,
   toProviderDto,
 } from './http.js';
-
-export interface WebSseOwner {
-  readonly reply: FastifyReply;
-  timer: ReturnType<typeof setInterval> | undefined;
-}
+import { registerProviderApiRoutes } from './provider-api.js';
+import { registerSessionApiRoutes, type SessionApiDependencies } from './session-api.js';
 
 export interface WebAdapterState {
   advertisedPort: number;
   serviceState: WebServiceState;
   tokenRedeemed: boolean;
   sessionSecret: string | undefined;
-  sseOwner: WebSseOwner | undefined;
 }
 
 export interface WebRouteDependencies {
@@ -40,6 +35,7 @@ export interface WebRouteDependencies {
   readonly heartbeatIntervalMs: number;
   readonly assetRoot: string | undefined;
   readonly state: WebAdapterState;
+  readonly sessionApi: Omit<SessionApiDependencies, 'state' | 'heartbeatIntervalMs'>;
 }
 
 export async function registerWebRoutes(
@@ -91,14 +87,17 @@ export async function registerWebRoutes(
       return;
     }
     const writable = state.serviceState === 'running';
+    const active = deps.sessionApi.coordinator.snapshot();
     const data: BootstrapDto = {
       workspace,
-      provider: toProviderDto(read.value, writable),
+      provider: toProviderDto(read.value, writable && active.sessionId === undefined),
       capabilities: projectRuntimeCapabilities({
         serviceState: state.serviceState,
         providerAvailable: read.value.apiKeyConfigured,
         selectedSessionAvailable: false,
         awaitingApproval: false,
+        ...(active.sessionId === undefined ? {} : { activeSessionId: active.sessionId }),
+        ...(active.turnId === undefined ? {} : { activeTurnId: active.turnId }),
       }),
     };
     const schemaErrors = validateWebJsonSchema(WEB_JSON_SCHEMAS.bootstrap, data);
@@ -109,52 +108,15 @@ export async function registerWebRoutes(
     void reply.status(200).send({ data, requestId: requestIdOf(request) });
   });
 
-  app.get('/api/v1/sessions/:sessionId/events', async (request, reply) => {
-    if (state.sseOwner !== undefined) {
-      sendError(
-        reply,
-        request,
-        409,
-        'STREAM_ACTIVE',
-        'This authentication cookie already has an active stream.',
-      );
-      return;
-    }
-    const owner: WebSseOwner = { reply, timer: undefined };
-    state.sseOwner = owner;
-    void reply.hijack();
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-store',
-      Connection: 'keep-alive',
-      'Content-Security-Policy': WEB_CSP,
-      'X-Content-Type-Options': 'nosniff',
-    });
-    const release = (): void => {
-      if (state.sseOwner !== owner) return;
-      if (owner.timer !== undefined) clearInterval(owner.timer);
-      owner.timer = undefined;
-      state.sseOwner = undefined;
-    };
-    const writeHeartbeat = (): void => {
-      if (reply.raw.destroyed || reply.raw.writableEnded) {
-        release();
-        return;
-      }
-      try {
-        reply.raw.write('event: heartbeat\ndata: {}\n\n');
-      } catch {
-        release();
-      }
-    };
-    writeHeartbeat();
-    owner.timer = setInterval(writeHeartbeat, heartbeatIntervalMs);
-    request.raw.once('close', release);
-    request.raw.once('aborted', release);
-    request.raw.socket?.once('close', release);
-    reply.raw.once('close', release);
-    reply.raw.once('finish', release);
-    reply.raw.once('error', release);
+  registerProviderApiRoutes(app, {
+    configService,
+    coordinator: deps.sessionApi.coordinator,
+    state,
+  });
+  registerSessionApiRoutes(app, {
+    ...deps.sessionApi,
+    state,
+    heartbeatIntervalMs,
   });
 
   app.setNotFoundHandler((request, reply) => {

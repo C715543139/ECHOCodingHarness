@@ -64,3 +64,34 @@ jobs:
 
       - name: Test known malicious scan samples
         run: pnpm scan:self-test
+
+      - name: Install pinned Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Run Web browser flows
+        id: web-e2e
+        continue-on-error: true
+        run: pnpm test:web:e2e
+
+      - name: Fail-closed scan Web browser artifacts
+        id: web-artifact-scan
+        if: always()
+        shell: pwsh
+        run: node scripts/scan-web-artifacts.mjs --root "$env:RUNNER_TEMP\echo-p2-b4-playwright"
+
+      - name: Upload scanned Web failure evidence
+        if: >-
+          always() &&
+          steps.web-e2e.outcome == 'failure' &&
+          steps.web-artifact-scan.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-e2e-failure-evidence
+          path: ${{ runner.temp }}\echo-p2-b4-playwright
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce Web browser result
+        if: always() && steps.web-e2e.outcome == 'failure'
+        shell: pwsh
+        run: exit 1

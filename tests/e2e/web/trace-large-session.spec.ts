@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-import { P2_B4_PENDING_WIRING } from '../../web-fixtures/pending-wiring.js';
-
 test.describe('large Trace list', () => {
   test('bounds and virtualizes the tail page of two hundred Fake records', async ({ page }) => {
     await page.goto('/?scenario=large-trace');
@@ -28,7 +26,5 @@ test.describe('large Trace list', () => {
     });
     await list.locator('[role="listitem"][aria-posinset="1"]').getByRole('button').click();
     await expect(page.getByRole('heading', { name: 'Inspector' })).toBeVisible();
-
-    expect(P2_B4_PENDING_WIRING.some((item) => item.id === 'trace-http-pagination')).toBeTruthy();
   });
 });

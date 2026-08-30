@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('independent Playwright entry', () => {
-  it('keeps Chromium Fake-Provider specs out of package scripts and paid URLs', async () => {
+  it('wires Chromium Fake-Provider specs into scanned CI without paid URLs', async () => {
     const names = await readdir(path.join(ROOT, 'tests', 'e2e', 'web'));
     const config = await readFile(path.join(ROOT, 'playwright.config.ts'), 'utf8');
     const teardown = await readFile(
@@ -24,8 +24,14 @@ describe('independent Playwright entry', () => {
     expect(config).toContain('ECHO_RUN_PROVIDER_SMOKE');
     expect(teardown).toContain('scan-web-artifacts.mjs');
     expect(config).not.toContain('api.openai.com');
-    expect(pack).not.toContain('test:web:e2e');
-    expect(ci).not.toContain('playwright');
+    expect(pack).toContain('test:web:e2e');
+    expect(pack).toContain('scan:web-artifacts');
+    expect(ci).toContain('playwright install chromium');
+    expect(ci).toContain('scan-web-artifacts.mjs');
+    expect(ci).toContain('steps.web-artifact-scan.outcome');
+    expect(ci.indexOf('scan-web-artifacts.mjs')).toBeLessThan(
+      ci.indexOf('actions/upload-artifact'),
+    );
 
     const specs = names.filter((name) => name.endsWith('.spec.ts')).sort();
     expect(specs).toEqual([

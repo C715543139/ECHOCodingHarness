@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -50,6 +50,7 @@ describe('Chat streaming projection', () => {
           createSampleChatTurn({
             userText: 'run the suite',
             status: 'completed',
+            stopReason: 'completed',
             toolSummaries: [
               {
                 toolCallId: 'call_1',
@@ -70,6 +71,9 @@ describe('Chat streaming projection', () => {
 
     const tool = screen.getByText('run_command · completed · exit 0');
     expect(tool.getAttribute('data-status')).toBe('completed');
+    const turn = screen.getByRole('article');
+    expect(within(turn).getByText('completed', { exact: true })).toBeTruthy();
+    expect(within(turn).queryByText('completed · completed', { exact: true })).toBeNull();
 
     const input = screen.getByLabelText('输入');
     const send = screen.getByRole('button', { name: '发送' });

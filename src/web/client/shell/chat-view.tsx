@@ -51,6 +51,12 @@ function canSubmitComposer(capabilities: RuntimeCapabilitiesDto, composerText: s
   return capabilities.canSubmitTurn && composerText.trim().length > 0;
 }
 
+function turnStatusLabel(turn: ChatTurnDto): string {
+  return turn.stopReason === undefined || turn.stopReason === turn.status
+    ? turn.status
+    : `${turn.status} · ${turn.stopReason}`;
+}
+
 export function ChatView({
   session,
   turns,
@@ -93,7 +99,7 @@ export function ChatView({
 
   if (session === undefined) {
     return (
-      <div className={styles.scroll}>
+      <div className={`${styles.scroll} ${styles.chatScroll}`}>
         <p>选择或新建会话后开始对话。</p>
       </div>
     );
@@ -115,7 +121,7 @@ export function ChatView({
   return (
     <>
       <div
-        className={styles.scroll}
+        className={`${styles.scroll} ${styles.chatScroll}`}
         data-testid="chat-scroll"
         onScroll={(event) => {
           const node = event.currentTarget;
@@ -167,10 +173,7 @@ export function ChatView({
                 {summary.resultSummary === undefined ? '' : ` · ${summary.resultSummary}`}
               </p>
             ))}
-            <p className={styles.turnStatus}>
-              {turn.status}
-              {turn.stopReason === undefined ? '' : ` · ${turn.stopReason}`}
-            </p>
+            <p className={styles.turnStatus}>{turnStatusLabel(turn)}</p>
           </article>
         ))}
       </div>

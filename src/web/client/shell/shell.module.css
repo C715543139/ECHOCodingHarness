@@ -279,6 +279,7 @@
 .workspaceName {
   margin: 0;
   overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .railSectionLabel {
@@ -443,6 +444,10 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.chatScroll {
+  padding: var(--echo-space-6) clamp(var(--echo-space-6), 4vw, 4rem);
 }
 
 /* ---------- chat ---------- */

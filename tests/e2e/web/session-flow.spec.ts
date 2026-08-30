@@ -46,9 +46,11 @@ test.describe('bootstrap and first Session', () => {
         rootOverflow: root === null ? undefined : getComputedStyle(root).overflow,
         chatOverflowX: chat === null ? undefined : getComputedStyle(chat).overflowX,
         chatOverflowY: chat === null ? undefined : getComputedStyle(chat).overflowY,
+        chatPaddingLeft: chat === null ? undefined : getComputedStyle(chat).paddingLeft,
+        chatPaddingRight: chat === null ? undefined : getComputedStyle(chat).paddingRight,
       };
     });
-    expect(viewport).toEqual({
+    expect(viewport).toMatchObject({
       height: viewport.height,
       documentHeight: viewport.height,
       htmlOverflow: 'hidden',
@@ -57,6 +59,8 @@ test.describe('bootstrap and first Session', () => {
       chatOverflowX: 'hidden',
       chatOverflowY: 'auto',
     });
+    expect(Number.parseFloat(viewport.chatPaddingLeft ?? '0')).toBeGreaterThan(24);
+    expect(viewport.chatPaddingRight).toBe(viewport.chatPaddingLeft);
 
     const typography = async (locator: Locator) =>
       locator.evaluate((element) => {
@@ -76,6 +80,9 @@ test.describe('bootstrap and first Session', () => {
     expect(await typography(sessionCaption)).toEqual(await typography(workspaceCaption));
     expect((await typography(sessionTitle)).fontSize).toBe((await typography(newSession)).fontSize);
     expect((await typography(workspaceName)).fontSize).toBe('17px');
+    expect(await workspaceName.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
+      'center',
+    );
 
     const modelSelect = page.getByLabel('模型');
     const safetySelect = page.getByLabel('安全模式');

@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：0.6
+> 版本：0.7
 >
 > 最后更新：2026-08-31
 
@@ -100,6 +100,7 @@ P2 交付的控制台使用深色主题、药丸式视图切换、纯文本消�
   工作区脱敏名称保持 `--echo-text-lg`，具体 Session 标题改用与“新会话”按钮相同的
   `--echo-text-base`；长工作区名称仍可换行并在悬停时显示完整脱敏名称。Web DTO 继续禁止 `/`、
   `\` 和盘符，绝对路径不得为解决显示问题而进入浏览器；
+- 工作区名称在侧栏可用宽度内居中显示；
 - 桌面顶栏使用三列布局，将“对话 / 轨迹”稳定置中，连接状态保持右对齐；
 - `html`、`body`、`#root` 与主壳固定为视口高度并隐藏文档级溢出；窄屏单列布局也保持在主壳内，
   滚动所有权只属于 Chat、Trace、Session 列表、Inspector 和设置内容等明确区域。Chat/Trace 只开放
@@ -116,15 +117,19 @@ P2 交付的控制台使用深色主题、药丸式视图切换、纯文本消�
 - 选中活动 Turn 所属 Session 时只显示“当前 Session 正在运行”的提示条，不重复显示“另一会话正在
   运行”；后者只用于浏览非活动 Session。`turn.terminal` 必须使用终态后的活动 Turn 快照投影，并在
   客户端无论当前选中哪个 Session 都清除旧的全局运行限制，不要求刷新或切换视图；
+- Chat 阅读区使用独立于 Trace 的响应式留白，桌面端四周至少 `--echo-space-6`，水平方向可随视口
+  增长至 `4rem`；相同的 Turn 状态与 stop reason 只显示一次，例如成功终态显示 `completed`，不显示
+  `completed · completed`。不同 stop reason 仍保留在状态后方；
 
 ### 验收证据
 
 - `tests/unit/web/session-rail.test.tsx` 与 `tests/unit/web/states.test.tsx` 覆盖两侧栏的拖动、键盘边界
   和恢复默认宽度；
 - `tests/unit/web/chat-stream.test.tsx` 与 `tests/unit/web/inspector.test.tsx` 覆盖统一文案、浮层位置和
-  恢复尾随；
+  恢复尾随，并守护成功终态文案去重；
 - `tests/e2e/web/session-flow.spec.ts` 覆盖桌面拖动、两组侧栏文字层级、文档无整体滚动和模型列表独立
-  滚动样式；`tests/e2e/web/trace-large-session.spec.ts` 覆盖 Inspector 宽度边界和无横向溢出；
+  滚动样式，以及工作区名称居中和 Chat 阅读区响应式留白；
+  `tests/e2e/web/trace-large-session.spec.ts` 覆盖 Inspector 宽度边界和无横向溢出；
 - `tests/unit/web/composer.test.tsx` 覆盖当前/其他 Session 的运行提示；
   `tests/integration/web/sse.test.ts` 与 `tests/unit/web/http-transport.test.ts` 覆盖终态 SSE 在当前或其他
   Session 视图下即时清除活动能力；

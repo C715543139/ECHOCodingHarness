@@ -1,6 +1,8 @@
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     coverage: {
       exclude: ['src/cli.ts', 'src/web/client/main.tsx', 'src/web/client/vite-env.d.ts'],

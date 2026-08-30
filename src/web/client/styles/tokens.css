@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  --echo-color-bg: #14161a;
+  --echo-color-surface: #1c1f26;
+  --echo-color-surface-raised: #252a33;
+  --echo-color-border: #3a404b;
+  --echo-color-text: #e8eaed;
+  --echo-color-muted: #b8bec6;
+  --echo-color-accent: #7aa2f7;
+  --echo-color-accent-text: #0b1220;
+  --echo-color-success: #3fbf7f;
+  --echo-color-danger: #f07178;
+  --echo-color-warning: #e6c07b;
+  --echo-color-focus: #9ec1ff;
+  --echo-font-ui: 'Segoe UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --echo-font-mono: 'Cascadia Code', 'Sarasa Mono SC', 'Consolas', monospace;
+  --echo-space-1: 0.25rem;
+  --echo-space-2: 0.5rem;
+  --echo-space-3: 0.75rem;
+  --echo-space-4: 1rem;
+  --echo-space-5: 1.5rem;
+  --echo-radius: 0.375rem;
+  --echo-rail-width: 17.5rem;
+  --echo-inspector-width: 22rem;
+  --echo-target-min: 1.5rem;
+  --echo-target-primary: 2.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --echo-motion: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    --echo-motion: 160ms;
+  }
+}

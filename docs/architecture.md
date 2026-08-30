@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -11,7 +11,10 @@
 本文定义 ECHO Harness 首个可交付版本的架构边界与关键约束。P0 实现、测试和受控真实 Provider 验收已与 1.0 边界对齐。P1-0 冻结的配置、应用服务与事件边界见
 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
-和 [contracts.md](./contracts.md) 1.2。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
+[ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
+[web-ui.md](./web-ui.md)；这些文档当前是设计契约，不表示 WebUI 已经实现。后续实现若与本文冲突，
+应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -43,11 +46,19 @@ ECHO 表示：
 
 P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文件为 `<artifact-root>/config/echo.config.json`。`ECHO_API_KEY` 仍是唯一秘密环境变量。
 
-### 2.3 非目标（P2 或明确排除）
+### 2.3 P2 目标
 
-- 首版不提供 Web UI、域名展示页或多客户端服务；
-- 不实现多智能体、插件市场、MCP、LSP 或向量数据库；
+- 增加只监听回环地址的固定工作区 Web 控制台；
+- 在同一工作区内提供多 Session 导航、Web Chat、Provider 非秘密配置和结构化 Trace；
+- 浏览器与 CLI 共享应用服务、配置服务、领域事件、Policy 和 Session repository；
+- 整个 Web 服务同时只运行一个 Turn，页面内不可切换工作区；
+- 静态前端资源随 `dist/` 产物交付，不建立远程或多用户服务。
+
+### 2.4 明确排除
+
+- 不实现多智能体、插件市场、Skill、MCP、LSP 或向量数据库；
 - 不追求完整 IDE、容器沙箱或操作系统级安全隔离；
+- 不实现域名部署、远程访问、账号系统、页面内工作区浏览或多个并发 Turn；
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
@@ -55,7 +66,7 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 
 1. **自主循环归本项目所有**：ECHO 自行维护步骤、历史、工具调度、错误处理和终止条件。
 2. **传输层不拥有控制权**：模型客户端仅负责 HTTP/SSE 与协议转换，不执行工具、不管理循环。
-3. **事件先于界面**：CLI、日志和未来 UI 消费同一事件模型；CLI 通过独立 `EventRenderer` 将事件映射为输出，核心逻辑不依赖表现层。
+3. **事件先于界面**：CLI、日志和 P2 UI 消费同一事件模型；CLI 通过独立 `EventRenderer` 将事件映射为输出，核心逻辑不依赖表现层。
 4. **策略集中执行**：路径、命令、审批、超时、输出限制都通过统一执行管线生效。
 5. **状态可解释**：每次模型调用和工具调用都有明确的开始、结果或错误状态。
 6. **Windows 是一等平台**：路径语义、PowerShell 调用、进程树终止与编码问题必须被测试。
@@ -64,12 +75,14 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 ## 4. 系统上下文
 
 ```text
-User / Demo Script
-        |
-        v
-  echo-harness CLI  (parser, paste adapter, renderer)
-        |
-        v
+User / Browser / Demo Script
+        |             |
+        v             v
+  echo-harness CLI   Loopback Web adapter
+        |             |
+        +------+
+               |
+               v
   Application service
         |
         v
@@ -82,7 +95,8 @@ User / Demo Script
      +--------------------> Model Provider -> OpenAI-compatible API
 ```
 
-P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由 CLI 渲染。
+P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由
+CLI 渲染。P2 Web adapter 将调用同一应用服务和查询投影，不能直接读取 JSONL 或解析 CLI 文本。
 
 ## 5. 模块划分
 
@@ -136,7 +150,7 @@ P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。�
 
 ### 5.5 Application service
 
-P1 增加应用服务，作为 CLI 与未来 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。P1-1B 已实现 Chat 输入适配器、Slash 与 `--resume`；Chat 通过可注入的模型目录端口列出 `/model` 候选项，不自行实现第二套 `GET /models` 发现。
+P1 增加应用服务，作为 CLI 与 P2 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。P1-1B 已实现 Chat 输入适配器、Slash 与 `--resume`；Chat 通过可注入的模型目录端口列出 `/model` 候选项，不自行实现第二套 `GET /models` 发现。
 
 ## 6. Turn、Step 与 Agent Loop
 
@@ -301,9 +315,12 @@ P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已�
 
 具体命令、离线 Eval、覆盖矩阵和 CI 边界见 [testing.md](./testing.md)。
 
-## 15. 未来扩展边界
+## 15. P2 Web 扩展边界
 
-若主体完成后增加本地服务或 React 页面，它们只能依赖公开的事件和命令契约，不得把 UI 状态反向侵入 Agent Loop。任何本地 HTTP 服务、会话数据库或远程展示页都需单独 ADR，不属于当前承诺。
+P2 按 [ADR-0007](./decisions/0007-local-web-console.md) 增加 Fastify loopback adapter 和 React/Vite
+页面。WebUI 只依赖公开应用服务、共享配置服务和有界 DTO；UI 状态不得反向侵入 Agent Loop。工作区
+在启动时固定，Provider API Key 不进入浏览器，进程同时只允许一个活动 Turn。远程展示页、多用户、
+跨工作区控制台和第二种 Session 存储仍不属于当前承诺。
 
 ## 16. 独立实现与原创边界
 
@@ -320,7 +337,7 @@ P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JS
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
 artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已抽出
-`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据，不启动 P2。P1.5 按 [ADR-0006](./decisions/0006-reasoning-session-events.md) 修补推理模型兼容与上下文预算。
+`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据。P1.5 按 [ADR-0006](./decisions/0006-reasoning-session-events.md) 修补推理模型兼容与上下文预算。
 
 当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI
@@ -336,3 +353,6 @@ CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部�
 无正文且无完整工具调用不得标记为成功。P1-1A 已支持从事件恢复 Session 查询、Provider 身份校验和悬空 Turn 补偿；P1-1B 已把
 `chat` 恢复、Slash 与粘贴适配器接到同一应用服务。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。
+
+P2 已完成计划、ADR、API 与 UI 契约冻结，但 `echo-harness web`、Fastify adapter、React 页面和浏览器
+测试尚未实现。实现状态只能在对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后更新。

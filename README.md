@@ -165,8 +165,13 @@ deterministic Fake Provider and never receives a real API key. Details and the c
 - [ADR-0002: P1 config and artifact-root](docs/decisions/0002-p1-config-artifact-root.md)
 - [ADR-0003: application service and recoverable sessions](docs/decisions/0003-p1-application-service-session.md)
 - [ADR-0005: restore artifact-root config](docs/decisions/0005-restore-artifact-config.md)
+- [ADR-0006: aggregated model content and reasoning events](docs/decisions/0006-reasoning-session-events.md)
+- [ADR-0007: fixed-workspace local Web console](docs/decisions/0007-local-web-console.md)
 - [P1 CLI plan](docs/plans/p1-cli.md)
 - [P2 local WebUI plan](docs/plans/p2-webui.md)
+- [P2 acceptance matrix](docs/plans/p2-acceptance-matrix.md)
+- [Local Web API contract](docs/web-api.md)
+- [WebUI product and interaction specification](docs/web-ui.md)
 
 ## Honest limits
 

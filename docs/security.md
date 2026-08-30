@@ -2,15 +2,16 @@
 
 > 状态：Accepted
 >
-> 版本：1.2
+> 版本：1.3
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 
 ## 1. 文档目的
 
 ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进程。本文件定义首个版本的威胁模型、信任边界与强制控制，目标是在开发工作区内提供可审查的自动化能力。
 
-ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。
+ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
+[ADR-0007](./decisions/0007-local-web-console.md)；当前尚未实现。
 
 ## 2. 需要保护的资产
 
@@ -20,6 +21,7 @@ ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操
 - Git 历史与未提交修改；
 - 本机进程、网络身份和外部服务；
 - 会话记录、演示材料和双盲身份信息；
+- P2 一次性 bootstrap token、进程级认证 Cookie 与浏览器中的脱敏 Session 投影；
 - 用户时间与 API 调用额度。
 
 ## 3. 信任边界
@@ -292,7 +294,33 @@ raw runtime data -> normalize -> redact -> truncate -> persist/render
 - 演示前在仓库、终端主题、路径、Git 输出和视频画面中执行人工检查；
 - 自动扫描提供辅助证据，但最终提交必须人工复核。
 
-## 16. 已知限制与后续增强
+## 16. P2 本地 Web 控制面
+
+回环监听不是认证。恶意网页仍可能尝试 DNS rebinding、CSRF、跨源读取或对 localhost 发起请求。
+P2 Web adapter 必须同时执行：
+
+- 只监听 `127.0.0.1`，拒绝非精确实际端口的 Host；
+- 默认不发送 CORS 许可，拒绝跨源、`Origin: null` 和不匹配 Origin；
+- 使用至少 256 bit、一次有效的 bootstrap token，通过 URL fragment 交付；
+- bootstrap 成功后设置进程级 `HttpOnly; SameSite=Strict` Cookie，并立即移除 fragment；
+- 所有 API 与 SSE 验证 Cookie；所有状态改变请求验证 JSON content-type、Origin、Host 与 requestId；
+- 静态页面设置 CSP、`frame-ancestors 'none'`、nosniff 和必要的 no-store；
+- 请求体和所有 ID/正文有界，错误响应不包含堆栈、绝对路径或敏感参数；
+- 页面关闭、刷新或 SSE 断开不得自动批准、取消、重试或重新执行；
+- API Key 只在服务端读取 `ECHO_API_KEY`，浏览器只获得 `apiKeyConfigured` 布尔值；
+- Provider 设置复用严格配置 Schema 和原子写入，活动 Turn 时只读；
+- 工作区由启动参数固定，API 不接受工作区路径；进程同时只允许一个活动 Turn；
+- 导出由服务端生成并再次执行秘密、身份、绝对路径和 reasoning 排除检查。
+
+bootstrap token、Cookie、Authorization、Provider 响应头和 API Key 不得进入 URL query、应用日志、
+Session、错误详情、浏览器持久存储或导出。URL fragment 只用于首次 bootstrap；`--no-open` 打印的
+fragment 是进程级短期访问材料，用户不应分享，成功兑换后即失效。
+
+SSE 只直播已经授权 Session 的有界投影。断线补齐使用 Session seq；无法连续恢复时要求客户端重新
+读取快照，不得通过重放 POST 修复。所有状态改变请求以 requestId 和领域标识保证幂等，重复审批仍
+精确绑定 Session、Turn、`toolCallId` 与 `approvalKey`。
+
+## 17. 已知限制与后续增强
 
 首版明确不提供：
 
@@ -305,7 +333,7 @@ raw runtime data -> normalize -> redact -> truncate -> persist/render
 
 后续若增加容器隔离、受限令牌、命令 AST 分析或变更快照，应通过独立 ADR 评估复杂度与收益。
 
-## 17. 安全验收证据
+## 18. 安全验收证据
 
 本文已基于以下自动化验证升级为 `Accepted / 1.1`：
 

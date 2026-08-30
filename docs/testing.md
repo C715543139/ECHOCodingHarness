@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -171,6 +171,67 @@ The script requires all three Provider settings, disables retries, limits output
 model response. Remove the API key from the shell environment after the check. This path is local
 acceptance only and is not part of CI. It does not read `.env.test`.
 
+## P2 Web quality plan (accepted, not implemented)
+
+P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
+unit-test run install or launch a browser. The exact script names are frozen before implementation;
+until those scripts exist, this section is a target contract rather than an available command list.
+
+### Fast unit and integration layer
+
+- Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
+- shared Provider config service tests prove CLI/Web use the same schema, artifact root, locking,
+  atomic replacement, and redacted errors;
+- Fastify injection tests cover routes without opening a TCP port;
+- authentication tests cover one-time bootstrap, cookie attributes, exact Host/Origin, no CORS,
+  content type, body limits, CSP, and no-store;
+- process-wide active-Turn tests cover two Sessions and prove the second cannot submit or mutate
+  runtime state while one Turn runs;
+- idempotency tests repeat Turn, cancel, approval, and config requests and assert one side effect;
+- SSE tests cover ordered backlog plus live handoff, duplicate seq, disconnect, terminal events,
+  heartbeat, and `resync_required`;
+- Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order;
+- export tests scan Markdown and JSON for secrets, identity, absolute paths, and reasoning.
+
+### React component layer
+
+Vitest, Testing Library, `user-event`, and a DOM environment cover:
+
+- Session rail paging, new Session, restore, and process-wide active state;
+- Chat aggregate rendering, streaming upsert, paused tail-follow, cancel, and approval;
+- model/safety controls and Provider settings validation;
+- Trace rows, Inspector ownership, bounded code/diff sections, and `Not verified`;
+- keyboard operation, focus return, accessible names, live regions, and reduced motion classes;
+- empty, loading, offline, reconnect, resync, failed, cancelled, limited, and completed states.
+
+### Browser and artifact layer
+
+Playwright Chromium runs a deliberately small set of critical flows against a built local server:
+
+1. bootstrap and first Session;
+2. Fake Provider Chat with an approval and a completed Turn;
+3. refresh/reconnect without duplicate execution;
+4. browsing another Session while a Turn is active;
+5. Trace selection and matching Inspector details;
+6. Provider config save without an API Key entering the DOM;
+7. keyboard-only critical flow and 200% zoom smoke;
+8. Markdown/JSON export privacy checks;
+9. graceful shutdown with and without an active Turn.
+
+The Windows artifact smoke copies only the packaged `dist/` and required package metadata into a
+temporary directory outside the repository, starts `echo-harness web --no-open`, parses the actual
+verified loopback endpoint from structured test output, exercises bootstrap/API/static assets, and
+stops the process. It must not rely on source files, repository `node_modules`, `.env.test`, a paid
+Provider, or a user profile path.
+
+CI installs the pinned Chromium version only in the Web E2E evidence step and caches it by the
+Playwright version. Browser failures save bounded screenshots/traces as CI artifacts only after
+secret and identity scanning. P0/P1 CLI tests remain required in the same gate.
+
+P2 local real-Provider acceptance is explicit and non-CI: start the packaged Web console with a
+temporary authorized workspace, complete one bounded Chat Turn, refresh/resume it, inspect Trace,
+and verify the saved Session and export. The response body and key are not printed or committed.
+
 ## Known gaps
 
 - PowerShell is not an OS sandbox; approved commands may still touch the network or files
@@ -194,3 +255,5 @@ acceptance only and is not part of CI. It does not read `.env.test`.
   multi-line paste atomicity. Chat `/model` consumes the catalog port rather than a second
   `GET /models` implementation.
 - P1 does not include Web UI, MCP, multi-agent execution, TUI, or multi-Provider profiles.
+- P2 Web scripts, browser dependencies, adapter, UI, and artifact smoke are planned but do not yet
+  exist; documentation acceptance must not be reported as implementation acceptance.

@@ -1,0 +1,113 @@
+# P2 需求、测试与验收证据矩阵
+
+> 状态：Accepted plan（尚未实现）
+>
+> 版本：1.0
+>
+> 最后更新：2026-08-30
+
+## 1. 用法
+
+本矩阵把 [P2 总计划](./p2-webui.md)、[Web API](../web-api.md) 和
+[WebUI 规格](../web-ui.md) 转换为可交付检查项。实现任务必须在同一提交中补充对应自动化测试；集成
+任务只负责共享装配和跨模块故事，不替代所有者的聚焦测试。
+
+“计划证据”是实现后应存在的测试或脚本位置，当前不代表文件已经存在。若实现时调整路径，应同步
+更新本矩阵。每项从 `Planned` 变为 `Accepted` 前，必须填入实际证据并通过完整质量门。
+
+## 2. P2-1：服务、配置与 API
+
+| ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| P2-1-01 | `web` 只监听 `127.0.0.1` 并报告实际端口 | integration / artifact | `tests/integration/web/server-lifecycle.test.ts`, `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-1-02 | 工作区启动时固定，API 不接受路径 | API security | `tests/integration/web/workspace-boundary.test.ts` | Planned |
+| P2-1-03 | 一次性 bootstrap 兑换 HttpOnly Strict Cookie | API security | `tests/integration/web/auth.test.ts` | Planned |
+| P2-1-04 | 精确 Host/Origin、无 CORS、JSON content-type 与 CSP | API security | `tests/integration/web/request-guard.test.ts` | Planned |
+| P2-1-05 | DTO 不含秘密、绝对路径、堆栈或 reasoning | unit / scan | `tests/unit/web/dto-redaction.test.ts` | Planned |
+| P2-1-06 | CLI/Web 共用配置 Schema、artifact-root 与原子写入 | unit / integration | `tests/unit/config/config-service.test.ts`, `tests/integration/web/provider-config.test.ts` | Planned |
+| P2-1-07 | 自动发现显式执行、不自动保存、错误脱敏 | integration | `tests/integration/web/provider-discovery.test.ts` | Planned |
+| P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts` | Planned |
+| P2-1-09 | requestId 重放不重复 Turn、取消、审批或保存 | integration | `tests/integration/web/idempotency.test.ts` | Planned |
+| P2-1-10 | SSE backlog 与 live 无缝衔接并按 seq 去重 | integration | `tests/integration/web/sse.test.ts` | Planned |
+| P2-1-11 | 无法连续补齐时显式 resync，不重放 POST | integration / browser | `tests/integration/web/sse-resync.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Planned |
+| P2-1-12 | 关闭时取消活动 Turn，10 秒内清理或非零退出 | integration / artifact | `tests/integration/web/shutdown.test.ts`, `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-1-13 | 每种 Policy 结论持久化稳定 rule ID 与原因，旧 Session 可读 | contract / session | `tests/unit/security/policy-explain.test.ts`, `tests/unit/session/session-query.test.ts` | Planned |
+
+## 3. P2-2：Session、Chat 与设置
+
+| ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts` | Planned |
+| P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/e2e/web/global-active-turn.spec.ts` | Planned |
+| P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`, `tests/e2e/web/refresh.spec.ts` | Planned |
+| P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`, `tests/e2e/web/long-stream.spec.ts` | Planned |
+| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/e2e/web/chat-scroll.spec.ts` | Planned |
+| P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/e2e/web/cancel.spec.ts` | Planned |
+| P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/e2e/web/approval.spec.ts` | Planned |
+| P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/e2e/web/runtime-settings.spec.ts` | Planned |
+| P2-2-09 | Provider 设置只有一个导航页并共用配置服务 | component / browser | `tests/unit/web/provider-settings.test.tsx`, `tests/e2e/web/provider-settings.spec.ts` | Planned |
+| P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/e2e/web/provider-secret.spec.ts` | Planned |
+
+## 4. P2-3：Trace、Inspector 与导出
+
+| ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| P2-3-01 | Trace 只含八类业务记录并按 seq 排序 | projection | `tests/unit/web/trace-projector.test.ts` | Planned |
+| P2-3-02 | chunk、内部重试和 reasoning 不形成记录 | projection / scan | `tests/unit/web/trace-privacy.test.ts` | Planned |
+| P2-3-03 | 直播、刷新、补页和恢复顺序一致 | integration / browser | `tests/e2e/web/trace-order.spec.ts` | Planned |
+| P2-3-04 | 选中记录只展示匹配的结构化 Inspector | component / browser | `tests/unit/web/inspector.test.tsx`, `tests/e2e/web/trace-inspector.spec.ts` | Planned |
+| P2-3-05 | Context 显示预算与裁剪，不泄漏完整内容 | projection | `tests/unit/web/context-detail.test.ts` | Planned |
+| P2-3-06 | Policy Explain 只消费结构化 decision/rule | projection | `tests/unit/web/policy-detail.test.ts` | Planned |
+| P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Planned |
+| P2-3-08 | Verified 只来源于真实命令终态且不夸大退出码含义 | projection / browser | `tests/unit/web/verification-detail.test.ts` | Planned |
+| P2-3-09 | 大型 Trace 分页、虚拟化且上滚不跳动 | component / performance | `tests/e2e/web/trace-large-session.spec.ts` | Planned |
+| P2-3-10 | Markdown/JSON 导出再次脱敏并排除 reasoning | integration / scan | `tests/integration/web/export.test.ts` | Planned |
+
+## 5. P2-4：体验、产物与回归
+
+| ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
+| --- | --- | --- | --- | --- |
+| P2-4-01 | 空、加载、断线、resync 和全部终态明确 | component | `tests/unit/web/states.test.tsx` | Planned |
+| P2-4-02 | 键盘完成核心流程，焦点与模态返回正确 | component / browser | `tests/e2e/web/keyboard.spec.ts` | Planned |
+| P2-4-03 | 状态不只依赖颜色，live region 不逐 token 播报 | accessibility | `tests/e2e/web/accessibility.spec.ts` | Planned |
+| P2-4-04 | 200% 缩放、窄屏抽屉和 reduced motion 可用 | browser | `tests/e2e/web/responsive.spec.ts` | Planned |
+| P2-4-05 | 构建产物包含 CLI 与 `dist/web/` 静态资源 | artifact | `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-4-06 | 非仓库 cwd 可启动、认证、创建 Session 并关闭 | Windows artifact | `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-4-07 | P0/P1 `run`、`chat`、`config` 与 Session 不退化 | regression | existing suite + `pnpm check` | Planned |
+| P2-4-08 | CI 不使用真实 Key/付费 Provider | workflow / scan | `.github/workflows/ci.yml`, scan tests | Planned |
+| P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | Web artifact scan step | Planned |
+| P2-4-10 | 受控真实 Provider 完成 Chat、刷新、Trace 与导出 | local acceptance | `scripts/accept-web-provider.mjs` | Planned |
+
+## 6. 全局门禁
+
+每个 P2 合并候选至少执行：
+
+```powershell
+pnpm check
+pnpm eval:offline
+pnpm smoke:demo
+```
+
+当 Web 脚本落地后，质量门还必须包含：
+
+```powershell
+pnpm test:web
+pnpm test:web:e2e
+pnpm smoke:web-artifact
+```
+
+脚本名若在骨架任务中调整，必须同时更新 `package.json`、CI、[testing.md](../testing.md)、本矩阵和
+P2 总计划。不得让 CI 与文档各自维护不同命令。
+
+## 7. 最终签收记录
+
+P2 最终验收时补充：
+
+- 合并提交 SHA；
+- Windows CI run URL；
+- 测试文件数、用例数和覆盖率；
+- Web E2E 浏览器与版本；
+- 非仓库 cwd 产物 smoke 结果；
+- 受控真实 Provider 验收日期与模型（不记录 Key 或私有响应）；
+- 双盲人工检查结论；
+- 所有矩阵项的 `Accepted` 状态与实际证据路径。

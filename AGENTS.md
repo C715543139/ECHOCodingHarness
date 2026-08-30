@@ -12,7 +12,7 @@ repository. Read it together with the documents under `docs/` before changing co
 - Supported development platform: Windows with PowerShell as a first-class environment.
 - CLI executable: `echo-harness`.
 
-The following documents are the Accepted P0/P1 design baseline:
+The following documents are the Accepted P0/P1 implementation baseline and P2 design baseline:
 
 - `docs/architecture.md`
 - `docs/contracts.md`
@@ -23,8 +23,13 @@ The following documents are the Accepted P0/P1 design baseline:
 - `docs/decisions/0003-p1-application-service-session.md`
 - `docs/decisions/0005-restore-artifact-config.md`
 - `docs/decisions/0006-reasoning-session-events.md`
+- `docs/decisions/0007-local-web-console.md`
 - `docs/plans/p1-cli.md`
 - `docs/plans/p1-5-reasoning-context.md`
+- `docs/plans/p2-webui.md`
+- `docs/plans/p2-acceptance-matrix.md`
+- `docs/web-api.md`
+- `docs/web-ui.md`
 - `docs/testing.md`
 
 Small implementation discoveries must update code, tests, and affected documentation together.
@@ -40,8 +45,8 @@ new ADR.
 - Do not copy source code, private interfaces, or directory structures from other coding agents.
 - General engineering ideas may inform the design, but the implementation and tests must be ECHO's
   own.
-- Do not start P2 work such as Web UI, MCP, multi-agent execution, or a showcase site while P0 is
-  incomplete.
+- P2 only includes the fixed-workspace local Web console defined by ADR-0007. Do not expand it into
+  MCP, multi-agent execution, Skill/plugin support, remote access, or a showcase site.
 
 ## Test-first delivery
 
@@ -92,6 +97,13 @@ a regression test that fails for the original behavior.
 - D2-2 owns `src/tools/command/`, `src/execution/`, `src/security/`, and their focused tests.
 - D2-3 owns cross-module registration, orchestration, session storage, CLI integration, and
   end-to-end tests. Shared registries are assembled there after the three parallel branches merge.
+- P2 phase A freezes Web DTOs, schemas, the shared config service, and build/test skeleton before
+  feature implementation branches start.
+- After phase A, P2 backend/API, Web Chat/settings, Trace/Inspector, and quality/artifact tasks may
+  run in separate worktrees. They must consume the frozen Web contracts and may not create private
+  competing DTOs, policy logic, or Session state machines.
+- Shared Fastify route assembly, React shell composition, package scripts, and CI workflow changes
+  belong to an explicit P2 integration task after feature branches pass focused tests.
 - Keep worktree directories outside this repository and never commit host-specific absolute paths.
 
 ## Code conventions

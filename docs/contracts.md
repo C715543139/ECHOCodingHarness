@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.4
+> 版本：1.5
 >
 > 最后更新：2026-08-30
 
@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、[ADR-0005](./decisions/0005-restore-artifact-config.md) 与 [ADR-0006](./decisions/0006-reasoning-session-events.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、[ADR-0005](./decisions/0005-restore-artifact-config.md) 与 [ADR-0006](./decisions/0006-reasoning-session-events.md) 为准。P2 Web 传输与 UI 契约分别冻结在 [web-api.md](./web-api.md) 和 [web-ui.md](./web-ui.md)，当前尚未实现，不改变本文件中已交付的领域接口。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -468,6 +468,26 @@ interface ApplicationService {
 ```
 
 `run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。`model.changed` 只记录会话内模型 ID 与来源，不保存发现列表或凭据。P1-1A 已把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、`--resume`、Slash、Ctrl+C 与 bracketed paste 适配器，并用 `resolveNewSessionSetting` / `resolveResumeSessionSetting` 落实 CLI > session > config。`/model` 与 `/model refresh` 只消费可注入的模型目录端口，不在 Chat 内实现第二套 `GET /models` 发现与缓存。P1-2A 已实现配置加载器与 artifact-root 解析；P1-2B 已实现模型目录发现与进程内缓存。
+
+### 7.2 P2 Web adapter 契约
+
+P2 Web adapter 是 `ApplicationService`、Session 查询和共享配置服务的传输适配器，不是新的领域
+服务。它必须遵守以下不变量：
+
+- 固定工作区来自服务启动参数，不接受浏览器路径；
+- 整个 Web 服务进程同时只允许一个活动 Turn；
+- Session 创建、恢复、取消、审批、模型和安全模式继续调用本节接口；
+- Provider 配置复用 CLI 背后的 Schema、artifact-root 和原子写入，不调用或解析 CLI；
+- Web DTO 是内部领域对象的有界脱敏投影，不直接序列化类实例或原始 JSONL；
+- Chat 历史只投影聚合 `model.text`，Trace 不把 chunk 或 `model.reasoning` 作为记录；
+- P2 新 Writer 的每种 `PolicyDecision` 都携带稳定 rule ID，并把 rule ID 与原因写入相应授权、审批
+  或拒绝事件；旧事件字段缺失时只标记不可用；
+- Policy 与 Verification 结论来自结构化领域事实，前端不得重新判断；命令退出码 0 只证明命令成功
+  退出，不自动证明修改正确；
+- HTTP 幂等、SSE 恢复和浏览器认证属于 [web-api.md](./web-api.md)，不能改变 Agent Loop 语义。
+
+P2 实现若需要扩大 `ApplicationService`，必须在 `src/contracts/application.ts` 增加最小、客户端无关的
+能力并同时补充 CLI 回归测试；不得为 WebUI 创建只在浏览器路径成立的第二套 Session 状态机。
 
 ## 8. Context Builder
 

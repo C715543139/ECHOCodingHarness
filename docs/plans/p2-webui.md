@@ -1,226 +1,231 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Proposed
+> 状态：Accepted plan（尚未实现）
 >
-> 版本：0.3
+> 版本：1.0
 >
 > 最后更新：2026-08-30
 
 ## 1. 目标
 
-P2 在 [P1 CLI](./p1-cli.md) 完成并冻结应用服务、会话查询和事件契约后，增加一个本地 WebUI。WebUI 既提供 Chat 与历史 Session 的图形化入口，也提供 Context、Policy、工具执行和验证证据的可解释性工作台。
+P2 在 P0/P1/P1.5 已交付的 CLI、应用服务、Session 查询、事件聚合、配置和安全策略之上，增加一个
+固定工作区的本地 Web 控制台。用户可以在浏览器内新建和恢复 Session、进行 Chat、处理审批、切换
+Session 模型与安全模式、检查结构化执行记录、维护 Provider 非秘密配置并导出脱敏证据。
 
-P2 不重新实现 Agent。CLI 和 WebUI 必须共享同一个 Provider、Agent Loop、Context Projector、工具注册表、安全策略与 Session repository。
+P2 不重新实现 Agent。CLI 与 WebUI 必须共享 Provider、Agent Loop、Context Projector、工具注册表、
+安全策略、配置服务、Session repository 与 `ApplicationService`。
+
+权威文档：
+
+- 架构与安全决策：[ADR-0007](../decisions/0007-local-web-console.md)；
+- HTTP、SSE 与 DTO：[web-api.md](../web-api.md)；
+- 页面、交互与无障碍：[web-ui.md](../web-ui.md)；
+- 核心领域契约：[contracts.md](../contracts.md)；
+- P1.5 聚合 Session 事实：[ADR-0006](../decisions/0006-reasoning-session-events.md)。
+- 需求—测试—证据映射：[p2-acceptance-matrix.md](./p2-acceptance-matrix.md)。
+
+若实现发现上述文档冲突，应先修订 ADR/契约与验收矩阵，再修改代码，不允许建立第二套临时语义。
 
 ## 2. 产品边界
 
-P2 只包含本地 WebUI：
+P2 分为四个交付包：
 
-1. P2-1：本地 Web 服务与 API；
-2. P2-2：Web Chat 与 Session 历史；
-3. P2-3：可解释性工作台；
-4. P2-4：WebUI 质量、测试与产物集成。
+1. **P2-1：本地 Web 服务、配置服务与 API**；
+2. **P2-2：Web Chat、Session 历史与 Provider 设置**；
+3. **P2-3：按序事件记录与结构化 Inspector**；
+4. **P2-4：体验、测试、产物和最终验收**。
 
-TUI、远程服务、域名部署、多用户、Skill、插件、MCP、多智能体和子代理编排均不属于 P2。Skill 与插件归入未来 P3，但 P3 当前不做任务拆解或交付承诺。
+P2 的产品语义是“针对启动工作区的图形化 Coding Agent 控制台”：
 
-## 3. 启动方式
+- 工作区在服务启动时固定，页面内不可选择或切换；
+- 固定工作区内可以创建、列出、恢复和浏览多个 Session；
+- 整个 Web 服务进程同时只允许一个活动 Turn；
+- 活动 Turn 期间可只读浏览其他 Session，但不可并发提交或修改运行时；
+- TUI、远程服务、域名部署、多用户、Skill、插件、MCP、多智能体和子代理均不属于 P2。
+
+## 3. 技术基线
+
+### 3.1 前端
+
+- React 19、Vite 8、TypeScript strict；
+- CSS Modules、CSS 自定义属性与语义设计 token；
+- React 本地状态与领域适配器，不引入 Redux 等第二套状态机；
+- 不引入完整组件库或 Tailwind；使用原生语义控件和一套可访问图标；
+- Vitest、Testing Library 与 Playwright Chromium 负责组件和浏览器流程测试。
+
+### 3.2 服务端
+
+- Fastify 5 作为有限的 loopback Web adapter；
+- JSON Schema 负责请求/响应边界校验；
+- HTTP 处理查询与命令，SSE 处理单向 Session 直播；
+- 前端静态资源和 API 由同一进程、同一 Origin 提供；
+- Web adapter 不持有 Agent 决策、Policy 判断或 JSONL 修复逻辑。
+
+### 3.3 构建
+
+生产构建先生成 Node CLI/库，再将 Vite 静态资源写入 `dist/web/`。最终包仍以 `dist/` 为唯一交付
+目录，用户不需要单独安装或启动开发服务器。Phase A 同步把 Node 运行时下限收紧为
+`>=22.12.0 <23`，并通过 `package.json` 与 `pnpm-lock.yaml` 固定上述 Web 依赖的精确版本。
+
+## 4. 启动与生命周期
 
 ```powershell
-echo-harness web [--workspace <path>] [--no-open]
+echo-harness web [--workspace <path>] [--port <port>] [--no-open]
 ```
 
-- 服务只监听 IPv4/IPv6 回环地址，不监听局域网或公网接口；
-- 默认在启动成功后打开浏览器，`--no-open` 只打印经过验证的本地地址；
-- 端口可由 CLI 显式指定或由系统选择可用端口，启动结果必须输出实际端口；
-- 工作区在服务启动时固定，P2 不在页面内切换或新增任意工作区；
-- 进程退出时先停止接收新 Turn，再向唯一活动 Turn 发送取消信号，并最多等待 10 秒让其写入终态、终止子进程和释放资源；超时后强制关闭剩余执行资源，并以非零退出码报告清理未完成。
+- 未提供 `--workspace` 时使用当前目录；
+- 只监听 `127.0.0.1`，默认由系统选择空闲端口；
+- 默认打开带一次性 bootstrap fragment 的页面；`--no-open` 打印同一经过验证的地址；
+- 启动输出实际端口和脱敏工作区名，不输出 API Key、Cookie 或绝对个人路径；
+- 关闭时立即拒绝新状态改变请求，取消唯一活动 Turn，最多等待 10 秒清理；
+- 清理完成退出 0，终态或资源清理失败以非零码报告。
 
-## 4. 总体架构
+## 5. P2-1：本地 Web 服务、配置服务与 API
+
+### 5.1 目标
+
+建立经过认证、验证、脱敏和可测试的本地适配层，让浏览器只通过稳定 DTO 使用现有领域能力。
+
+### 5.2 工作项
+
+1. 新增 Web DTO、错误码和序列化边界；
+2. 补齐每种 Policy 结论的稳定 rule ID 与授权原因持久事实，旧 Session 保持可读；
+3. 从 CLI 配置向导抽出共享配置读写服务，保持 artifact-root、Schema、原子写入和错误语义；
+4. 实现 Fastify 生命周期、静态资源、精确 Host/Origin、CSP 和请求体上限；
+5. 实现一次性 bootstrap token 与进程级 `HttpOnly` Cookie；
+6. 实现 bootstrap、Provider、Session、Turn、取消、审批、Trace、导出 API；
+7. 实现进程级单活动 Turn 仲裁；
+8. 实现每浏览器上下文一个 Session SSE；活动 Turn 时保持绑定其 Session，并支持 seq 补齐、去重和
+   `resync_required`；
+9. 为状态改变请求实现 `requestId` 幂等记录；
+10. 把内部错误映射为稳定、脱敏的 Web 错误，不返回堆栈或磁盘路径。
+
+### 5.3 完成标准
+
+- API 与 [web-api.md](../web-api.md) 一致；
+- 重复 Turn、取消、审批和保存不会产生第二次副作用；
+- 浏览器无法提交工作区根路径；
+- API Key 与 bootstrap/Cookie 不进入 DTO、Session 或日志；
+- Fastify 注入测试覆盖认证、安全头、Schema、错误和生命周期。
+
+## 6. P2-2：Web Chat、Session 历史与 Provider 设置
+
+### 6.1 主界面
+
+默认两栏：Session rail 与当前 Session 主视图。Session 内提供 `Chat` / `Trace`。Inspector 只在
+选中结构化详情时展开，不保留空白第三栏。
+
+Session rail 支持：
+
+- 新建 Session；
+- 分页列出固定工作区 Session；
+- 恢复并切换 Session；
+- 显示脱敏标题、更新时间、模型和运行状态；
+- 活动 Turn 期间浏览其他 Session，并明确禁用并发提交。
+
+P2 不实现删除、fork、跨工作区搜索或批量管理。
+
+### 6.2 Chat
+
+- 显示用户输入、聚合 `model.text`、工具摘要、审批和 Turn 终态；
+- 当前直播使用 SSE 更新同一条记录，刷新只读聚合 Session 事实；
+- 固定输入区提供发送/停止、模型选择和安全模式选择；
+- 活动 Turn 期间禁止切换模型/安全模式和提交其他 Session；
+- 审批提供拒绝、仅本次、本 Session 三种明确动作；
+- 用户上滚后暂停自动跟随，使用“有新内容”恢复尾随；
+- Provider/连接/认证错误与 Agent 失败分开显示。
+
+### 6.3 Provider 设置
+
+设置采用可扩展的左侧导航形式，但 P2 只包含 `Provider` 页面：
+
+- Base URL；
+- 自动发现或手动模型目录，二选一；
+- 默认模型；
+- API Key 是否由环境变量配置；
+- 与 CLI 共用校验和保存服务。
+
+API Key 不提供输入、读取、复制或清除。自动发现是显式动作且不自动保存。活动 Turn 存在时设置
+只读。
+
+### 6.4 完成标准
+
+- 无 Session、新建、恢复、运行、审批、断线、失败和取消状态均有明确 UI；
+- CLI 与 WebUI 对模型、安全模式、审批和配置产生同一领域结果；
+- 页面刷新不产生重复 Turn，不显示 reasoning，不丢失已聚合正文；
+- Session 列表和历史使用 cursor 分页，大量数据不阻塞输入。
+
+## 7. P2-3：按序事件记录与结构化 Inspector
+
+### 7.1 事件记录
+
+Trace 不使用顶部图形时间线。记录按 Session seq 从旧到新排列，并按 Turn/Step 轻量分组。固定类型：
 
 ```text
-React/Vite WebUI
-   |  HTTP command/query
-   |  SSE events
-   v
-Loopback Web adapter
-   |
-   v
-Application service
-   |
-   +----> Agent Loop ----> Provider / Tools / Policy
-   |
-   +----> Session repository
+用户 · 上下文 · 代理 · 工具 · 策略 · 审批 · 验证 · Turn
 ```
 
-前端使用 TypeScript，并优先复用领域类型的只读传输表示。Web adapter 负责认证、输入校验、传输错误映射和事件序列化，不拥有 Agent 决策逻辑。前端不得解析 CLI 文本，也不得直接读取 `.echo` JSONL 文件。
+每行显示事件类型、名称/动作、状态、时间、可用耗时、参数摘要和结果摘要。Provider chunk、推理 chunk、
+内部重试和原始 HTTP 事件不形成 UI 行；直播更新稳定 record ID。
 
-## 5. P2-1：本地 Web 服务与 API
+### 7.2 Inspector
 
-### 5.1 能力
+选中记录后展示结构化的元数据、参数、结果、限制和关联记录。不同类型继续复用同一 Inspector 壳：
 
-本地服务至少支持：
+- Context：预算、数量和裁剪原因；
+- Policy：decision、rule ID、原因和最终是否执行；
+- Tool：脱敏参数、结果、状态和 bounded output；
+- 文件变化：相对路径和 bounded diff；
+- Verification：真实 `run_command`、退出码、耗时和截断；成功只表示命令退出码为 0；
+- Turn：终态、stop reason、Step/工具数和实际证据。
 
-- 获取当前工作区、配置摘要和运行能力；
-- 列出、创建和读取 Session；
-- 恢复 Session；
-- 提交一个 Turn；
-- 取消当前 Turn；
-- 提交一次精确的审批响应；
-- 订阅 Session 实时事件；
-- 读取 Context、Policy、工具结果和验证证据的脱敏视图；
-- 导出一个脱敏 Session。
+默认不展示 `model.reasoning`，也不把它当作完成或验证证据。前端不得根据命令文本自行判断 Policy。
 
-具体 URL 与 JSON Schema 在实现前写入独立接口文档；API 以领域对象为准，不暴露内部类、异常堆栈或磁盘路径。
+### 7.3 导出
 
-### 5.2 实时事件
+支持服务端生成 Markdown 和 JSON。导出包含 Session 摘要、Chat、Trace、文件变化、Policy、审批、验证
+证据与终态；继续通过脱敏、绝对路径、秘密和身份扫描，不含 reasoning 或浏览器临时状态。
 
-首版使用 SSE 传输服务器到浏览器的单向事件，用户命令、取消和审批使用普通 HTTP 请求。SSE 事件保留单调序号，使短暂断线能够从最后确认位置恢复，而不是重复执行 Turn。
+### 7.4 完成标准
 
-一个 Session 同时只允许一个活动 Turn。重复提交、重复审批和过期审批必须幂等拒绝，不能触发第二次工具副作用。
+- Trace 顺序在直播、刷新、补页和恢复后稳定；
+- 长 Session 分页并虚拟化；上滚时不被新事件抢夺位置；
+- Inspector 内容与选中 record ID 精确对应；
+- `Verified` 只能由实际 `run_command` 终态产生，且只表示退出码成功；无证据显示 `Not verified`；
+- 导出与页面使用同一服务端事实，且隐私扫描通过。
 
-### 5.3 本地服务安全
+## 8. P2-4：体验、测试、产物与验收
 
-仅监听 `127.0.0.1` 并不足以防止恶意网页访问本地端口。P2 还必须：
+### 8.1 体验与无障碍
 
-- 默认关闭 CORS；
-- 校验 `Origin`、`Host` 与请求内容类型；
-- 在启动时生成进程级随机访问令牌，并将其安全传递给本次打开的页面；
-- 对改变状态的请求验证令牌；
-- 不把 `ECHO_API_KEY`、授权头或可还原秘密发送到浏览器；
-- 不接受浏览器提交任意工作区根路径；
-- 对 Session ID、Turn ID、审批 ID 和所有正文做长度与结构校验；
-- 复用 P0/P1 的工作区隔离、命令策略、审批、超时、取消和脱敏管线；
-- 页面关闭或 SSE 断开不得自动批准、取消或重新执行工具。
+- 空、加载、运行、等待审批、断线、resync、失败、取消、受限和完成状态齐全；
+- 桌面两栏、按需 Inspector；窄屏使用抽屉/单列但不复制状态；
+- 键盘可完成新建、切换、发送、停止、审批、Trace 检查和设置保存；
+- 焦点可见，模态焦点可恢复，流式内容不逐 token 播报；
+- 颜色不是唯一状态线索，200% 缩放和 reduced motion 可用；
+- 双盲界面不显示姓名、学校、账号、邮箱或个人绝对路径。
 
-## 6. P2-2：Web Chat 与 Session 历史
-
-### 6.1 布局
-
-桌面主界面采用三栏结构：
-
-```text
-Session list | Conversation / Timeline | Detail inspector
-```
-
-窄屏可按相同信息层级折叠为抽屉或分页，不另建一套业务状态。
-
-### 6.2 Session 列表
-
-显示：
-
-- Session 短 ID 或脱敏标题；
-- 更新时间与 Turn 数；
-- 当前模型和安全模式；
-- `idle`、`running`、`completed`、`failed` 或 `cancelled`；
-- 新建与恢复操作。
-
-P2 不提供跨工作区 Session 浏览，也不允许通过前端输入磁盘路径打开任意 Session。
-
-### 6.3 Chat
-
-支持：
-
-- 用户输入与流式模型文本；
-- 工具调用摘要与终态；
-- 当前 Turn 取消；
-- 精确绑定到工具请求的审批；
-- 当前 Session 内模型和安全模式切换；
-- `/model` 与 `/safety` 相同的领域语义，但前端可使用选择控件；
-- 失败、取消、限制和完成状态；
-- 刷新页面后从响应级 `model.text` 等 Session 事实恢复，而不依赖浏览器内存或历史 SSE 分片。
-
-Provider URL、默认模型目录和 API Key 仍由 P1 的 `echo-harness config` 与环境变量管理。P2 第一版只显示脱敏配置状态，不实现重复的 Provider 配置页面。
-
-## 7. P2-3：可解释性工作台
-
-工作台是 Session 的观察和审计层，不是模型思维链查看器。P1.5 已把普通正文和推理分别聚合为响应级 `model.text` 与 `model.reasoning` Session 事件；WebUI 可以消费同一事件流，但默认仍不展示推理原文。正在运行的 Turn 可直接消费 SSE 直播分片，历史与刷新恢复只读取聚合 Session 事实，不重放逐 token 打字过程。它解释 ECHO 的输入、外部动作、结构化策略判断和验证证据，不把隐藏推理当作完成证据。
-
-### 7.1 执行时间线
-
-按 Turn 和 Step 展示：
-
-```text
-User input
-Context projected
-Model requested / completed
-Tool requested
-Policy decision / approval
-Tool completed / failed / denied / cancelled
-Verification evidence
-Turn completed / failed / cancelled / limited
-```
-
-每个节点至少包含时间、耗时、状态和可展开的脱敏详情。刷新和恢复不得改变已经记录的历史顺序。
-
-### 7.2 Context 投影查看器
-
-展示：
-
-- 投影策略版本；
-- 上下文总预算与输出预留；
-- 近似输入 token；
-- 纳入的消息/事件数量和角色摘要；
-- 被替代、裁剪、截断或因预算排除的数量与原因；
-- 工具输出的原始长度和截断标记。
-
-默认不展示完整仓库内容；用户展开时仍使用 P1 的脱敏结果。工作台不得把 Session 中已保存的 `model.reasoning` 作为默认展示，也不得把它当作验证证据。
-
-### 7.3 Policy Explain
-
-策略详情基于结构化事实展示：
-
-- `allow`、`approval` 或 `deny`；
-- 稳定的 rule ID；
-- 规范化后的安全摘要；
-- 用户可理解的原因；
-- 审批请求及其最终响应；
-- 工具是否真正执行以及最终状态。
-
-前端不得重新判断权限，也不得根据命令字符串自行推断策略结论。
-
-### 7.4 文件变化与验证证据
-
-展示：
-
-- 相对工作区路径；
-- 写入或补丁产生的 bounded diff；
-- 验证命令、退出码、耗时和截断状态；
-- 最终答复可引用的实际测试证据；
-- 未进行验证时明确显示 `Not verified`，不得从模型文本推断成功。
-
-### 7.5 脱敏导出
-
-支持导出 Markdown 和 JSON，至少包含 Session 摘要、时间线、文件变化、策略决定、验证证据和最终状态。导出继续经过统一脱敏与身份扫描规则，不包含 API Key、授权头、个人绝对路径、隐藏推理或未经校验的敏感参数。
-
-## 8. P2-4：质量与产物集成
-
-### 8.1 体验
-
-- 明确的空状态、加载状态、断线状态和错误恢复；
-- 长工具输出、diff 和大型 Session 使用折叠、分页或虚拟化；
-- 颜色不是唯一状态信号；
-- 支持键盘操作、可见焦点和基础屏幕阅读语义；
-- 流式更新不抢夺焦点，不导致时间线无界跳动；
-- UI 不展示姓名、学校、账号或个人目录等双盲信息。
-
-### 8.2 测试
+### 8.2 自动化
 
 至少覆盖：
 
-- 应用服务与 Web adapter 集成测试；
-- API 输入校验、鉴权、Origin/CORS 和工作区隔离；
-- SSE 顺序、重连、重复事件和断线；
-- Session 创建、恢复、取消和审批竞态；
-- React 组件与状态投影测试；
-- 浏览器端 Chat、历史、审批和工作台关键流程；
-- 秘密、身份和绝对路径扫描；
-- Windows 构建产物从非仓库目录启动的 smoke test。
+- 配置服务、Web adapter 与应用服务集成；
+- API Schema、Cookie、Host、Origin、CORS、CSP 和工作区隔离；
+- 进程级单活动 Turn 与 Session 切换；
+- SSE 顺序、补齐、重复、断线和 resync；
+- Turn、取消和审批竞态及幂等；
+- React 组件、状态投影、键盘和焦点；
+- Playwright Chat、审批、Trace、设置、导出关键流程；
+- 大型 Session 分页/虚拟化和直播滚动；
+- 秘密、身份、绝对路径与 reasoning 泄露扫描；
+- Windows 构建产物从非仓库目录启动的 Web smoke；
+- P0/P1 `run`、`chat`、`config` 回归。
 
-CI 继续只使用 Fake Provider，不注入真实 Key 或调用付费服务。
+CI 只使用 Fake Provider，不设置真实 API Key 或调用付费服务。真实 Provider 只在本地受控验收中运行。
 
 ### 8.3 构建产物
 
-Web 前端静态资源随 ECHO 构建产物交付，不要求单独安装开发服务器。最终产物应同时支持：
+最终产物支持：
 
 ```text
 echo-harness run
@@ -229,36 +234,75 @@ echo-harness config
 echo-harness web
 ```
 
-## 9. 实施顺序
+`dist/web/` 与 Node 入口一起交付。产物 smoke 必须从不含源码、`node_modules` 和仓库配置的临时目录
+启动，并验证静态页面、API 鉴权、Session 创建和优雅关闭。
 
-1. 用新 ADR 冻结本地服务、访问令牌、SSE 和前端技术边界；
-2. 定义并测试 Web DTO 与接口文档；
-3. 实现只读 Session/配置查询和静态资源服务；
-4. 实现 Turn 提交、取消、审批和 SSE；
-5. 实现 Session 列表与 Web Chat；
-6. 实现时间线、Context、Policy、diff 和验证证据；
-7. 实现脱敏导出、无障碍、端到端测试和产物 smoke；
-8. 使用受控任务完成本地真实 Provider 验收和双盲展示审查。
+## 9. 实施顺序与并行边界
 
-## 10. 验收标准
+### 阶段 A：契约与骨架
+
+1. 冻结 Web DTO、错误码、API Schema 与验收矩阵；
+2. 抽出共享配置服务；
+3. 建立 Fastify 生命周期、认证与静态资源骨架；
+4. 建立 React/Vite、设计 token、主壳和测试环境。
+
+Web DTO 与配置服务属于共享边界，阶段 A 完成前不得并行实现相互竞争的私有类型。
+
+### 阶段 B：可并行核心
+
+- B1：Session/Turn/审批 API、单活动 Turn 与 SSE；
+- B2：Session rail、Chat、输入区和 Provider 设置；
+- B3：Trace 投影、Inspector DTO 与导出；
+- B4：安全、浏览器测试夹具和产物构建管线。
+
+B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。共享路由装配和主壳由集成任务
+统一合并。
+
+### 阶段 C：集成验收
+
+1. 连接真实 Web adapter 与前端；
+2. 完成断线、刷新、审批、取消和跨 Session 浏览；
+3. 完成大型 Session、无障碍和隐私验收；
+4. 完成 Windows 产物 smoke 和 P0/P1 回归；
+5. 使用受控真实 Provider 完成一次 Web Chat 与恢复；
+6. 同步所有文档、演示说明和验收矩阵。
+
+## 10. 文档同步规则
+
+每个 P2 实现任务必须同时更新：
+
+- 行为所属的 ADR、API 或 UI 规格；
+- 对应 DTO/Schema 和测试；
+- [architecture.md](../architecture.md)、[security.md](../security.md) 或
+  [testing.md](../testing.md) 中受影响的跨阶段事实；
+- 本计划的完成状态和验收证据。
+
+API、事件、工作区、认证、单活动 Turn、配置落点或技术基线变化属于架构决策，必须先修订 ADR。
+纯视觉调整不能改变领域语义。实现提交不得把 `Accepted design contract（尚未实现）` 静默改成已交付；
+只有完整验收通过后才更新实现状态。
+
+## 11. 最终验收标准
 
 P2 完成必须同时满足：
 
-- WebUI 与 CLI 对同一任务使用相同应用服务、Agent Loop 和安全策略；
-- 服务只监听回环地址，并通过令牌与 Origin/Host 校验阻止跨站本地调用；
-- API Key 从不进入浏览器、前端包、API 响应、Session 或导出；
-- 工作区在启动时固定，页面无法访问或切换到工作区外路径；
-- Session 历史、恢复、实时事件、取消和审批在刷新/断线后保持一致；
-- 时间线能够从事件事实解释 Turn/Step、工具、策略、Context 与停止原因；
-- 测试证据来源于真实工具结果，不从模型声明推断；
-- 完整质量门、Web 端到端测试、Windows 产物 smoke、秘密扫描和身份扫描通过；
-- P0/P1 的 `run`、`chat`、`config` 与非交互行为不退化。
+- WebUI 与 CLI 共享应用服务、配置服务、Agent Loop、Policy 与 Session repository；
+- 固定工作区不可由页面更改，进程任意时刻只有一个活动 Turn；
+- 回环服务通过一次性 bootstrap、Cookie、Host、Origin 和 Schema 校验阻止跨站本地调用；
+- API Key、认证材料、reasoning 和绝对个人路径不进入前端、Session 或导出；
+- Session 新建、列表、恢复、Chat、Trace、取消和审批在刷新/断线后保持一致；
+- Provider 设置与 CLI 配置使用同一 Schema 和原子写入；
+- Trace 以业务事件解释 Turn/Step、Context、工具、策略、审批、验证和停止原因；
+- 测试证据来自实际工具结果，不从模型声明推断；
+- 完整质量门、Playwright、Windows 产物 smoke、秘密扫描和身份扫描通过；
+- P0/P1/P1.5 的 `run`、`chat`、`config`、Session 与非交互行为不退化。
 
-## 11. 主要风险
+## 12. 主要风险
 
-- 本地 Web 服务具有执行代码的能力，回环监听仍需防范 DNS rebinding、CSRF 和恶意网页对 localhost 的请求；
-- SSE 重连、页面刷新和重复 POST 可能造成重复副作用，必须通过 Turn/审批 ID 和单活动 Turn 约束保证幂等；
-- 大型 Session、工具输出和 diff 可能使浏览器卡顿，需要 bounded DTO 和渐进加载；
-- 若 UI 建立第二套状态机，CLI 与 Web 行为会漂移，因此所有状态必须来自应用服务和 EchoEvent；
-- 可解释性不等于暴露思维链。工作台只能展示可验证的输入、动作、策略结果和证据；
-- DSH、OpenCode 等公开产品只作为交互形态参考，ECHO 不复制其代码、私有接口或目录结构。
+- 本地 Web 服务可以触发代码执行，回环监听仍需防范 DNS rebinding、CSRF 和恶意网页访问；
+- 页面刷新、SSE 重连和重复 POST 可能产生副作用，必须依赖 seq、requestId 和领域幂等；
+- Provider 配置页面若复制 CLI 写入逻辑会产生双契约，必须先抽共享服务；
+- 多 Session 导航容易被误实现为多 Turn 并发，必须保持进程级仲裁；
+- 大型 Session、输出和 diff 可能导致浏览器卡顿，需要 bounded DTO、分页与虚拟化；
+- 可解释性不等于思维链公开，P2 只展示输入、动作、策略、结果和验证证据；
+- 浏览器端测试与 Windows CI 会增加耗时，必须分层保留快速单测与有限 E2E；
+- 第三方项目只作为交互参考，ECHO 保持独立实现与原创结构。

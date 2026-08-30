@@ -153,4 +153,31 @@ describe('Provider settings modal', () => {
     expect(screen.getByText('请修正 Provider 设置中的错误。')).toBeTruthy();
     expect(screen.getByText('Base URL 无效')).toBeTruthy();
   });
+
+  it('groups the dialog into 连接 and 模型目录 cards with a read-only key status', async () => {
+    const user = userEvent.setup();
+    render(
+      <App
+        transport={createFakeTransport({
+          sessions: [createIdleSession()],
+          selectedSessionId: 'ses_idle',
+        })}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: '设置' }));
+
+    const connection = screen.getByText('连接').parentElement;
+    expect(connection?.contains(screen.getByLabelText('Base URL'))).toBe(true);
+
+    const catalog = screen.getByText('模型目录').parentElement;
+    expect(catalog?.contains(screen.getByRole('radio', { name: '自动发现' }))).toBe(true);
+    expect(catalog?.contains(screen.getByRole('radio', { name: '手动维护' }))).toBe(true);
+    expect(catalog?.contains(screen.getByLabelText('默认模型'))).toBe(true);
+    expect(catalog?.contains(screen.getByLabelText('Base URL'))).toBe(false);
+
+    const status = screen.getByTestId('api-key-status');
+    expect(status.tagName).toBe('SPAN');
+    expect(status.textContent).toBe('已通过环境变量配置');
+    expect(screen.getByRole('list', { name: '发现的模型' }).textContent).toContain('echo-model');
+  });
 });

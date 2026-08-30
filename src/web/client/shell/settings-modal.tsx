@@ -8,6 +8,7 @@ import {
   type WebConsoleView,
 } from '../view-model/console-controller.js';
 import { catalogModels } from '../view-model/provider-catalog.js';
+import { Glyph } from './glyph.js';
 import styles from './shell.module.css';
 
 const FOCUSABLE_SELECTOR =
@@ -93,165 +94,200 @@ export function SettingsModal({
         role="dialog"
       >
         <nav aria-label="设置" className={styles.settingsNav}>
-          <p aria-current="page">Provider</p>
+          <p aria-current="page" className={styles.settingsNavItem}>
+            <Glyph name="gear" />
+            Provider
+          </p>
         </nav>
         <div className={styles.settingsBody}>
-          <h2 id={titleId} ref={headingRef} tabIndex={-1}>
-            Provider
-          </h2>
+          <div className={styles.settingsHeader}>
+            <div>
+              <h2 id={titleId} ref={headingRef} tabIndex={-1}>
+                Provider
+              </h2>
+              <p className={styles.settingsCaption}>
+                连接与模型目录只在本地保存，API Key 始终来自环境变量。
+              </p>
+            </div>
+          </div>
           {readOnly ? <p className={styles.errorSummary}>活动 Turn 存在时设置只读。</p> : null}
           {errorSummary === undefined ? null : (
             <p className={styles.errorSummary}>{errorSummary}</p>
           )}
-          <label className={styles.field}>
-            Base URL
-            <input
-              aria-invalid={fieldErrors?.baseUrl !== undefined}
-              onChange={(event) => {
-                onChange({ ...provider, baseUrl: event.target.value });
-              }}
-              readOnly={readOnly}
-              value={provider.baseUrl}
-            />
-          </label>
-          {fieldErrors?.baseUrl === undefined ? null : (
-            <p className={styles.blockReason}>{fieldErrors.baseUrl}</p>
-          )}
-          <fieldset className={styles.field}>
-            <legend>模型目录模式</legend>
-            <label>
+          <section className={styles.settingsCard}>
+            <p className={styles.settingsCardTitle}>连接</p>
+            <label className={styles.field}>
+              Base URL
               <input
-                checked={catalogSource === 'discover'}
-                disabled={readOnly}
-                name="catalog-source"
-                onChange={() => {
-                  onChange({
-                    ...provider,
-                    catalog: { source: 'discover', cachedModels: models },
-                  });
+                aria-invalid={fieldErrors?.baseUrl !== undefined}
+                onChange={(event) => {
+                  onChange({ ...provider, baseUrl: event.target.value });
                 }}
-                type="radio"
+                readOnly={readOnly}
+                value={provider.baseUrl}
               />
-              自动发现
             </label>
-            <label>
-              <input
-                checked={catalogSource === 'manual'}
-                disabled={readOnly}
-                name="catalog-source"
-                onChange={() => {
-                  onChange({
-                    ...provider,
-                    catalog: { source: 'manual', models },
-                  });
-                }}
-                type="radio"
-              />
-              手动维护
-            </label>
-          </fieldset>
-          {catalogSource === 'discover' ? (
-            <div>
-              <button
-                className={styles.secondaryButton}
-                disabled={readOnly || !wired}
-                onClick={() => {
-                  actions?.discoverModels();
-                }}
-                type="button"
-              >
-                获取模型
-              </button>
-              {view.lastDiscoveredAt === undefined ? null : (
-                <p className={styles.muted}>发现结果只读，不会自动保存。</p>
-              )}
-              <ul aria-label="发现的模型">
-                {models.map((model) => (
-                  <li key={model}>{model}</li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div>
-              <label className={styles.field}>
-                添加模型
-                <input
-                  onChange={(event) => {
-                    setManualName(event.target.value);
-                  }}
-                  readOnly={readOnly}
-                  value={manualName}
-                />
-              </label>
-              <button
-                className={styles.secondaryButton}
-                disabled={readOnly || manualName.trim().length === 0}
-                onClick={() => {
-                  const name = manualName.trim();
-                  if (name.length === 0 || models.includes(name)) {
-                    setManualName('');
-                    return;
-                  }
-                  onChange({
-                    ...provider,
-                    catalog: { source: 'manual', models: [...models, name] },
-                  });
-                  setManualName('');
-                }}
-                type="button"
-              >
-                添加
-              </button>
-              <ul aria-label="手动模型">
-                {models.map((model) => (
-                  <li key={model}>
-                    {model}{' '}
-                    <button
-                      className={styles.secondaryButton}
-                      disabled={readOnly}
-                      onClick={() => {
-                        const next = models.filter((item) => item !== model);
-                        onChange({
-                          ...provider,
-                          catalog: { source: 'manual', models: next },
-                          ...(provider.defaultModel === model
-                            ? { defaultModel: next[0] ?? '' }
-                            : {}),
-                        });
+            {fieldErrors?.baseUrl === undefined ? null : (
+              <p className={styles.blockReason}>{fieldErrors.baseUrl}</p>
+            )}
+          </section>
+          <section className={styles.settingsCard}>
+            <p className={styles.settingsCardTitle}>模型目录</p>
+            <fieldset className={styles.segmented}>
+              <legend>模型目录模式</legend>
+              <div className={styles.segmentedOptions}>
+                <label className={styles.segmentedOption}>
+                  <input
+                    checked={catalogSource === 'discover'}
+                    disabled={readOnly}
+                    name="catalog-source"
+                    onChange={() => {
+                      onChange({
+                        ...provider,
+                        catalog: { source: 'discover', cachedModels: models },
+                      });
+                    }}
+                    type="radio"
+                  />
+                  自动发现
+                </label>
+                <label className={styles.segmentedOption}>
+                  <input
+                    checked={catalogSource === 'manual'}
+                    disabled={readOnly}
+                    name="catalog-source"
+                    onChange={() => {
+                      onChange({
+                        ...provider,
+                        catalog: { source: 'manual', models },
+                      });
+                    }}
+                    type="radio"
+                  />
+                  手动维护
+                </label>
+              </div>
+            </fieldset>
+            {catalogSource === 'discover' ? (
+              <>
+                <div className={styles.actions}>
+                  {view.lastDiscoveredAt === undefined ? null : (
+                    <p className={styles.muted}>发现结果只读，不会自动保存。</p>
+                  )}
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={readOnly || !wired}
+                    onClick={() => {
+                      actions?.discoverModels();
+                    }}
+                    type="button"
+                  >
+                    <Glyph name="database" />
+                    获取模型
+                  </button>
+                </div>
+                <ul aria-label="发现的模型" className={styles.modelList}>
+                  {models.map((model) => (
+                    <li className={styles.modelListItem} key={model}>
+                      {model}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <>
+                <div className={styles.composerControls}>
+                  <label className={styles.field}>
+                    添加模型
+                    <input
+                      onChange={(event) => {
+                        setManualName(event.target.value);
                       }}
-                      type="button"
-                    >
-                      {`删除 ${model}`}
-                    </button>
-                  </li>
+                      readOnly={readOnly}
+                      value={manualName}
+                    />
+                  </label>
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={readOnly || manualName.trim().length === 0}
+                    onClick={() => {
+                      const name = manualName.trim();
+                      if (name.length === 0 || models.includes(name)) {
+                        setManualName('');
+                        return;
+                      }
+                      onChange({
+                        ...provider,
+                        catalog: { source: 'manual', models: [...models, name] },
+                      });
+                      setManualName('');
+                    }}
+                    type="button"
+                  >
+                    <Glyph name="plus" />
+                    添加
+                  </button>
+                </div>
+                <ul aria-label="手动模型" className={styles.modelList}>
+                  {models.map((model) => (
+                    <li className={styles.modelListItem} key={model}>
+                      {model}
+                      <button
+                        className={styles.ghostButton}
+                        disabled={readOnly}
+                        onClick={() => {
+                          const next = models.filter((item) => item !== model);
+                          onChange({
+                            ...provider,
+                            catalog: { source: 'manual', models: next },
+                            ...(provider.defaultModel === model
+                              ? { defaultModel: next[0] ?? '' }
+                              : {}),
+                          });
+                        }}
+                        type="button"
+                      >
+                        {`删除 ${model}`}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <label className={styles.field}>
+              默认模型
+              <select
+                aria-invalid={fieldErrors?.defaultModel !== undefined}
+                disabled={readOnly}
+                onChange={(event) => {
+                  onChange({ ...provider, defaultModel: event.target.value });
+                }}
+                value={provider.defaultModel}
+              >
+                {models.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
                 ))}
-              </ul>
-            </div>
-          )}
-          <label className={styles.field}>
-            默认模型
-            <select
-              aria-invalid={fieldErrors?.defaultModel !== undefined}
-              disabled={readOnly}
-              onChange={(event) => {
-                onChange({ ...provider, defaultModel: event.target.value });
-              }}
-              value={provider.defaultModel}
+              </select>
+            </label>
+            {fieldErrors?.defaultModel === undefined ? null : (
+              <p className={styles.blockReason}>{fieldErrors.defaultModel}</p>
+            )}
+          </section>
+          <div className={styles.apiKeyCard}>
+            <Glyph name="shield" />
+            <span>API Key</span>
+            <span
+              className={`${styles.apiKeyStatus}${
+                provider.apiKeyConfigured ? '' : ` ${styles.apiKeyStatusMissing}`
+              }`}
+              data-testid="api-key-status"
             >
-              {models.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-          {fieldErrors?.defaultModel === undefined ? null : (
-            <p className={styles.blockReason}>{fieldErrors.defaultModel}</p>
-          )}
-          <p data-testid="api-key-status">
-            {provider.apiKeyConfigured ? '已通过环境变量配置' : '未配置'}
-          </p>
-          <div className={styles.actions}>
+              {provider.apiKeyConfigured ? '已通过环境变量配置' : '未配置'}
+            </span>
+          </div>
+          <div className={styles.settingsFooter}>
             <button className={styles.secondaryButton} onClick={onClose} type="button">
               取消
             </button>

@@ -15,6 +15,7 @@ import {
   toEchoError,
   withRetries,
 } from './errors.js';
+import { extractReasoningDelta } from './reasoning.js';
 import { collectStreamedToolCalls, toModelToolCall } from './stream-aggregation.js';
 import { toWireRequest } from './request-mapping.js';
 
@@ -23,6 +24,9 @@ interface StreamChunk {
     readonly delta?: {
       readonly content?: string | null;
       readonly tool_calls?: readonly Readonly<Record<string, unknown>>[] | undefined;
+      readonly reasoning?: string | null;
+      readonly reasoning_content?: string | null;
+      readonly reasoning_details?: readonly unknown[];
     } | null;
     readonly finish_reason?: string | null;
   }[];
@@ -161,6 +165,10 @@ export class OpenAICompatibleProvider implements ModelProvider, ModelCatalogClie
         }
         if (typeof choice.delta?.content === 'string' && choice.delta.content.length > 0) {
           yield { type: 'text_delta', delta: choice.delta.content };
+        }
+        const reasoning = extractReasoningDelta(choice.delta);
+        if (reasoning !== undefined) {
+          yield { type: 'reasoning_delta', delta: reasoning };
         }
         const fragments = choice.delta?.tool_calls;
         if (fragments !== undefined && fragments !== null) {

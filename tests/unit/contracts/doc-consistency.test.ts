@@ -20,6 +20,9 @@ describe('P1 documentation freeze', () => {
       adr3: await readDoc('docs/decisions/0003-p1-application-service-session.md'),
       adr4: await readDoc('docs/decisions/0004-workspace-echo-config.md'),
       adr5: await readDoc('docs/decisions/0005-restore-artifact-config.md'),
+      adr6: await readDoc('docs/decisions/0006-reasoning-session-events.md'),
+      p15: await readDoc('docs/plans/p1-5-reasoning-context.md'),
+      cliUx: await readDoc('docs/cli-ux.md'),
       contracts: await readDoc('docs/contracts.md'),
       architecture: await readDoc('docs/architecture.md'),
       testing: await readDoc('docs/testing.md'),
@@ -82,6 +85,44 @@ describe('P1 documentation freeze', () => {
     expect(files.testing).toContain('P1-2B');
     expect(files.testing).toContain('smoke:artifact');
     expect(files.testing).not.toContain('not yet implemented');
+    expect(files.adr6).toContain('model.reasoning');
+    expect(files.adr6).toContain('model.text');
+    expect(files.adr6).toContain('EVENT_SCHEMA_VERSION');
+    expect(files.adr6).toContain('type`/`text`/`format`/`index');
+    expect(files.adr6).toContain('完全一致');
+    expect(files.adr6).toContain('canonical `reasoning`');
+    expect(files.adr6).toContain('整组数组原样保留');
+    expect(files.adr6).not.toContain('逻辑项合并');
+    expect(files.p15).toContain('all-or-nothing');
+    expect(files.p15).toContain('details-only');
+    expect(files.p15).toContain('整组数组及顺序必须原样保留');
+    expect(files.contracts).toContain('type`/`text`/`format`/`index');
+    expect(files.contracts).toContain('整组原样保留数组及顺序');
+    expect(files.contracts).toContain('model.reasoning');
+    expect(files.contracts).toContain('model.text');
+    expect(files.contracts).toContain('output_limit');
+    expect(files.contracts).toContain('256,000');
+    expect(files.architecture).toContain('ADR-0006');
+    expect(files.architecture).toContain('canonical `reasoning`');
+    expect(files.testing).toContain('details-only canonical `reasoning`');
+    const reasoningSource = await readDoc('src/provider/reasoning.ts');
+    expect(reasoningSource).not.toContain("type === 'text'");
+    expect(reasoningSource).not.toContain('details.filter');
+    expect(reasoningSource).not.toContain('.includes(text)');
+    expect(reasoningSource).not.toContain('isRedundantTextDetail');
+    expect(reasoningSource).not.toContain('hasStringField');
+    await expect(
+      fs.access(path.join(ROOT, 'docs/decisions/0007-reasoning-details-merge.md')),
+    ).rejects.toThrow();
+    expect(await readDoc('src/provider/reasoning.ts')).not.toContain('mergeReasoningDetails');
+    expect(await readDoc('AGENTS.md')).not.toContain('0007-reasoning-details-merge');
+    expect(files.cliUx).toContain('model.reasoning');
+    expect(files.plan).toContain('ADR-0006');
+    expect(files.p15).toContain('状态：Accepted');
+    expect(files.testing).toContain('P15_TEST_MATRIX');
+    expect(files.testing).toContain('session-text-invariants');
+    expect(files.testing).toContain('adapter directly');
+    expect(files.testing).toContain('Session `.jsonl`');
     expect(files.plan).toContain('状态：Accepted');
     expect(P1_TEST_MATRIX.every((row) => !row.runtimeEvidence.includes('pending:'))).toBe(true);
 

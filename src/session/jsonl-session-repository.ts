@@ -85,7 +85,7 @@ export class JsonlSessionRepository extends JsonlSessionStore implements Session
     if (input.eventSchemaVersion !== EVENT_SCHEMA_VERSION) {
       throw storageError(
         'SESSION_LOG_INCOMPATIBLE',
-        'New sessions must use event schema version 2.',
+        'New sessions must use event schema version 3.',
       );
     }
 

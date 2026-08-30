@@ -6,6 +6,9 @@ import type { EchoPersistentConfig, ModelCatalogConfig } from '../contracts/conf
 import type { SafetyMode } from '../contracts/safety.js';
 
 import {
+  DEFAULT_MAX_APPROX_TOKENS,
+  DEFAULT_MAX_OUTPUT_CHARS,
+  DEFAULT_RESERVED_OUTPUT_TOKENS,
   inspectProviderUrl,
   parsePersistentConfig,
   persistentConfigPath,
@@ -224,7 +227,17 @@ export async function runConfigWizard(
     }
     const model = await promptDefaultModel(io, catalog, existing?.model, signal);
     const safetyMode = await promptSafetyMode(io, existing?.safetyMode, signal);
-    const draft: EchoPersistentConfig = { baseUrl, model, modelCatalog: catalog, safetyMode };
+    const draft: EchoPersistentConfig = {
+      baseUrl,
+      model,
+      modelCatalog: catalog,
+      safetyMode,
+      maxOutputChars: existing?.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS,
+      context: existing?.context ?? {
+        maxApproxTokens: DEFAULT_MAX_APPROX_TOKENS,
+        reservedOutputTokens: DEFAULT_RESERVED_OUTPUT_TOKENS,
+      },
+    };
 
     io.write('\n');
     io.write(`baseUrl      ${draft.baseUrl}\n`);

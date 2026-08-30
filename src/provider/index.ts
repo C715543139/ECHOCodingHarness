@@ -32,4 +32,10 @@ export {
 export type { OpenAICompatibleClient } from './openai-compatible-provider.js';
 export { collectStreamedToolCalls, toModelToolCall } from './stream-aggregation.js';
 export { toWireMessage, toWireRequest, toWireTool } from './request-mapping.js';
+export {
+  aggregateReasoning,
+  extractReasoningDelta,
+  isJsonSerializable,
+  isReasoningPayload,
+} from './reasoning.js';
 export { createOpenAIClient } from './openai-client.js';

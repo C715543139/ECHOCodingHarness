@@ -174,6 +174,7 @@ export class DefaultEventRenderer implements EventRenderer {
   private lastVerification: { command: string; exitCode: number; durationMs?: number } | undefined;
   private lastDenialDetail: string | undefined;
   private textBuffer = '';
+  private textKind: 'none' | 'aggregated' | 'delta' = 'none';
   private stepToolCalls = 0;
   private flushedProgress = false;
   private lastProgressText = '';
@@ -194,6 +195,7 @@ export class DefaultEventRenderer implements EventRenderer {
 
   private resetStep(): void {
     this.textBuffer = '';
+    this.textKind = 'none';
     this.stepToolCalls = 0;
     this.flushedProgress = false;
     this.stepHasGroup = false;
@@ -294,8 +296,17 @@ export class DefaultEventRenderer implements EventRenderer {
               'blue',
             )
           : [];
+      case 'model.text':
+        if (this.textKind === 'delta') return [];
+        this.textKind = 'aggregated';
+        this.textBuffer += event.payload.text;
+        return [];
       case 'model.text_delta':
+        if (this.textKind === 'aggregated') return [];
+        this.textKind = 'delta';
         this.textBuffer += event.payload.delta;
+        return [];
+      case 'model.reasoning':
         return [];
       case 'model.tool_call':
         this.stepToolCalls += 1;
@@ -420,17 +431,22 @@ export class DefaultEventRenderer implements EventRenderer {
   renderResult(result: AgentResult, capabilities: RenderCapabilities): readonly RenderChunk[] {
     const chunks: RenderChunk[] = [];
     const options = layoutOptions(capabilities);
-    if (result.status === 'completed' && result.finalText !== undefined) {
-      const finalText = this.sanitize(result.finalText);
+    const visibleFinal =
+      (result.status === 'completed' || result.status === 'limited') &&
+      result.finalText !== undefined &&
+      result.finalText.length > 0
+        ? this.sanitize(result.finalText)
+        : undefined;
+    if (visibleFinal !== undefined) {
       if (this.surface === 'chat') {
         chunks.push(
           { channel: 'stderr', text: '\n' },
-          ...this.emit('ECHO', finalText.trimEnd(), capabilities, 'cyan'),
+          ...this.emit('ECHO', visibleFinal.trimEnd(), capabilities, 'cyan'),
         );
       } else {
         chunks.push({
           channel: 'stdout',
-          text: finalText.endsWith('\n') ? finalText : `${finalText}\n`,
+          text: visibleFinal.endsWith('\n') ? visibleFinal : `${visibleFinal}\n`,
         });
       }
     }

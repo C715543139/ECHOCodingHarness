@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.2
+> 版本：1.3
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 
 ## Automated quality gate
 
@@ -48,6 +48,9 @@ pnpm vitest run tests/integration/file-tools.test.ts tests/integration/tools/run
 | P1-1B Chat resume, slash, Ctrl+C, paste, and default catalog port | `tests/integration/cli-chat.test.ts`, `tests/unit/cli/parse-chat-input.test.ts`, `tests/unit/cli/chat-input-decoder.test.ts`, `tests/unit/cli/session-id.test.ts`, `tests/unit/config/session-settings.test.ts`; matrix APP-03/CHAT-* rows |
 | Chat interrupt of an in-flight `run_command` PowerShell tree | `tests/integration/cli-chat-cancel-command.test.ts` |
 | Interactive approval prompt and `n`/`y`/`s` decisions in run/chat | `tests/unit/cli/interactive-approval-handler.test.ts`, `tests/integration/cli-run.test.ts`, `tests/integration/cli-chat.test.ts` |
+| P1.5 aggregate text/reasoning events, stop matrix, 256K budget, and `/status` | `P15_TEST_MATRIX` in `src/contracts/p15-matrix.ts`; `tests/unit/provider/reasoning.test.ts`, `tests/unit/agent/agent-loop.test.ts`, `tests/unit/context/event-context-builder.test.ts`, `tests/unit/session/jsonl-session-repository.test.ts`, `tests/unit/session/session-query.test.ts`, `tests/unit/cli/event-renderer.test.ts`, `tests/unit/cli/chat-view.test.ts`, `tests/integration/cli-run.test.ts`, `tests/integration/cli-chat.test.ts` |
+
+P1.5 正文聚合回归必须使用合成 Provider 流覆盖：大量单字符 delta 只产生一条 `model.text`；新 Session 不产生 `model.text_delta`；失败和取消在终态前保存一条 `partial: true` 正文；旧 v1/v2 与修订前本地 v3 增量日志仍可读取、查询、投影和渲染；同一 Step 混用聚合正文与增量正文安全拒绝。推理回归必须覆盖严格 `reasoning.text` 的等价整组省略、details-only canonical `reasoning`、拼接不一致、额外键、encrypted、signature、summary、未知类型、混合数组和空文本整组保留。CLI snapshot 必须证明聚合前后 stdout/stderr、Step 间距和最终摘要不变。
 
 P1-0 增加契约与矩阵测试。矩阵每一行同时记录 `contractEvidence` 与 `runtimeEvidence`；P1 集成验收要求所有 `runtimeEvidence` 都指向真实运行时测试，不得再保留 `pending:<task>`：
 
@@ -142,8 +145,13 @@ default `scripts/smoke-provider.mjs` path prints that it was skipped and exits 0
 ## Real OpenAI-compatible Provider smoke check
 
 The real Provider smoke check is disabled by default. It talks to the OpenAI-compatible
-adapter directly (not through `echo-harness` config merge). Build first, then explicitly enable one
-bounded request from PowerShell:
+adapter directly (not through `echo-harness` config merge) using smoke-only `ECHO_BASE_URL` /
+`ECHO_MODEL` / `ECHO_API_KEY`. The same bounded request is persisted through one Agent Loop
+turn into a temporary workspace Session. The script then reads that Session `.jsonl` and
+asserts the P1.5 writer contract: at most one `model.text` per model response, no persisted
+`model.text_delta`, and text event envelopes that do not grow with body length.
+`scripts/session-text-invariants.mjs` is the shared JSONL checker; Fake Provider evals reuse it
+offline. Build first, then explicitly enable one bounded request from PowerShell:
 
 ```powershell
 $env:ECHO_RUN_PROVIDER_SMOKE = '1'
@@ -159,8 +167,9 @@ They are not `echo-harness` configuration sources. `echo-harness run` reads
 `<artifact-root>/config/echo.config.json` plus `ECHO_API_KEY` only.
 
 The script requires all three Provider settings, disables retries, limits output, applies a
-60-second abort timeout, and never prints the key or model response. Remove the API key from the
-shell environment after the check. This path is local acceptance only and is not part of CI.
+60-second abort timeout, deletes the temporary workspace afterward, and never prints the key or
+model response. Remove the API key from the shell environment after the check. This path is local
+acceptance only and is not part of CI. It does not read `.env.test`.
 
 ## Known gaps
 

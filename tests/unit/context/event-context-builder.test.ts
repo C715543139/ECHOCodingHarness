@@ -114,17 +114,13 @@ describe('EventContextBuilder', () => {
     expect(projection.truncations[0]?.originalSize).toBe(500);
   });
 
-  it('preserves only the system prompt and current goal under a tiny budget', () => {
+  it('fails when the current turn tool group cannot fit as a complete set', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM CONSTRAINTS' });
     const tinyBudget: ContextBudget = { maxApproxTokens: 15, reservedOutputTokens: 4 };
 
-    const projection = builder.build(simpleHistory(), tinyBudget);
-
-    expect(projection.messages).toEqual([
-      { role: 'system', content: 'SYSTEM CONSTRAINTS' },
-      { role: 'user', content: 'Fix the failing tests' },
-    ]);
-    expect(projection.omittedEventCount).toBeGreaterThan(0);
+    expect(() => builder.build(simpleHistory(), tinyBudget)).toThrow(
+      expect.objectContaining({ code: 'CONTEXT_ATOMIC_GROUP_EXCEEDED' }),
+    );
   });
 
   it('keeps the current exchange when the budget equals the actual projection size', () => {
@@ -346,12 +342,134 @@ describe('EventContextBuilder', () => {
     ]);
   });
 
+  it('keeps a failed empty turn goal and counts reasoning in approximate tokens', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const withoutReasoning = builder.build(
+      [
+        event('turn.started', { goal: 'first goal' }),
+        event('turn.failed', {
+          result: {
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            status: 'failed',
+            stopReason: 'provider_error',
+            steps: 1,
+            toolCalls: 0,
+            error: {
+              category: 'provider_protocol',
+              code: 'PROVIDER_REASONING_BUDGET_EXHAUSTED',
+              message: 'exhausted',
+              retryable: false,
+            },
+          },
+        }),
+        event('turn.started', { goal: 'second goal' }, 'turn-2'),
+      ],
+      largeBudget,
+    );
+    expect(withoutReasoning.messages).toEqual(
+      expect.arrayContaining([
+        { role: 'user', content: 'first goal' },
+        { role: 'user', content: 'second goal' },
+      ]),
+    );
+
+    const withReasoning = builder.build(
+      [
+        event('turn.started', { goal: 'goal' }),
+        event('model.text_delta', { delta: 'visible' }),
+        event('model.reasoning', {
+          reasoning: 'x'.repeat(400),
+          reasoningDetails: [{ blob: 'y'.repeat(400) }],
+        }),
+      ],
+      largeBudget,
+    );
+    const textOnly = builder.build(
+      [event('turn.started', { goal: 'goal' }), event('model.text_delta', { delta: 'visible' })],
+      largeBudget,
+    );
+    expect(withReasoning.approximateTokens).toBeGreaterThan(textOnly.approximateTokens);
+  });
+
   it('produces a deterministic projection for identical inputs', () => {
     const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
     const history = simpleHistory();
     const first = builder.build(history, largeBudget);
     const second = builder.build(history, largeBudget);
     expect(first).toEqual(second);
+  });
+
+  it('projects aggregated model.text the same way as concatenated text deltas', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const history: EchoEvent[] = [
+      event('turn.started', { goal: 'goal' }),
+      event('step.started', { step: 1 }),
+      event('model.text', { text: 'Let me look at the file.' }),
+      event('model.tool_call', {
+        call: { id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } },
+      }),
+      event('tool.completed', {
+        result: toolResult('completed', 'file contents here'),
+        durationMs: 3,
+      }),
+    ];
+    const projection = builder.build(history, largeBudget);
+    expect(projection.messages).toEqual(
+      expect.arrayContaining([
+        { role: 'user', content: 'goal' },
+        {
+          role: 'assistant',
+          content: 'Let me look at the file.',
+          toolCalls: [{ id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } }],
+        },
+      ]),
+    );
+  });
+
+  it('projects partial aggregated text as the assistant body already returned', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    const projection = builder.build(
+      [
+        event('turn.started', { goal: 'goal' }),
+        event('step.started', { step: 1 }),
+        event('model.text', { text: 'half', partial: true }),
+        event('turn.cancelled', {
+          result: {
+            sessionId: 'session-1',
+            turnId: 'turn-1',
+            status: 'cancelled',
+            stopReason: 'cancelled',
+            steps: 1,
+            toolCalls: 0,
+          },
+        }),
+      ],
+      largeBudget,
+    );
+    expect(projection.messages).toEqual(
+      expect.arrayContaining([{ role: 'assistant', content: 'half' }]),
+    );
+  });
+
+  it('rejects mixed model.text and model.text_delta in the same step', () => {
+    const builder = new EventContextBuilder({ systemPrompt: 'SYSTEM' });
+    expect(() =>
+      builder.build(
+        [
+          event('turn.started', { goal: 'goal' }),
+          event('step.started', { step: 1 }),
+          event('model.text', { text: 'aggregated' }),
+          event('model.text_delta', { delta: 'delta' }),
+        ],
+        largeBudget,
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        category: 'storage',
+        code: 'SESSION_LOG_INVALID',
+      }),
+    );
   });
 
   it('projects a workspace summary message when provided', () => {

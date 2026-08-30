@@ -7,9 +7,11 @@ import {
   CONFIG_ERROR_CODES,
   EVENT_SCHEMA_VERSION,
   EVENT_SCHEMA_VERSION_P0,
+  EVENT_SCHEMA_VERSION_P1,
   P1_CONFIG_RELATIVE_PATH,
   P1_SETTING_SOURCES,
   P1_SLASH_COMMANDS,
+  P15_TEST_MATRIX,
   P1_TEST_MATRIX,
   exitCodeForAgentResult,
   type ApplicationService,
@@ -31,6 +33,12 @@ describe('P1 frozen contracts', () => {
     const ids = P1_TEST_MATRIX.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(P1_TEST_MATRIX.some((row) => row.area === 'p0-guard')).toBe(true);
+    const p15Ids = P15_TEST_MATRIX.map((row) => row.id);
+    expect(new Set(p15Ids).size).toBe(p15Ids.length);
+    expect(p15Ids).toEqual(
+      expect.arrayContaining(['TXT-01', 'TXT-02', 'TXT-03', 'TXT-04', 'TXT-05', 'TXT-06']),
+    );
+    expect(P15_TEST_MATRIX.every((row) => !row.runtimeEvidence.includes('pending:'))).toBe(true);
     expect(P1_CONFIG_RELATIVE_PATH.replaceAll('\\', '/')).toBe('config/echo.config.json');
     for (const row of P1_TEST_MATRIX) {
       expect(row.contractEvidence.length).toBeGreaterThan(0);
@@ -64,6 +72,9 @@ describe('P1 frozen contracts', () => {
     };
     expect(exitCodeForAgentResult(base)).toBe(CLI_EXIT_CODES.success);
     expect(exitCodeForAgentResult({ ...base, status: 'limited', stopReason: 'max_steps' })).toBe(6);
+    expect(exitCodeForAgentResult({ ...base, status: 'limited', stopReason: 'output_limit' })).toBe(
+      6,
+    );
     expect(exitCodeForAgentResult({ ...base, status: 'cancelled', stopReason: 'cancelled' })).toBe(
       130,
     );
@@ -76,7 +87,8 @@ describe('P1 frozen contracts', () => {
     );
     expect(exitCodeForAgentResult({ ...base, status: 'failed', stopReason: 'completed' })).toBe(1);
     expect(EVENT_SCHEMA_VERSION_P0).toBe(1);
-    expect(EVENT_SCHEMA_VERSION).toBe(2);
+    expect(EVENT_SCHEMA_VERSION_P1).toBe(2);
+    expect(EVENT_SCHEMA_VERSION).toBe(3);
   });
 
   it('brands endpoint fingerprints so raw URL strings cannot satisfy ProviderIdentity', () => {

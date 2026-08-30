@@ -9,6 +9,9 @@ interface Chunk {
     delta?: {
       content?: string | null;
       tool_calls?: readonly Readonly<Record<string, unknown>>[];
+      reasoning?: string | null;
+      reasoning_content?: string | null;
+      reasoning_details?: readonly unknown[];
     } | null;
     finish_reason?: string | null;
   }[];
@@ -94,6 +97,25 @@ function makeProvider(
 }
 
 describe('OpenAICompatibleProvider', () => {
+  it('emits reasoning deltas in arrival order without turning them into text', async () => {
+    const provider = makeProvider([
+      { choices: [{ delta: { reasoning: 'think-' } }] },
+      { choices: [{ delta: { reasoning_content: ' hidden' } }] },
+      { choices: [{ delta: { reasoning_details: [{ id: 1 }] } }] },
+      { choices: [{ delta: { content: 'visible' } }] },
+      finishChunk('stop'),
+    ]);
+    const events = await collectEvents(provider);
+
+    expect(events).toEqual([
+      { type: 'reasoning_delta', delta: { reasoning: 'think-' } },
+      { type: 'reasoning_delta', delta: { reasoningContent: ' hidden' } },
+      { type: 'reasoning_delta', delta: { reasoningDetails: [{ id: 1 }] } },
+      { type: 'text_delta', delta: 'visible' },
+      { type: 'completed', finishReason: 'stop' },
+    ]);
+  });
+
   it('emits text deltas followed by a completion event', async () => {
     const provider = makeProvider([textChunk('Hello'), textChunk(' world'), finishChunk('stop')]);
     const events = await collectEvents(provider);

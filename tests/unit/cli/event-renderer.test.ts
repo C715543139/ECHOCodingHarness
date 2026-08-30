@@ -226,6 +226,39 @@ describe('DefaultEventRenderer', () => {
     ).toBe('ECHO       | I will inspect the parser.\n');
   });
 
+  it('buffers aggregated model.text the same way as concatenated text deltas', () => {
+    const renderer = new DefaultEventRenderer();
+    renderer.renderEvent(event('step.started', { step: 1 }), plain);
+    expect(
+      renderer.renderEvent(event('model.text', { text: 'I will inspect the parser.' }), plain),
+    ).toEqual([]);
+    renderer.renderEvent(
+      event('model.tool_call', {
+        call: { id: 'call-1', name: 'search_text', arguments: { query: 'parseReport' } },
+      }),
+      plain,
+    );
+    expect(
+      join(renderer.renderEvent(event('model.completed', { finishReason: 'tool_calls' }), plain)),
+    ).toBe('ECHO       | I will inspect the parser.\n');
+  });
+
+  it('does not concatenate mixed aggregated text and text deltas in one step', () => {
+    const renderer = new DefaultEventRenderer();
+    renderer.renderEvent(event('step.started', { step: 1 }), plain);
+    renderer.renderEvent(event('model.text', { text: 'aggregated' }), plain);
+    renderer.renderEvent(event('model.text_delta', { delta: 'delta' }), plain);
+    renderer.renderEvent(
+      event('model.tool_call', {
+        call: { id: 'call-1', name: 'search_text', arguments: { query: 'x' } },
+      }),
+      plain,
+    );
+    expect(
+      join(renderer.renderEvent(event('model.completed', { finishReason: 'tool_calls' }), plain)),
+    ).toBe('ECHO       | aggregated\n');
+  });
+
   it('inserts one blank line between complete groups, not inside a tool group', () => {
     const renderer = new DefaultEventRenderer();
     renderer.renderEvent(event('step.started', { step: 2 }), plain);
@@ -362,6 +395,67 @@ describe('DefaultEventRenderer', () => {
     expect(failed).toContain('One or more operations were denied.');
     expect(failed).toContain('The user denied this operation.');
     expect(failed).not.toContain('policy_denied | The user denied this operation.');
+  });
+
+  it('ignores model.reasoning and does not render a blank ECHO for empty failures', () => {
+    const renderer = new DefaultEventRenderer({}, 'chat');
+    expect(
+      renderer.renderEvent(event('model.reasoning', { reasoning: 'secret chain' }), {
+        ...plain,
+        verbose: true,
+      }),
+    ).toEqual([]);
+    const emptyFailed = join(
+      renderer.renderResult(
+        {
+          sessionId: 'session-test',
+          turnId: 'turn-test',
+          status: 'failed',
+          stopReason: 'provider_error',
+          finalText: '',
+          steps: 1,
+          toolCalls: 0,
+          error: {
+            category: 'provider_protocol',
+            code: 'PROVIDER_REASONING_BUDGET_EXHAUSTED',
+            message:
+              'The model exhausted its output budget before producing a visible response or tool call.',
+            retryable: false,
+          },
+        },
+        plain,
+      ),
+    );
+    expect(emptyFailed).toContain('Turn failed');
+    expect(emptyFailed).toContain('provider_error');
+    expect(emptyFailed).toContain('exhausted its output budget');
+    expect(emptyFailed).not.toContain('ECHO       |');
+    expect(emptyFailed).not.toContain('secret chain');
+
+    const limited = join(
+      renderer.renderResult(
+        {
+          sessionId: 'session-test',
+          turnId: 'turn-test',
+          status: 'limited',
+          stopReason: 'output_limit',
+          finalText: 'partial body',
+          steps: 1,
+          toolCalls: 0,
+          error: {
+            category: 'provider_protocol',
+            code: 'PROVIDER_OUTPUT_LIMIT',
+            message: 'The response may be incomplete.',
+            retryable: false,
+          },
+        },
+        plain,
+      ),
+    );
+    expect(limited).toContain('ECHO       | partial body');
+    expect(limited).toContain('Turn limited');
+    expect(limited).toContain('output_limit');
+    expect(limited).toContain('NOT VERIFIED');
   });
 
   it('does not print intermediate text or reasoning-only progress on the final-text path', () => {

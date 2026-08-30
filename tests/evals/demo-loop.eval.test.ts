@@ -17,6 +17,11 @@ import {
   toolTurn,
 } from './eval-harness.js';
 
+import {
+  assertAggregatedSessionJsonl,
+  assertAggregatedSessionText,
+} from '../../scripts/session-text-invariants.mjs';
+
 const describeWindows = process.platform === 'win32' ? describe : describe.skip;
 const workspaces: string[] = [];
 
@@ -107,5 +112,16 @@ describeWindows('offline Fake Provider eval: demo-loop', () => {
     expect(jsonl).not.toContain(os.homedir());
     expect(jsonl).not.toContain(workspaceRoot);
     expect(jsonl).toContain('"type":"context.projected"');
+    expect(jsonl).toContain('"type":"model.text"');
+    expect(jsonl).not.toContain('"type":"model.text_delta"');
+    expect(assertAggregatedSessionText(run.events)).toMatchObject({
+      modelResponses: 7,
+      textEvents: 1,
+    });
+    expect(assertAggregatedSessionJsonl(jsonl)).toMatchObject({
+      modelResponses: 7,
+      textEvents: 1,
+      textLineCount: 1,
+    });
   });
 });

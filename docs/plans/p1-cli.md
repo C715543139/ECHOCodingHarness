@@ -2,11 +2,13 @@
 
 > 状态：Accepted
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 >
-> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[ADR-0005](../decisions/0005-restore-artifact-config.md)、[contracts.md](../contracts.md) 1.2
+> 契约基线：[ADR-0002](../decisions/0002-p1-config-artifact-root.md)、[ADR-0003](../decisions/0003-p1-application-service-session.md)、[ADR-0005](../decisions/0005-restore-artifact-config.md)、[ADR-0006](../decisions/0006-reasoning-session-events.md)、[contracts.md](../contracts.md) 1.3
+>
+> P1.5 补丁：[p1-5-reasoning-context.md](./p1-5-reasoning-context.md) 已冻结聚合正文/推理事件、终止语义与 256K 近似预算。
 
 ## 1. 目标
 
@@ -496,7 +498,7 @@ PROVIDER    │ OpenAI-compatible
 MODEL       │ deepseek-reasoner · session
 SAFETY      │ auto · session
 TURNS       │ 6
-CONTEXT     │ ~18,400 / 28,000 tokens · 66%
+CONTEXT     │ ~18K / 28K
 LAST TURN   │ completed · 5 steps · 7 tools
 LAST CHECK  │ pnpm test · exit 0
 API KEY     │ configured
@@ -665,7 +667,7 @@ P1 负责记录未来 WebUI 所需的事实：
 - 命令耗时、退出码和截断状态；
 - Turn 终态、停止原因和可引用的验证结果。
 
-事件不得保存模型内部思维链、秘密、未经脱敏的个人路径或原始敏感参数。
+事件可以保存聚合后的 Provider 推理字段（`model.reasoning`）供恢复和续接，但不得把推理原文当作 CLI 展示、验证证据或导出材料。事件仍不得保存秘密、未经脱敏的个人路径或原始敏感参数。
 
 ## 7. 实施顺序
 

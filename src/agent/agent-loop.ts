@@ -12,6 +12,8 @@ import type {
   EchoEventType,
   ModelFinishReason,
   ModelProvider,
+  ModelReasoning,
+  ModelReasoningDelta,
   ModelToolCall,
   ProviderIdentity,
   SafetyMode,
@@ -24,6 +26,7 @@ import type {
   TurnId,
 } from '../contracts/index.js';
 import { EVENT_SCHEMA_VERSION, isToolTerminalEvent } from '../contracts/index.js';
+import { aggregateReasoning } from '../provider/reasoning.js';
 import { redactValue, type RedactionOptions } from '../session/index.js';
 import { normalizeToolInput, toolCallSignature } from '../tools/tool-registry.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -124,6 +127,23 @@ function policyError(message: string): EchoError {
     message,
     retryable: false,
   };
+}
+
+function providerProtocolError(code: string, message: string): EchoError {
+  return {
+    category: 'provider_protocol',
+    code,
+    message,
+    retryable: false,
+  };
+}
+
+function visibleTextOf(parts: readonly string[]): string {
+  return parts.join('');
+}
+
+function hasVisibleText(text: string): boolean {
+  return text.length > 0;
 }
 
 function validateToolCallIds(
@@ -358,10 +378,29 @@ export class AgentLoop {
       const stepId = this.idFactory('step') as StepId;
       await this.emit(state, 'step.started', { step }, stepId, state.turnId);
 
-      const projection = this.options.contextBuilder.build(
-        state.events,
-        this.options.contextBudget,
-      );
+      let projection;
+      try {
+        projection = this.options.contextBuilder.build(state.events, this.options.contextBudget);
+      } catch (error) {
+        const normalized = errorFromUnknown(
+          error,
+          providerProtocolError(
+            'CONTEXT_ATOMIC_GROUP_EXCEEDED',
+            'The current turn reasoning, tool calls, and tool results cannot fit in the remaining approximate context budget.',
+          ),
+        );
+        if (normalized.category === 'storage' && normalized.code === 'SESSION_LOG_INVALID') {
+          return this.finishFailed(state, 'provider_error', normalized);
+        }
+        await this.emit(
+          state,
+          'limit.reached',
+          { kind: 'context_budget', limit: this.options.contextBudget.maxApproxTokens },
+          stepId,
+          state.turnId,
+        );
+        return this.finishFailed(state, 'provider_error', normalized);
+      }
       await this.emit(
         state,
         'context.projected',
@@ -389,6 +428,7 @@ export class AgentLoop {
 
       const text: string[] = [];
       const calls: ModelToolCall[] = [];
+      const reasoningDeltas: ModelReasoningDelta[] = [];
       let finishReason: ModelFinishReason | undefined;
       let usage: { inputTokens?: number; outputTokens?: number } = {};
       try {
@@ -403,22 +443,10 @@ export class AgentLoop {
         )) {
           if (streamEvent.type === 'text_delta') {
             text.push(streamEvent.delta);
-            await this.emit(
-              state,
-              'model.text_delta',
-              { delta: streamEvent.delta },
-              stepId,
-              state.turnId,
-            );
+          } else if (streamEvent.type === 'reasoning_delta') {
+            reasoningDeltas.push(streamEvent.delta);
           } else if (streamEvent.type === 'tool_call') {
             calls.push(streamEvent.call);
-            await this.emit(
-              state,
-              'model.tool_call',
-              { call: streamEvent.call },
-              stepId,
-              state.turnId,
-            );
           } else if (streamEvent.type === 'usage') {
             usage = {
               ...(streamEvent.inputTokens === undefined
@@ -447,6 +475,8 @@ export class AgentLoop {
           message: 'The model request failed.',
           retryable: false,
         });
+        await this.persistReasoning(state, reasoningDeltas, stepId);
+        await this.persistText(state, text, stepId, true);
         await this.emit(state, 'model.failed', { error: normalized }, stepId, state.turnId);
         if (normalized.category === 'cancelled' || signal.aborted) {
           return this.finishCancelled(
@@ -457,27 +487,81 @@ export class AgentLoop {
         return this.finishFailed(state, 'provider_error', normalized);
       }
 
+      const aggregated = await this.persistReasoning(state, reasoningDeltas, stepId);
+      await this.persistText(state, text, stepId, false);
       const toolCallIdError = validateToolCallIds(calls, state.seenToolCallIds);
       if (toolCallIdError !== undefined) {
         await this.emit(state, 'model.failed', { error: toolCallIdError }, stepId, state.turnId);
         return this.finishFailed(state, 'provider_error', toolCallIdError);
       }
-      for (const call of calls) state.seenToolCallIds.add(call.id);
+      for (const call of calls) {
+        state.seenToolCallIds.add(call.id);
+        await this.emit(state, 'model.tool_call', { call }, stepId, state.turnId);
+      }
 
       await this.emit(state, 'model.completed', { finishReason, ...usage }, stepId, state.turnId);
 
-      if (calls.length === 0) {
+      const visibleText = visibleTextOf(text);
+      const hasText = hasVisibleText(visibleText);
+      const hasTools = calls.length > 0;
+      const hasReasoning = aggregated !== undefined;
+
+      if (finishReason === 'content_filter') {
+        return this.finishFailed(
+          state,
+          'provider_error',
+          providerProtocolError(
+            'PROVIDER_CONTENT_FILTERED',
+            'The model response was blocked by the provider content filter.',
+          ),
+        );
+      }
+
+      if (hasTools && finishReason === 'length') {
+        return this.finishLimited(
+          state,
+          'output_limit',
+          hasText ? visibleText : undefined,
+          providerProtocolError('PROVIDER_OUTPUT_LIMIT', 'The response may be incomplete.'),
+        );
+      }
+
+      if (hasTools) {
+        // Complete tool calls may arrive with stop or unknown finish reasons.
+      } else if (hasText && finishReason === 'length') {
+        return this.finishLimited(
+          state,
+          'output_limit',
+          visibleText,
+          providerProtocolError('PROVIDER_OUTPUT_LIMIT', 'The response may be incomplete.'),
+        );
+      } else if (hasText) {
         const result: AgentResult = {
           sessionId: state.sessionId,
           turnId: state.turnId,
           status: 'completed',
           stopReason: 'completed',
-          finalText: text.join(''),
+          finalText: visibleText,
           steps: state.steps,
           toolCalls: state.toolCalls,
         };
         await this.emit(state, 'turn.completed', { result }, undefined, state.turnId);
         return result;
+      } else if (finishReason === 'length' && hasReasoning) {
+        return this.finishFailed(
+          state,
+          'provider_error',
+          providerProtocolError(
+            'PROVIDER_REASONING_BUDGET_EXHAUSTED',
+            'The model exhausted its output budget before producing a visible response or tool call.',
+          ),
+        );
+      } else {
+        return this.finishFailed(
+          state,
+          'provider_error',
+          providerProtocolError('PROVIDER_EMPTY_RESPONSE', 'The model returned an empty response.'),
+        );
       }
 
       for (const call of calls) {
@@ -830,9 +914,40 @@ export class AgentLoop {
     return result;
   }
 
+  private async persistReasoning(
+    state: TurnState,
+    deltas: readonly ModelReasoningDelta[],
+    stepId: StepId,
+  ): Promise<ModelReasoning | undefined> {
+    const payload = aggregateReasoning(deltas);
+    if (payload === undefined) return undefined;
+    await this.emit(state, 'model.reasoning', payload, stepId, state.turnId);
+    return payload;
+  }
+
+  private async persistText(
+    state: TurnState,
+    parts: readonly string[],
+    stepId: StepId,
+    partial: boolean,
+  ): Promise<string | undefined> {
+    const text = visibleTextOf(parts);
+    if (!hasVisibleText(text)) return undefined;
+    await this.emit(
+      state,
+      'model.text',
+      partial ? { text, partial: true } : { text },
+      stepId,
+      state.turnId,
+    );
+    return text;
+  }
+
   private async finishLimited(
     state: TurnState,
-    stopReason: Extract<AgentStopReason, 'max_steps' | 'repeated_tool_call'>,
+    stopReason: Extract<AgentStopReason, 'max_steps' | 'repeated_tool_call' | 'output_limit'>,
+    finalText?: string,
+    error?: EchoError,
   ): Promise<AgentResult> {
     const result: AgentResult = {
       sessionId: state.sessionId,
@@ -841,6 +956,8 @@ export class AgentLoop {
       stopReason,
       steps: state.steps,
       toolCalls: state.toolCalls,
+      ...(finalText === undefined ? {} : { finalText }),
+      ...(error === undefined ? {} : { error }),
     };
     await this.emit(state, 'turn.failed', { result }, undefined, state.turnId);
     return result;

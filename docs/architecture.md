@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.2
+> 版本：1.3
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 
 ## 1. 文档目的
 
@@ -103,6 +103,7 @@ P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。�
 负责将会话事实转换为模型可消费的请求：
 
 - 保存追加式事件；
+- 把版本 3 的聚合 `model.text` 直接投影为 assistant 正文，并把旧 Session 的 `model.text_delta` 按 Step 兼容聚合；
 - 保留系统约束、当前目标和最近步骤；
 - 保留先前 Turn 的用户目标，使恢复会话与多轮 Chat 能按时间重建对话；当前目标作为独立保留项只计费一次，插在先前对话之后、当前 Turn 模型消息之前；
 - 裁剪陈旧且体积大的命令输出；
@@ -127,6 +128,7 @@ P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。�
 
 - 创建 Turn 与 Step；
 - 请求模型并消费流式事件；
+- 在当前模型响应内聚合正文与推理，只把响应级内容事实写入 Session；失败或取消前冲刷已收到的 partial 正文；
 - 顺序执行工具调用；
 - 将工具结果反馈给模型；
 - 判断完成、失败、取消、步数上限与重复调用；
@@ -318,15 +320,19 @@ P0 的 Provider、Context、文件/命令工具、安全策略、Agent Loop、JS
 `echo-harness run` 已按 1.0 边界实现。P1-0 已冻结 1.1 契约、ADR 与测试矩阵。P1-2A 已实现
 artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对新配置规则的加载。P1-2B 已实现
 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已抽出
-`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据，不启动 P2。
+`ApplicationService` 与 Session 查询，并把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、恢复、Slash、Ctrl+C 与 bracketed paste；默认 `/model` 目录实现为 P1-2B 的 `ProcessModelCatalog`，Chat 仍只通过端口消费、不复制第二套发现。P1-3 已实现分组式时间线与 Chat 输入表现层。P1 集成验收已把第 8 节规划标准落到可复现证据，不启动 P2。P1.5 按 [ADR-0006](./decisions/0006-reasoning-session-events.md) 修补推理模型兼容与上下文预算。
 
 当前目录以 `src/provider/`、`src/context/`、
 `src/tools/`、`src/security/`、`src/agent/`、`src/session/` 和 `src/cli/` 分隔职责；CLI
 只通过公开事件和 `AgentResult` 观察循环。P1 类型位于 `src/contracts/application.ts`、
 `src/contracts/config.ts`、`src/contracts/model.ts` 与 `src/contracts/chat-input.ts`。
 
-已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 20,000 字符、
-32,000 近似 token 上下文（其中预留 4,000 输出 token），以及同一规范化工具调用第三次
-出现时终止。P1-1A 已支持从事件恢复 Session 查询、Provider 身份校验和悬空 Turn 补偿；P1-1B 已把
+已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 40,000 字符、
+256,000 近似 token 上下文（其中预留 16,000 输出 token），以及同一规范化工具调用第三次
+出现时终止。P1.5 把普通正文和 Provider 允许的推理字段分别聚合为单一 `model.text` 与
+`model.reasoning` Session 事件；等价且无额外状态的纯文本 `reasoning_details` 归一化为 canonical `reasoning`，特殊或不一致数组保持原结构。Provider 流仍在内存中逐分片消费，新 Writer 不再持久化正文 delta，旧 Session
+由 Reader 按 Step 兼容聚合。推理内容参与 Context 投影和近似计数，但 CLI 默认不展示；聚合正文保持原有
+CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部分输出和内容过滤按终止矩阵区分；
+无正文且无完整工具调用不得标记为成功。P1-1A 已支持从事件恢复 Session 查询、Provider 身份校验和悬空 Turn 补偿；P1-1B 已把
 `chat` 恢复、Slash 与粘贴适配器接到同一应用服务。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。

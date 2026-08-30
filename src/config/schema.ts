@@ -243,7 +243,7 @@ function parseContext(
     issues.push(
       issue(
         CONFIG_ERROR_CODES.invalid,
-        'context.maxApproxTokens must be a positive integer.',
+        'context.maxApproxTokens must be a positive approximate token integer.',
         'context.maxApproxTokens',
       ),
     );
@@ -252,7 +252,7 @@ function parseContext(
     issues.push(
       issue(
         CONFIG_ERROR_CODES.invalid,
-        'context.reservedOutputTokens must be a positive integer.',
+        'context.reservedOutputTokens must be a positive approximate token integer.',
         'context.reservedOutputTokens',
       ),
     );
@@ -262,7 +262,7 @@ function parseContext(
       issues.push(
         issue(
           CONFIG_ERROR_CODES.invalid,
-          'Context reservedOutputTokens must be smaller than maxApproxTokens.',
+          'Context reservedOutputTokens must be smaller than maxApproxTokens. Both values are approximate token budgets.',
           'context',
         ),
       );

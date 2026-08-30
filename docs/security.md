@@ -261,8 +261,8 @@ raw runtime data -> normalize -> redact -> truncate -> persist/render
 - 大输出如需临时落盘，只能进入工作区内被忽略的 ECHO 临时目录，并遵守清理与脱敏策略；
 - API 重试次数和总等待时间有界。
 
-当前默认值为 24 个 Step、120 秒工具超时、20,000 字符工具输出上限、300 秒 Provider
-请求超时、32,000 近似 token 上下文和 4,000 输出 token 预留；配置契约见
+当前默认值为 24 个 Step、120 秒工具超时、40,000 字符工具输出上限、300 秒 Provider
+请求超时、256,000 近似 token 上下文和 16,000 输出 token 预留；配置契约见
 [contracts.md](./contracts.md)。
 
 ## 13. 取消与进程清理

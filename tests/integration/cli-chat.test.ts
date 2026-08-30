@@ -504,6 +504,43 @@ describe('CLI chat integration', () => {
     expect(blankResume.stderr()).toContain('not valid');
   });
 
+  it('does not render a blank ECHO when the model only returns reasoning', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoning: 'hidden thought' } },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const captured = output();
+    const outcome = await runChat(
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+        input: new ScriptedChatInput([
+          { kind: 'batch', text: 'analyze this', source: 'typed' },
+          { kind: 'batch', text: '/quit', source: 'typed' },
+        ]),
+      },
+    );
+    expect(outcome.exitCode).toBe(0);
+    expect(captured.stderr()).toContain('Turn failed');
+    expect(captured.stderr()).toContain('provider_error');
+    expect(captured.stderr()).not.toMatch(/ECHO\s+\|\s*$/m);
+    expect(captured.stderr()).not.toContain('hidden thought');
+  });
+
   it('repairs a dangling turn on resume and accepts non-TTY line input', async () => {
     const root = await workspace();
     await writeArtifactConfig(root, 'discover');

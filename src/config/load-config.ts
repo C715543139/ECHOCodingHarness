@@ -16,9 +16,9 @@ export const ENV_KEYS = {
 export const DEFAULT_SAFETY_MODE: SafetyMode = 'balanced';
 export const DEFAULT_MAX_STEPS = 24;
 export const DEFAULT_TIMEOUT_MS = 120_000;
-export const DEFAULT_MAX_OUTPUT_CHARS = 20_000;
-export const DEFAULT_MAX_APPROX_TOKENS = 32_000;
-export const DEFAULT_RESERVED_OUTPUT_TOKENS = 4_000;
+export const DEFAULT_MAX_OUTPUT_CHARS = 40_000;
+export const DEFAULT_MAX_APPROX_TOKENS = 256_000;
+export const DEFAULT_RESERVED_OUTPUT_TOKENS = 16_000;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 
 export interface ContextConfig {

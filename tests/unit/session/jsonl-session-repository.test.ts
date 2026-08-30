@@ -4,7 +4,12 @@ import * as path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EVENT_SCHEMA_VERSION, type EchoEvent } from '../../../src/contracts/index.js';
+import {
+  EVENT_SCHEMA_VERSION,
+  EVENT_SCHEMA_VERSION_P0,
+  EVENT_SCHEMA_VERSION_P1,
+  type EchoEvent,
+} from '../../../src/contracts/index.js';
 import {
   createProviderIdentity,
   JsonlSessionRepository,
@@ -28,7 +33,7 @@ async function temporaryWorkspace(): Promise<string> {
 }
 
 describe('JsonlSessionRepository', () => {
-  it('creates a version-2 session summary from input without a second file read', async () => {
+  it('creates a version-3 session summary from input without a second file read', async () => {
     const workspace = await temporaryWorkspace();
     const provider = createProviderIdentity('https://provider.example/v1');
     const repository = new JsonlSessionRepository({
@@ -49,7 +54,7 @@ describe('JsonlSessionRepository', () => {
       sessionId: 'session-fixed',
       updatedAt: '2026-08-29T00:00:00.000Z',
       turnCount: 0,
-      eventSchemaVersion: 2,
+      eventSchemaVersion: 3,
       provider,
       model: 'fake-model',
       safetyMode: 'balanced',
@@ -173,5 +178,221 @@ describe('JsonlSessionRepository', () => {
     expect(
       view.events.filter((event) => event.type === 'tool.failed' || event.type === 'turn.failed'),
     ).toHaveLength(2);
+  });
+
+  it('round-trips a version-3 reasoning event and still resumes a version-2 session', async () => {
+    const workspace = await temporaryWorkspace();
+    const provider = createProviderIdentity('https://provider.example/v1');
+    const repository = new JsonlSessionRepository({ workspaceRoot: workspace });
+    const created = await repository.create({
+      workspaceRoot: workspace,
+      provider,
+      model: 'fake-model',
+      safetyMode: 'balanced',
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+    });
+    await repository.append({
+      id: 'event-reason',
+      sequence: 2,
+      timestamp: '2026-08-29T00:00:00.000Z',
+      sessionId: created.sessionId,
+      turnId: 'turn-1',
+      stepId: 'step-1',
+      type: 'model.reasoning',
+      payload: { reasoning: 'kept', reasoningDetails: [{ id: 1 }] },
+    });
+    const view = await repository.getQueryView(created.sessionId);
+    expect(view.eventSchemaVersion).toBe(3);
+    expect(view.events.some((event) => event.type === 'model.reasoning')).toBe(true);
+
+    const store = new JsonlSessionStore({ workspaceRoot: workspace });
+    const v2: EchoEvent = {
+      id: 'event-1',
+      sequence: 1,
+      timestamp: '2026-08-29T00:00:00.000Z',
+      sessionId: 'session-v2',
+      type: 'session.started',
+      payload: {
+        workspace: '.',
+        safetyMode: 'balanced',
+        eventSchemaVersion: EVENT_SCHEMA_VERSION_P1,
+        provider,
+        model: 'old-model',
+      },
+    };
+    await store.append(v2);
+    const resumed = await repository.resume({
+      workspaceRoot: workspace,
+      sessionId: 'session-v2',
+      provider,
+    });
+    expect(resumed.eventSchemaVersion).toBe(2);
+    expect(resumed.events.some((event) => event.type === 'model.reasoning')).toBe(false);
+  });
+
+  it('reads pre-revision text_delta logs and rejects mixed text representations', async () => {
+    const workspace = await temporaryWorkspace();
+    const provider = createProviderIdentity('https://provider.example/v1');
+    const repository = new JsonlSessionRepository({ workspaceRoot: workspace });
+    const store = new JsonlSessionStore({ workspaceRoot: workspace });
+
+    const v2Delta: EchoEvent[] = [
+      {
+        id: 'event-1',
+        sequence: 1,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v2-delta',
+        type: 'session.started',
+        payload: {
+          workspace: '.',
+          safetyMode: 'balanced',
+          eventSchemaVersion: EVENT_SCHEMA_VERSION_P1,
+          provider,
+          model: 'old-model',
+        },
+      },
+      {
+        id: 'event-2',
+        sequence: 2,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v2-delta',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'turn.started',
+        payload: { goal: 'old goal' },
+      },
+      {
+        id: 'event-3',
+        sequence: 3,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v2-delta',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'model.text_delta',
+        payload: { delta: 'Hel' },
+      },
+      {
+        id: 'event-4',
+        sequence: 4,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v2-delta',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'model.text_delta',
+        payload: { delta: 'lo' },
+      },
+    ];
+    for (const item of v2Delta) await store.append(item);
+    const resumedV2 = await repository.resume({
+      workspaceRoot: workspace,
+      sessionId: 'session-v2-delta',
+      provider,
+    });
+    expect(resumedV2.eventSchemaVersion).toBe(2);
+    expect(resumedV2.events.filter((event) => event.type === 'model.text_delta')).toHaveLength(2);
+    expect(resumedV2.events.some((event) => event.type === 'model.text')).toBe(false);
+
+    const v3Delta: EchoEvent[] = [
+      {
+        id: 'event-1',
+        sequence: 1,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v3-delta',
+        type: 'session.started',
+        payload: {
+          workspace: '.',
+          safetyMode: 'balanced',
+          eventSchemaVersion: EVENT_SCHEMA_VERSION,
+          provider,
+          model: 'local-v3',
+        },
+      },
+      {
+        id: 'event-2',
+        sequence: 2,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-v3-delta',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'model.text_delta',
+        payload: { delta: 'legacy v3 body' },
+      },
+    ];
+    for (const item of v3Delta) await store.append(item);
+    const queried = await repository.getQueryView('session-v3-delta');
+    expect(queried.eventSchemaVersion).toBe(3);
+    expect(queried.events.some((event) => event.type === 'model.text_delta')).toBe(true);
+
+    const mixed: EchoEvent[] = [
+      {
+        id: 'event-1',
+        sequence: 1,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-mixed',
+        type: 'session.started',
+        payload: {
+          workspace: '.',
+          safetyMode: 'balanced',
+          eventSchemaVersion: EVENT_SCHEMA_VERSION,
+          provider,
+          model: 'fake-model',
+        },
+      },
+      {
+        id: 'event-2',
+        sequence: 2,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-mixed',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'model.text',
+        payload: { text: 'aggregated' },
+      },
+      {
+        id: 'event-3',
+        sequence: 3,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        sessionId: 'session-mixed',
+        turnId: 'turn-1',
+        stepId: 'step-1',
+        type: 'model.text_delta',
+        payload: { delta: 'delta' },
+      },
+    ];
+    for (const item of mixed) await store.append(item);
+    await expect(repository.getQueryView('session-mixed')).rejects.toMatchObject({
+      code: 'SESSION_LOG_INVALID',
+    });
+    await expect(
+      repository.resume({
+        workspaceRoot: workspace,
+        sessionId: 'session-mixed',
+        provider,
+      }),
+    ).rejects.toMatchObject({ code: 'CONFIG_SESSION_CORRUPT' });
+
+    const v1: EchoEvent = {
+      id: 'event-1',
+      sequence: 1,
+      timestamp: '2026-08-29T00:00:00.000Z',
+      sessionId: 'session-v1-delta',
+      type: 'session.started',
+      payload: { workspace: '.', safetyMode: 'balanced' },
+    };
+    await store.append(v1);
+    await store.append({
+      id: 'event-2',
+      sequence: 2,
+      timestamp: '2026-08-29T00:00:00.000Z',
+      sessionId: 'session-v1-delta',
+      turnId: 'turn-1',
+      stepId: 'step-1',
+      type: 'model.text_delta',
+      payload: { delta: 'p0 body' },
+    });
+    const restored: EchoEvent[] = [];
+    for await (const item of store.read('session-v1-delta')) restored.push(item);
+    expect(restored.some((event) => event.type === 'model.text_delta')).toBe(true);
+    expect(EVENT_SCHEMA_VERSION_P0).toBe(1);
   });
 });

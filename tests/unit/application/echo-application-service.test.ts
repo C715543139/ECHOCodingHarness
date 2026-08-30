@@ -119,7 +119,7 @@ describe('EchoApplicationService', () => {
       'step.started',
       'context.projected',
       'model.started',
-      'model.text_delta',
+      'model.text',
       'model.completed',
       'turn.completed',
     ]);

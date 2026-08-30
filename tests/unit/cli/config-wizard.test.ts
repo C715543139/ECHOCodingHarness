@@ -75,6 +75,8 @@ describe('runConfigWizard', () => {
       model: 'example-model',
       modelCatalog: { source: 'discover' },
       safetyMode: 'balanced',
+      maxOutputChars: 40_000,
+      context: { maxApproxTokens: 256_000, reservedOutputTokens: 16_000 },
     });
     expect(JSON.stringify(written)).not.toMatch(/apiKey|secret/iu);
     expect(scripted.output()).toContain('ECHO_API_KEY');

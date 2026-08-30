@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.2
+> 版本：1.4
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 
 ## 1. 文档目的
 
@@ -172,7 +172,9 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 | `step.started` | `── Step <n> ──` 或 ASCII `-- Step <n> --` |
 | `context.projected` | 默认隐藏；详细模式可显示预算与裁剪摘要 |
 | `model.started` | 默认不单独输出 |
-| `model.text_delta` | 按 Step 缓冲普通 assistant 内容；不得接收或渲染推理字段 |
+| `model.text` | 按 Step 缓冲版本 3 的聚合普通 assistant 内容；`partial: true` 仍等待对应失败/取消终态决定展示语义 |
+| `model.text_delta` | 仅用于旧 Session 恢复；按 Step 兼容聚合，不得接收或渲染推理字段 |
+| `model.reasoning` | 始终忽略，包括 `--verbose`；推理原文不得进入 CLI |
 | `model.tool_call` | 默认隐藏；`--verbose` 可显示模型提出了哪个工具，但不回显未校验的完整参数 |
 | `model.completed` | 默认隐藏；`--verbose` 可显示 finishReason 与已提供的 usage |
 | `model.failed` | 可重试时显示 `WARN`；不可恢复时显示 `FAIL`，最终退出仍由 Turn 终态决定 |
@@ -188,12 +190,12 @@ Windows Terminal 和传统控制台都必须能读懂输出。稳定标签使用
 | `tool.cancelled` | `CANCELLED` 与取消阶段 |
 | `limit.reached` | `LIMIT` 与具体限制 |
 | `turn.completed` | `run`：stdout 最终文本，stderr `Run completed` 摘要；Chat：stderr `ECHO` 回复与 `Turn completed` |
-| `turn.failed` | stderr `Run failed` / `Turn failed`，含 `REASON`；不得使用 `VERIFIED` |
+| `turn.failed` | stderr `Run failed` / `Turn failed` 或 `Run limited` / `Turn limited`，含 `REASON`；空响应不得渲染空白 `ECHO`；部分正文可保留但不得标 `VERIFIED` |
 | `turn.cancelled` | stderr 取消摘要 |
 
-高频增量事件应在内存中聚合，不逐 token 产生日志行。JSONL Session Event Store 仍保存契约要求的脱敏事件。
+Provider 的高频增量只在当前模型请求内存中聚合，不逐 token 产生日志行或 Session 事件。版本 3 JSONL 每次模型响应至多保存一条 `model.text` 和一条 `model.reasoning`；旧 `model.text_delta` 仅在读取历史 Session 时兼容。
 
-Provider 只能把普通 assistant content 转换为 `model.text_delta`；provider-specific reasoning、analysis 或思维字段不得进入该事件。一个 Step 聚合结束后：
+Provider 只能把普通 assistant content 转换为内部 `text_delta` 流，Agent Loop 再聚合为 `model.text`；provider-specific reasoning、analysis 或思维字段进入独立的 `model.reasoning`，不得混入正文。一个 Step 聚合结束后：
 
 - 若包含工具调用，合格的中间 assistant 文本可以作为 `ECHO` 进度说明写入 stderr，不得进入 stdout；
 - 若不包含工具调用并形成最终答复，`run` 的聚合文本由 `turn.completed` 路径写入 stdout；

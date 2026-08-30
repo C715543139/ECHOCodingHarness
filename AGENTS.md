@@ -22,7 +22,9 @@ The following documents are the Accepted P0/P1 design baseline:
 - `docs/decisions/0002-p1-config-artifact-root.md`
 - `docs/decisions/0003-p1-application-service-session.md`
 - `docs/decisions/0005-restore-artifact-config.md`
+- `docs/decisions/0006-reasoning-session-events.md`
 - `docs/plans/p1-cli.md`
+- `docs/plans/p1-5-reasoning-context.md`
 - `docs/testing.md`
 
 Small implementation discoveries must update code, tests, and affected documentation together.

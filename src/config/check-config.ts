@@ -62,7 +62,8 @@ export function checkConfig(config: EchoConfig): ConfigCheckResult {
     issues.push({
       severity: 'error',
       code: CONFIG_ERROR_CODES.invalid,
-      message: 'Context reservedOutputTokens must be smaller than maxApproxTokens.',
+      message:
+        'Context reservedOutputTokens must be smaller than maxApproxTokens. Both values are approximate token budgets.',
     });
   }
 

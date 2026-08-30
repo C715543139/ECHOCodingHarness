@@ -161,8 +161,6 @@ export function renderSessionStatus(
   capabilities: RenderCapabilities,
 ): readonly RenderChunk[] {
   const options = layoutOptions(capabilities);
-  const percent =
-    input.contextBudget > 0 ? Math.round((input.contextUsed / input.contextBudget) * 100) : 0;
   const lines = [
     formatRuleTitle('Session status', options, 'blueBold'),
     ...formatLabeled('WORKSPACE', input.workspaceName, options),
@@ -181,7 +179,7 @@ export function renderSessionStatus(
     ...formatLabeled('TURNS', String(input.turns), options),
     ...formatLabeled(
       'CONTEXT',
-      `~${formatCount(input.contextUsed)} / ${formatCount(input.contextBudget)} tokens${valueJoin(options.unicode)}${String(percent)}%`,
+      `~${formatCompactCount(input.contextUsed)} / ${formatCompactCount(input.contextBudget)}`,
       options,
     ),
   ];
@@ -211,6 +209,8 @@ function precedeChatBlock(chunks: readonly RenderChunk[]): readonly RenderChunk[
   return [{ channel: 'stderr', text: '\n' }, ...chunks];
 }
 
-function formatCount(value: number): string {
-  return Math.round(value).toLocaleString('en-US');
+function formatCompactCount(value: number): string {
+  const rounded = Math.round(value);
+  if (Math.abs(rounded) < 1_000) return String(rounded);
+  return `${String(Math.round(rounded / 1_000))}K`;
 }

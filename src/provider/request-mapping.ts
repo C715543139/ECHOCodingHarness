@@ -36,6 +36,15 @@ export function toWireMessage(message: ModelMessage): WireMessage {
     if (toolCalls !== undefined) {
       wire['tool_calls'] = toolCalls;
     }
+    if (message.reasoning !== undefined) {
+      wire['reasoning'] = message.reasoning;
+    }
+    if (message.reasoningContent !== undefined) {
+      wire['reasoning_content'] = message.reasoningContent;
+    }
+    if (message.reasoningDetails !== undefined) {
+      wire['reasoning_details'] = message.reasoningDetails;
+    }
     return wire;
   }
   return { role: message.role, content: message.content };

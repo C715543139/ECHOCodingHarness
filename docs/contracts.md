@@ -2,15 +2,15 @@
 
 > 状态：Accepted
 >
-> 版本：1.2
+> 版本：1.4
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-08-30
 
 ## 1. 文档目的
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md) 与 [ADR-0005](./decisions/0005-restore-artifact-config.md) 为准。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、[ADR-0005](./decisions/0005-restore-artifact-config.md) 与 [ADR-0006](./decisions/0006-reasoning-session-events.md) 为准。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 
@@ -76,7 +76,7 @@ interface ModelRequest {
 type ModelMessage =
   | { role: "system"; content: string }
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; toolCalls?: ModelToolCall[] }
+  | { role: "assistant"; content: string; reasoning?: string; reasoningContent?: string; reasoningDetails?: unknown[]; toolCalls?: ModelToolCall[] }
   | { role: "tool"; toolCallId: ToolCallId; content: string };
 
 interface ModelToolDefinition {
@@ -97,10 +97,17 @@ interface ModelToolCall {
 ```ts
 type ModelStreamEvent =
   | { type: "text_delta"; delta: string }
+  | { type: "reasoning_delta"; delta: ModelReasoning }
   | { type: "tool_call_delta"; callId: ToolCallId; delta: string }
   | { type: "tool_call"; call: ModelToolCall }
   | { type: "usage"; inputTokens?: number; outputTokens?: number }
   | { type: "completed"; finishReason: ModelFinishReason };
+
+interface ModelReasoning {
+  reasoning?: string;
+  reasoningContent?: string;
+  reasoningDetails?: unknown[];
+}
 
 type ModelFinishReason =
   | "stop"
@@ -271,7 +278,9 @@ type EchoEvent =
   | EventEnvelope<"step.started", StepStarted>
   | EventEnvelope<"context.projected", ContextProjected>
   | EventEnvelope<"model.started", ModelStarted>
+  | EventEnvelope<"model.text", ModelText>
   | EventEnvelope<"model.text_delta", ModelTextDelta>
+  | EventEnvelope<"model.reasoning", ModelReasoning>
   | EventEnvelope<"model.tool_call", ModelToolCallCompleted>
   | EventEnvelope<"model.completed", ModelCompleted>
   | EventEnvelope<"model.failed", OperationFailed>
@@ -293,6 +302,21 @@ type EchoEvent =
   | EventEnvelope<"turn.cancelled", TurnCancelled>;
 ```
 
+P1.5 版本 3 的正文持久化类型为：
+
+```ts
+type ModelText = Readonly<{
+  text: string;
+  partial?: true;
+}>;
+```
+
+Provider 的 `text_delta` 仍是实时传输事件，但版本 3 Writer 必须在内存中按到达顺序聚合，并为每次模型响应至多写一条非空 `model.text`。Provider 流在完成前失败或取消时，已经收到的非空正文写成 `partial: true`；正常结束（包括 `finishReason=length`）不带 `partial`，由 `model.completed` 和 Turn 终态表达限制原因。聚合正文必须在对应 `model.completed`、`model.failed` 或 `turn.cancelled` 前写入。
+
+`model.text_delta` 仅作为版本 1/2 及修订前本地版本 3 Session 的读取兼容事件保留。Reader、Session 查询、Context 投影和 Renderer 必须能把旧 delta 按 Step 聚合；新 Writer 不得持久化它。同一 Step 同时出现 `model.text` 与 `model.text_delta` 视为损坏 Session，必须安全拒绝，不能拼接形成重复正文。
+
+`model.reasoning` 的 `reasoning_details` 按整组归一化：仅当非空数组的每一项都严格为 `reasoning.text`、对象键只来自 `type`/`text`/`format`/`index`，且按到达顺序拼接的非空 `text` 与已有 `reasoning` 或 `reasoningContent` 完全一致时，Writer 省略该数组。若没有字符串推理字段，则把同样满足约束的非空拼接文本写为 canonical `reasoning` 并省略数组。只要包含额外键、特殊或未知类型、空文本，或拼接结果不一致，Writer 就必须整组原样保留数组及顺序；Reader 继续接受历史日志中的 `reasoning_details`。
+
 `model.tool_call` 必须保存 Provider 聚合后的完整、Provider 无关工具调用，包括调用 ID、工具名和经脱敏但尚未做语义规范化的参数。`tool.requested` 则记录进入工具管线的输入及其规范化结果；即使后续校验、审批或执行失败，也能区分“模型原始请求”与“ECHO 实际尝试执行的操作”。
 
 同一 Session 中每个 `ModelToolCall.id` 必须是非空且唯一的稳定标识。同一模型响应内重复、
@@ -301,7 +325,7 @@ type EchoEvent =
 
 `approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
 
-P0 事件模式版本为 `1`（缺省视为 1）。P1 事件模式版本为 `2`：必须能记录 Session/Turn/Step 标识与时间、模型与安全模式变化、Context 投影版本/预算/估算量/裁剪原因摘要、工具请求、策略 rule ID、审批、执行终态、命令耗时/退出码/截断，以及 Turn 终态与可引用验证结果。`session.resumed`、`model.changed` 和 `safety.changed` 属于版本 2。恢复时遇到未知事件类型必须失败，不得丢弃后继续。现有 payload 的新增字段在版本 2 中可选，P0 写入方可省略。P0 `EventRenderer` 对尚未实现视觉的新事件保持无输出，不得改变 stdout/stderr 契约。
+P0 事件模式版本为 `1`（缺省视为 1）。P1 事件模式版本为 `2`：必须能记录 Session/Turn/Step 标识与时间、模型与安全模式变化、Context 投影版本/预算/估算量/裁剪原因摘要、工具请求、策略 rule ID、审批、执行终态、命令耗时/退出码/截断，以及 Turn 终态与可引用验证结果。`session.resumed`、`model.changed` 和 `safety.changed` 属于版本 2。P1.5 事件模式版本为 `3`：新 Session 写入版本 3，增加聚合 `model.text`、聚合 `model.reasoning` 与停止原因 `output_limit`。版本 3 Writer 不写 `model.text_delta`；Reader 接受并验证两个聚合事件，同时兼容旧版本及修订前本地 v3 的正文增量。版本 2 Session 继续可读和恢复，但不补造历史推理字段。恢复时遇到未知事件类型、未知未来版本、损坏聚合 payload 或同一 Step 混用两种正文表示必须失败，不得丢弃后继续。现有 payload 的新增字段在版本 2 中可选，P0 写入方可省略。CLI `EventRenderer` 对 `model.reasoning` 保持无输出，对新旧正文表示产生相同聚合显示，不得改变 stdout/stderr 契约。
 
 `session.started.provider`（可选）与 `session.resumed.provider` 必须是 `ProviderIdentity`，不得使用任意 `string` 或原始 endpoint URL。`model.started.provider` 保持 P0 适配器名；版本 2 可附加可选 `endpointFingerprint`。
 
@@ -480,6 +504,7 @@ type AgentStopReason =
   | "completed"
   | "max_steps"
   | "repeated_tool_call"
+  | "output_limit"
   | "policy_denied"
   | "provider_error"
   | "tool_error"
@@ -528,8 +553,8 @@ P1 不迁移旧工作区、用户目录或 ADR-0004 工作区 `.echo/config` 中
 - 缺少配置文件时 `run`/`chat` 使用退出码 `2`，提示执行 `echo-harness config`，不得自动创建含真实 Provider 信息的文件；
 - 手动模型目录必须包含唯一非空模型 ID，且默认模型位于列表中；自动发现模式不持久化完整列表；
 - 自动发现由 P1-2B 在进程内缓存；`run` 不调用 `/models`；发现失败不得阻断已配置模型；
-- 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、20,000 字符工具输出上限、
-  300 秒 Provider 请求超时、32,000 近似 token 上下文与 4,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源。
+- 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、40,000 字符工具输出上限、
+  300 秒 Provider 请求超时、256,000 近似 token 上下文与 16,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源，数值为 approximate。
 - 稳定配置错误码见 `CONFIG_ERROR_CODES`：`CONFIG_MISSING`、`CONFIG_UNKNOWN_KEY`、`CONFIG_CREDENTIAL_FORBIDDEN`、`CONFIG_PROVIDER_MISMATCH`、`CONFIG_SESSION_INCOMPATIBLE` 等。
 
 ## 11. 错误模型

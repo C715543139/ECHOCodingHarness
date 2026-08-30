@@ -39,12 +39,23 @@ export interface ModelRequest {
   readonly maxOutputTokens?: number;
 }
 
+export interface ModelReasoning {
+  readonly reasoning?: string;
+  readonly reasoningContent?: string;
+  readonly reasoningDetails?: readonly unknown[];
+}
+
+export type ModelReasoningDelta = ModelReasoning;
+
 export type ModelMessage =
   | Readonly<{ role: 'system'; content: string }>
   | Readonly<{ role: 'user'; content: string }>
   | Readonly<{
       role: 'assistant';
       content: string;
+      reasoning?: string;
+      reasoningContent?: string;
+      reasoningDetails?: readonly unknown[];
       toolCalls?: readonly ModelToolCall[];
     }>
   | Readonly<{ role: 'tool'; toolCallId: ToolCallId; content: string }>;
@@ -63,6 +74,7 @@ export interface ModelToolCall {
 
 export type ModelStreamEvent =
   | Readonly<{ type: 'text_delta'; delta: string }>
+  | Readonly<{ type: 'reasoning_delta'; delta: ModelReasoningDelta }>
   | Readonly<{ type: 'tool_call_delta'; callId: ToolCallId; delta: string }>
   | Readonly<{ type: 'tool_call'; call: ModelToolCall }>
   | Readonly<{ type: 'usage'; inputTokens?: number; outputTokens?: number }>

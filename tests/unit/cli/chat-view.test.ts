@@ -144,6 +144,9 @@ describe('Chat presentation', () => {
     expect(text).toContain('SAFETY     | auto | session');
     expect(text).toContain('API KEY    | configured');
     expect(text).toContain('LAST CHECK | pnpm test | exit 0');
+    expect(text).toContain('CONTEXT    | ~18K / 28K');
+    expect(text).not.toContain('%');
+    expect(text).not.toContain('REASONING');
     expect(text).not.toContain('sk-');
   });
 

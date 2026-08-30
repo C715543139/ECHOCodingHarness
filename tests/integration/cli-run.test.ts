@@ -100,7 +100,7 @@ describe('CLI run integration', () => {
     expect(parsed.at(-1)?.type).toBe('turn.completed');
     expect(parsed[0]).toMatchObject({
       type: 'session.started',
-      payload: { eventSchemaVersion: 2 },
+      payload: { eventSchemaVersion: 3 },
     });
     expect(provider.listModelCallCount).toBe(0);
   });
@@ -255,6 +255,61 @@ describe('CLI run integration', () => {
     expect(captured.stdout()).not.toContain('Approve [y] once');
   });
 
+  it('fails reasoning-only length instead of printing a blank completed run', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoning: 'hidden' } },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const captured = output();
+    const outcome = await runGoal(
+      'analyze',
+      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+      },
+    );
+    expect(outcome.exitCode).toBe(3);
+    expect(captured.stdout()).toBe('');
+    expect(captured.stderr()).toContain('Run failed');
+    expect(captured.stderr()).toContain('provider_error');
+    expect(captured.stderr()).not.toContain('hidden');
+  });
+
+  it('keeps partial stdout when the model hits the output limit', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'partial body' },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const captured = output();
+    const outcome = await runGoal(
+      'write',
+      { workspace: root, verbose: false, color: false, interactive: false, artifactRoot: root },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () => provider,
+      },
+    );
+    expect(outcome.exitCode).toBe(6);
+    expect(captured.stdout()).toBe('partial body\n');
+    expect(captured.stderr()).toContain('Run limited');
+    expect(captured.stderr()).toContain('output_limit');
+  });
+
   it('maps every Agent result class to the stable documented exit code', () => {
     const base: AgentResult = {
       sessionId: 'session',
@@ -266,6 +321,7 @@ describe('CLI run integration', () => {
     };
     expect(toExitCode(base)).toBe(0);
     expect(toExitCode({ ...base, status: 'limited', stopReason: 'max_steps' })).toBe(6);
+    expect(toExitCode({ ...base, status: 'limited', stopReason: 'output_limit' })).toBe(6);
     expect(toExitCode({ ...base, status: 'cancelled', stopReason: 'cancelled' })).toBe(130);
     expect(toExitCode({ ...base, status: 'failed', stopReason: 'provider_error' })).toBe(3);
     expect(toExitCode({ ...base, status: 'failed', stopReason: 'tool_error' })).toBe(4);

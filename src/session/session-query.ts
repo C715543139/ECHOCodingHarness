@@ -16,9 +16,11 @@ import type {
 import {
   EVENT_SCHEMA_VERSION,
   EVENT_SCHEMA_VERSION_P0,
+  EVENT_SCHEMA_VERSION_P1,
   isToolTerminalEvent,
 } from '../contracts/index.js';
 
+import { isReasoningPayload } from '../provider/reasoning.js';
 import { storageError } from './errors.js';
 
 const KNOWN_EVENT_TYPES = {
@@ -28,7 +30,9 @@ const KNOWN_EVENT_TYPES = {
   'step.started': true,
   'context.projected': true,
   'model.started': true,
+  'model.text': true,
   'model.text_delta': true,
+  'model.reasoning': true,
   'model.tool_call': true,
   'model.completed': true,
   'model.failed': true,
@@ -64,6 +68,40 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isModelTextPayload(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const allowed = new Set(['text', 'partial']);
+  const keys = Object.keys(value);
+  if (keys.length === 0) return false;
+  for (const key of keys) {
+    if (!allowed.has(key)) return false;
+  }
+  if (typeof value['text'] !== 'string' || value['text'].length === 0) return false;
+  return value['partial'] === undefined || value['partial'] === true;
+}
+
+function stepTextKey(event: EchoEvent): string {
+  return `${event.turnId ?? ''}::${event.stepId ?? event.id}`;
+}
+
+function assertExclusiveStepText(events: readonly EchoEvent[]): void {
+  const seen = new Map<string, { aggregated: boolean; delta: boolean }>();
+  for (const event of events) {
+    if (event.type !== 'model.text' && event.type !== 'model.text_delta') continue;
+    const key = stepTextKey(event);
+    const current = seen.get(key) ?? { aggregated: false, delta: false };
+    if (event.type === 'model.text') current.aggregated = true;
+    else current.delta = true;
+    if (current.aggregated && current.delta) {
+      throw storageError(
+        'SESSION_LOG_INVALID',
+        'The session event log mixes aggregated and incremental text in the same step.',
+      );
+    }
+    seen.set(key, current);
+  }
+}
+
 function isProviderIdentity(value: unknown): value is ProviderIdentity {
   if (!isRecord(value)) return false;
   return (
@@ -95,19 +133,40 @@ export function assertRecoverableEvents(events: readonly EchoEvent[]): void {
   }
 
   const version = schemaVersionOf(events);
-  if (version !== EVENT_SCHEMA_VERSION_P0 && version !== EVENT_SCHEMA_VERSION) {
+  if (
+    version !== EVENT_SCHEMA_VERSION_P0 &&
+    version !== EVENT_SCHEMA_VERSION_P1 &&
+    version !== EVENT_SCHEMA_VERSION
+  ) {
     throw storageError(
       'SESSION_LOG_INCOMPATIBLE',
       'The session event schema version is not supported.',
     );
   }
 
-  if (version < EVENT_SCHEMA_VERSION) {
+  if (version === EVENT_SCHEMA_VERSION_P0) {
     throw storageError(
       'SESSION_LOG_INCOMPATIBLE',
       'P0 session logs cannot be resumed because they lack a Provider identity.',
     );
   }
+
+  for (const event of events) {
+    if (event.type === 'model.reasoning' && !isReasoningPayload(event.payload)) {
+      throw storageError(
+        'SESSION_LOG_INVALID',
+        'The session event log contains a damaged reasoning payload.',
+      );
+    }
+    if (event.type === 'model.text' && !isModelTextPayload(event.payload)) {
+      throw storageError(
+        'SESSION_LOG_INVALID',
+        'The session event log contains a damaged aggregated text payload.',
+      );
+    }
+  }
+
+  assertExclusiveStepText(events);
 
   const started = events.find((event) => event.type === 'session.started');
   if (started?.type !== 'session.started' || started.payload.provider === undefined) {

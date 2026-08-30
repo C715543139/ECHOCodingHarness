@@ -31,6 +31,31 @@ interface StepDigest {
 const TOOL_RESULT_DEFAULT_MAX_CHARS = 4_000;
 const SUMMARY_PER_EVENT_MAX_CHARS = 400;
 
+function mixedTextRepresentationError(): never {
+  throw {
+    category: 'storage',
+    code: 'SESSION_LOG_INVALID',
+    message: 'The session event log mixes aggregated and incremental text in the same step.',
+    retryable: false,
+  };
+}
+
+type StepTextKind = 'aggregated' | 'delta';
+
+function textChunkForStep(
+  currentKind: StepTextKind | undefined,
+  event: Extract<EchoEvent, { type: 'model.text' | 'model.text_delta' }>,
+): { kind: StepTextKind; chunk: string } {
+  const kind: StepTextKind = event.type === 'model.text' ? 'aggregated' : 'delta';
+  if (currentKind !== undefined && currentKind !== kind) {
+    mixedTextRepresentationError();
+  }
+  return {
+    kind,
+    chunk: event.type === 'model.text' ? event.payload.text : event.payload.delta,
+  };
+}
+
 function toolResultContent(
   event: Extract<
     EchoEvent,
@@ -77,10 +102,24 @@ function messageTokens(message: ModelMessage): number {
   const base = approxTokensForText(message.content ?? '');
   if (message.role === 'assistant') {
     return (
-      base + (message.toolCalls ?? []).reduce((sum, call) => sum + approxTokensForValue(call), 0)
+      base +
+      (message.toolCalls ?? []).reduce((sum, call) => sum + approxTokensForValue(call), 0) +
+      approxTokensForText(message.reasoning ?? '') +
+      approxTokensForText(message.reasoningContent ?? '') +
+      (message.reasoningDetails === undefined ? 0 : approxTokensForValue(message.reasoningDetails))
     );
   }
   return base;
+}
+
+function contextAtomicGroupError(): never {
+  throw {
+    category: 'internal',
+    code: 'CONTEXT_ATOMIC_GROUP_EXCEEDED',
+    message:
+      'The current turn reasoning, tool calls, and tool results cannot fit in the remaining approximate context budget.',
+    retryable: false,
+  };
 }
 
 function projectionTokens(messages: readonly ModelMessage[]): number {
@@ -92,6 +131,7 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
   let current: {
     index: number;
     text: string;
+    textKind?: StepTextKind;
     toolCalls: { name: string; arguments: unknown }[];
     toolResults: ToolResultContent[];
   } | null = null;
@@ -108,8 +148,11 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
       continue;
     }
     switch (event.type) {
+      case 'model.text':
       case 'model.text_delta': {
-        current.text += event.payload.delta;
+        const next = textChunkForStep(current.textKind, event);
+        current.textKind = next.kind;
+        current.text += next.chunk;
         break;
       }
       case 'model.tool_call': {
@@ -142,16 +185,44 @@ function collectStepDigests(events: readonly EchoEvent[]): readonly StepDigest[]
 interface ConversationTurn {
   turnIndex: number;
   user?: string;
-  assistant: { content: string; toolCalls: { id: string; name: string; arguments: unknown }[] };
+  assistant: {
+    content: string;
+    textKind?: StepTextKind;
+    toolCalls: { id: string; name: string; arguments: unknown }[];
+    reasoning?: string;
+    reasoningContent?: string;
+    reasoningDetails?: unknown[];
+  };
   toolMessages: { toolCallId: string; toolName: string; status: string; content: string }[];
+  outcome?: string;
 }
 
 function conversationHasContent(turn: ConversationTurn): boolean {
   return (
+    (turn.user !== undefined && turn.user.length > 0) ||
     turn.assistant.content.length > 0 ||
     turn.assistant.toolCalls.length > 0 ||
-    turn.toolMessages.length > 0
+    turn.toolMessages.length > 0 ||
+    turn.outcome !== undefined
   );
+}
+
+function formatTurnOutcome(event: EchoEvent): string | undefined {
+  if (event.type !== 'turn.failed' && event.type !== 'turn.cancelled') return undefined;
+  const result = event.payload.result;
+  if (result.stopReason === 'output_limit') {
+    return 'Turn limited: the response may be incomplete.';
+  }
+  if (result.error?.code === 'PROVIDER_REASONING_BUDGET_EXHAUSTED') {
+    return 'Turn failed: provider reasoning exhausted the output budget; no tool call was executed.';
+  }
+  if (result.error?.code === 'PROVIDER_EMPTY_RESPONSE') {
+    return 'Turn failed: the model returned an empty response.';
+  }
+  if (result.status === 'cancelled') {
+    return 'Turn cancelled before a visible response or tool call completed.';
+  }
+  return `Turn ${result.status}: ${result.stopReason}.`;
 }
 
 function latestTurnIndex(events: readonly EchoEvent[]): number {
@@ -181,13 +252,34 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
     return turn;
   };
 
+  const flushTurn = (): void => {
+    if (current !== null && conversationHasContent(current)) {
+      turns.push(current);
+      current = null;
+      return;
+    }
+    if (
+      current === null &&
+      turnUser !== undefined &&
+      turnUser.length > 0 &&
+      pendingTurnIndex !== currentTurnIndex &&
+      firstFragment
+    ) {
+      turns.push({
+        turnIndex: pendingTurnIndex,
+        user: turnUser,
+        assistant: { content: '', toolCalls: [] },
+        toolMessages: [],
+      });
+      firstFragment = false;
+    }
+    current = null;
+  };
+
   for (const event of events) {
     switch (event.type) {
       case 'turn.started': {
-        if (current !== null && conversationHasContent(current)) {
-          turns.push(current);
-        }
-        current = null;
+        flushTurn();
         turnUser = event.payload.goal;
         pendingTurnIndex = nextTurnIndex;
         nextTurnIndex += 1;
@@ -201,9 +293,28 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
         }
         break;
       }
+      case 'model.text':
       case 'model.text_delta': {
         current ??= startFragment();
-        current.assistant.content += event.payload.delta;
+        const next = textChunkForStep(current.assistant.textKind, event);
+        current.assistant.textKind = next.kind;
+        current.assistant.content += next.chunk;
+        break;
+      }
+      case 'model.reasoning': {
+        current ??= startFragment();
+        if (event.payload.reasoning !== undefined) {
+          current.assistant.reasoning = `${current.assistant.reasoning ?? ''}${event.payload.reasoning}`;
+        }
+        if (event.payload.reasoningContent !== undefined) {
+          current.assistant.reasoningContent = `${current.assistant.reasoningContent ?? ''}${event.payload.reasoningContent}`;
+        }
+        if (event.payload.reasoningDetails !== undefined) {
+          current.assistant.reasoningDetails = [
+            ...(current.assistant.reasoningDetails ?? []),
+            ...event.payload.reasoningDetails,
+          ];
+        }
         break;
       }
       case 'model.tool_call': {
@@ -216,6 +327,13 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
             arguments: event.payload.call.arguments,
           },
         ];
+        break;
+      }
+      case 'turn.failed':
+      case 'turn.cancelled': {
+        current ??= startFragment();
+        const outcome = formatTurnOutcome(event);
+        if (outcome !== undefined) current.outcome = outcome;
         break;
       }
       case 'tool.completed':
@@ -241,9 +359,7 @@ function collectConversation(events: readonly EchoEvent[]): readonly Conversatio
         break;
     }
   }
-  if (current !== null && conversationHasContent(current)) {
-    turns.push(current);
-  }
+  flushTurn();
   return turns;
 }
 
@@ -264,10 +380,23 @@ function conversationMessages(
   if (turn.user !== undefined && turn.user.length > 0) {
     messages.push({ role: 'user', content: turn.user });
   }
-  if (turn.assistant.content.length > 0 || pairedCalls.length > 0) {
+  if (
+    turn.assistant.content.length > 0 ||
+    pairedCalls.length > 0 ||
+    turn.assistant.reasoning !== undefined ||
+    turn.assistant.reasoningContent !== undefined ||
+    turn.assistant.reasoningDetails !== undefined
+  ) {
     messages.push({
       role: 'assistant',
       content: turn.assistant.content,
+      ...(turn.assistant.reasoning === undefined ? {} : { reasoning: turn.assistant.reasoning }),
+      ...(turn.assistant.reasoningContent === undefined
+        ? {}
+        : { reasoningContent: turn.assistant.reasoningContent }),
+      ...(turn.assistant.reasoningDetails === undefined
+        ? {}
+        : { reasoningDetails: turn.assistant.reasoningDetails }),
       ...(pairedCalls.length > 0
         ? {
             toolCalls: pairedCalls.map((call) => ({
@@ -361,6 +490,13 @@ export class EventContextBuilder implements ContextBuilder {
       const turnMessages = conversationMessages(turn, this.toolResultMaxChars, truncations);
       const cost = projectionTokens(turnMessages);
       if (used + cost > remaining) {
+        if (
+          turn.turnIndex === currentTurnIndex &&
+          keptTurns.length === 0 &&
+          turnMessages.length > 0
+        ) {
+          contextAtomicGroupError();
+        }
         break;
       }
       used += cost;
@@ -375,14 +511,22 @@ export class EventContextBuilder implements ContextBuilder {
         1 +
         turn.assistant.toolCalls.length +
         turn.toolMessages.length +
-        (turn.assistant.content.length > 0 ? 1 : 0)
+        (turn.assistant.content.length > 0 ? 1 : 0) +
+        (turn.assistant.reasoning === undefined &&
+        turn.assistant.reasoningContent === undefined &&
+        turn.assistant.reasoningDetails === undefined
+          ? 0
+          : 1)
       );
     }, 0);
 
     const summaryMessages: ModelMessage[] = [];
     if (omittedTurns.length > 0) {
       const summaryText = omittedTurns
-        .map((_, index) => renderStepDigest(digests[index] as StepDigest))
+        .map((turn, index) => {
+          const digest = renderStepDigest(digests[index] as StepDigest);
+          return turn.outcome === undefined ? digest : `${digest}\n${turn.outcome}`;
+        })
         .join('\n');
       const summaryMessage: ModelMessage = { role: 'user', content: summaryText };
       const summaryTokens = projectionTokens([summaryMessage]);

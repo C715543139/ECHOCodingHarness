@@ -144,7 +144,7 @@ describe('AgentLoop', () => {
       'step.started',
       'context.projected',
       'model.started',
-      'model.text_delta',
+      'model.text',
       'model.completed',
       'turn.completed',
     ]);
@@ -650,5 +650,382 @@ describe('AgentLoop', () => {
     });
     expect(inspect.execute).not.toHaveBeenCalled();
     expect(store.events.filter((event) => event.type === 'tool.requested')).toHaveLength(0);
+  });
+
+  it('aggregates reasoning into one session event and replays it with the next tool step', async () => {
+    const inspect = tool();
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoning: 'think-' } },
+          { type: 'reasoning_delta', delta: { reasoning: 'twice' } },
+          { type: 'tool_call', call: { id: 'call-1', name: 'inspect', arguments: { path: 'a' } } },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'done' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store, tools: [inspect] }).run('inspect');
+
+    expect(result.status).toBe('completed');
+    expect(store.events.filter((event) => event.type === 'model.reasoning')).toHaveLength(1);
+    expect(store.events.find((event) => event.type === 'model.reasoning')?.payload).toEqual({
+      reasoning: 'think-twice',
+    });
+    const types = store.events.map((event) => event.type);
+    expect(types.indexOf('model.reasoning')).toBeLessThan(types.indexOf('model.tool_call'));
+    expect(types.indexOf('model.tool_call')).toBeLessThan(types.indexOf('model.completed'));
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'assistant',
+          reasoning: 'think-twice',
+          toolCalls: [expect.objectContaining({ id: 'call-1' })],
+        }),
+        expect.objectContaining({ role: 'tool', toolCallId: 'call-1' }),
+      ]),
+    );
+  });
+
+  it('normalizes many equivalent reasoning text fragments before session replay', async () => {
+    const inspect = tool();
+    const reasoning = 'plan carefully '.repeat(40);
+    const fragments = [...reasoning].map((text) => ({
+      type: 'reasoning_delta' as const,
+      delta: {
+        reasoning: text,
+        reasoningDetails: [{ type: 'reasoning.text', text, format: 'x', index: 0 }],
+      },
+    }));
+    const provider = new FakeProvider([
+      {
+        events: [
+          ...fragments,
+          { type: 'tool_call', call: { id: 'call-1', name: 'inspect', arguments: { path: 'a' } } },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'done' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    await createLoop({ provider, store, tools: [inspect] }).run('inspect');
+
+    expect(store.events.filter((event) => event.type === 'model.reasoning')).toHaveLength(1);
+    expect(store.events.find((event) => event.type === 'model.reasoning')?.payload).toEqual({
+      reasoning,
+    });
+    const replayedAssistant = provider.requests[1]?.messages.find(
+      (message) => message.role === 'assistant',
+    );
+    expect(replayedAssistant).toEqual(expect.objectContaining({ role: 'assistant', reasoning }));
+    expect(replayedAssistant).not.toHaveProperty('reasoningDetails');
+  });
+
+  it('persists the entire reasoning_details array when any non-text item is present', async () => {
+    const inspect = tool();
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoning: 'think' } },
+          {
+            type: 'reasoning_delta',
+            delta: {
+              reasoningDetails: [
+                { type: 'reasoning.text', text: 'think' },
+                { type: 'reasoning.encrypted', data: 'blob', id: 'enc_1' },
+                { type: 'reasoning.summary', summary: 'short' },
+              ],
+            },
+          },
+          { type: 'tool_call', call: { id: 'call-1', name: 'inspect', arguments: { path: 'a' } } },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'done' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    await createLoop({ provider, store, tools: [inspect] }).run('inspect');
+
+    expect(store.events.find((event) => event.type === 'model.reasoning')?.payload).toEqual({
+      reasoning: 'think',
+      reasoningDetails: [
+        { type: 'reasoning.text', text: 'think' },
+        { type: 'reasoning.encrypted', data: 'blob', id: 'enc_1' },
+        { type: 'reasoning.summary', summary: 'short' },
+      ],
+    });
+    expect(provider.requests[1]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'assistant',
+          reasoning: 'think',
+          reasoningDetails: [
+            { type: 'reasoning.text', text: 'think' },
+            { type: 'reasoning.encrypted', data: 'blob', id: 'enc_1' },
+            { type: 'reasoning.summary', summary: 'short' },
+          ],
+        }),
+      ]),
+    );
+  });
+
+  it('fails reasoning-only length responses instead of completing them', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoningContent: 'hidden' } },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store }).run('analyze');
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      stopReason: 'provider_error',
+      error: { code: 'PROVIDER_REASONING_BUDGET_EXHAUSTED' },
+    });
+    expect(store.events.some((event) => event.type === 'turn.completed')).toBe(false);
+    expect(store.events.some((event) => event.type === 'model.reasoning')).toBe(true);
+  });
+
+  it('keeps partial text when length arrives without a tool call', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'text_delta', delta: 'partial answer' },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store }).run('write');
+
+    expect(result).toMatchObject({
+      status: 'limited',
+      stopReason: 'output_limit',
+      finalText: 'partial answer',
+    });
+    const textEvent = store.events.find((event) => event.type === 'model.text');
+    expect(textEvent?.payload).toEqual({ text: 'partial answer' });
+    expect(store.events.some((event) => event.type === 'model.text_delta')).toBe(false);
+  });
+
+  it('does not execute a tool call that finished with length', async () => {
+    const inspect = tool();
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'tool_call', call: { id: 'call-1', name: 'inspect', arguments: {} } },
+          { type: 'completed', finishReason: 'length' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store, tools: [inspect] }).run('inspect');
+
+    expect(result).toMatchObject({ status: 'limited', stopReason: 'output_limit' });
+    expect(inspect.execute).not.toHaveBeenCalled();
+  });
+
+  it('fails empty stop responses and content-filtered streams', async () => {
+    const empty = await createLoop({
+      provider: new FakeProvider([{ events: [{ type: 'completed', finishReason: 'stop' }] }]),
+      store: new MemoryStore(),
+    }).run('empty');
+    expect(empty).toMatchObject({
+      status: 'failed',
+      error: { code: 'PROVIDER_EMPTY_RESPONSE' },
+    });
+
+    const filtered = await createLoop({
+      provider: new FakeProvider([
+        { events: [{ type: 'completed', finishReason: 'content_filter' }] },
+      ]),
+      store: new MemoryStore(),
+    }).run('filter');
+    expect(filtered).toMatchObject({
+      status: 'failed',
+      error: { code: 'PROVIDER_CONTENT_FILTERED' },
+    });
+  });
+
+  it('persists already received reasoning before a stream failure', async () => {
+    const provider = new FakeProvider([
+      {
+        events: [{ type: 'reasoning_delta', delta: { reasoning: 'partial-thought' } }],
+        error: {
+          category: 'provider_network',
+          code: 'PROVIDER_STREAM_FAILED',
+          message: 'stream dropped',
+          retryable: false,
+        },
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store }).run('continue');
+
+    expect(result.status).toBe('failed');
+    const types = store.events.map((event) => event.type);
+    expect(types).toContain('model.reasoning');
+    expect(types.indexOf('model.reasoning')).toBeLessThan(types.indexOf('model.failed'));
+  });
+
+  it('aggregates many single-character deltas into one model.text and never writes text_delta', async () => {
+    const body = 'Hello, world! This is a long streamed reply.';
+    const provider = new FakeProvider([
+      {
+        events: [
+          ...[...body].map((character) => ({ type: 'text_delta' as const, delta: character })),
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    const result = await createLoop({ provider, store }).run('stream');
+
+    expect(result).toMatchObject({ status: 'completed', finalText: body });
+    const textEvents = store.events.filter((event) => event.type === 'model.text');
+    expect(textEvents).toHaveLength(1);
+    expect(textEvents[0]?.payload).toEqual({ text: body });
+    expect(store.events.filter((event) => event.type === 'model.text_delta')).toHaveLength(0);
+    const types = store.events.map((event) => event.type);
+    expect(types.indexOf('model.text')).toBeLessThan(types.indexOf('model.completed'));
+  });
+
+  it('persists partial aggregated text before model.failed and turn.cancelled', async () => {
+    const failStore = new MemoryStore();
+    const failResult = await createLoop({
+      provider: new FakeProvider([
+        {
+          events: [
+            { type: 'text_delta', delta: 'hel' },
+            { type: 'text_delta', delta: 'lo' },
+          ],
+          error: {
+            category: 'provider_network',
+            code: 'PROVIDER_STREAM_FAILED',
+            message: 'stream dropped',
+            retryable: false,
+          },
+        },
+      ]),
+      store: failStore,
+    }).run('fail mid-stream');
+    expect(failResult.status).toBe('failed');
+    const failTypes = failStore.events.map((event) => event.type);
+    expect(failStore.events.find((event) => event.type === 'model.text')?.payload).toEqual({
+      text: 'hello',
+      partial: true,
+    });
+    expect(failTypes.indexOf('model.text')).toBeLessThan(failTypes.indexOf('model.failed'));
+    expect(failStore.events.some((event) => event.type === 'model.text_delta')).toBe(false);
+
+    const cancelStore = new MemoryStore();
+    const cancelResult = await createLoop({
+      provider: new FakeProvider([
+        {
+          events: [
+            { type: 'text_delta', delta: 'ab' },
+            { type: 'text_delta', delta: 'orted' },
+          ],
+          error: {
+            category: 'cancelled',
+            code: 'TURN_CANCELLED',
+            message: 'The agent turn was cancelled.',
+            retryable: false,
+          },
+        },
+      ]),
+      store: cancelStore,
+    }).run('cancel mid-stream');
+    expect(cancelResult.status).toBe('cancelled');
+    const cancelTypes = cancelStore.events.map((event) => event.type);
+    expect(cancelStore.events.find((event) => event.type === 'model.text')?.payload).toEqual({
+      text: 'aborted',
+      partial: true,
+    });
+    expect(cancelTypes.indexOf('model.text')).toBeLessThan(cancelTypes.indexOf('model.failed'));
+    expect(cancelTypes.indexOf('model.failed')).toBeLessThan(cancelTypes.indexOf('turn.cancelled'));
+  });
+
+  it('does not persist an empty model.text when no visible body arrived', async () => {
+    const store = new MemoryStore();
+    await createLoop({
+      provider: new FakeProvider([
+        {
+          events: [],
+          error: {
+            category: 'provider_network',
+            code: 'OFFLINE',
+            message: 'network unavailable',
+            retryable: false,
+          },
+        },
+      ]),
+      store,
+    }).run('empty fail');
+    expect(store.events.some((event) => event.type === 'model.text')).toBe(false);
+    expect(store.events.some((event) => event.type === 'model.text_delta')).toBe(false);
+  });
+
+  it('keeps reasoning-before-text-before-completed order on a mixed response', async () => {
+    const inspect = tool();
+    const provider = new FakeProvider([
+      {
+        events: [
+          { type: 'reasoning_delta', delta: { reasoning: 'plan' } },
+          { type: 'text_delta', delta: 'calling ' },
+          { type: 'text_delta', delta: 'inspect' },
+          { type: 'tool_call', call: { id: 'call-1', name: 'inspect', arguments: {} } },
+          { type: 'completed', finishReason: 'tool_calls' },
+        ],
+      },
+      {
+        events: [
+          { type: 'text_delta', delta: 'done' },
+          { type: 'completed', finishReason: 'stop' },
+        ],
+      },
+    ]);
+    const store = new MemoryStore();
+
+    await createLoop({ provider, store, tools: [inspect] }).run('inspect');
+
+    const firstText = store.events.find((event) => event.type === 'model.text');
+    const firstReasoning = store.events.find((event) => event.type === 'model.reasoning');
+    const firstTool = store.events.find((event) => event.type === 'model.tool_call');
+    const firstCompleted = store.events.find((event) => event.type === 'model.completed');
+    expect(firstText?.payload).toEqual({ text: 'calling inspect' });
+    expect(firstReasoning?.sequence).toBeLessThan(firstText?.sequence ?? 0);
+    expect(firstText?.sequence).toBeLessThan(firstTool?.sequence ?? 0);
+    expect(firstTool?.sequence).toBeLessThan(firstCompleted?.sequence ?? 0);
+    expect(store.events.filter((event) => event.type === 'model.text')).toHaveLength(2);
+    expect(store.events.some((event) => event.type === 'model.text_delta')).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ export type AgentStopReason =
   | 'completed'
   | 'max_steps'
   | 'repeated_tool_call'
+  | 'output_limit'
   | 'policy_denied'
   | 'provider_error'
   | 'tool_error'

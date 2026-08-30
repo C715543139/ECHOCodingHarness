@@ -10,7 +10,7 @@ import type {
   ToolCallId,
   TurnId,
 } from './identifiers.js';
-import type { ModelFinishReason, ModelToolCall } from './model.js';
+import type { ModelFinishReason, ModelReasoning, ModelToolCall } from './model.js';
 import type { SafetyMode } from './safety.js';
 import type { ToolResultMessage } from './tools.js';
 
@@ -56,7 +56,12 @@ export interface EchoEventPayloads {
     model: string;
     endpointFingerprint?: EndpointFingerprint;
   }>;
+  readonly 'model.text': Readonly<{
+    text: string;
+    partial?: true;
+  }>;
   readonly 'model.text_delta': Readonly<{ delta: string }>;
+  readonly 'model.reasoning': ModelReasoning;
   readonly 'model.tool_call': Readonly<{ call: ModelToolCall }>;
   readonly 'model.completed': Readonly<{
     finishReason: ModelFinishReason;

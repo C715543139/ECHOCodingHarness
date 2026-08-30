@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_MAX_APPROX_TOKENS,
+  DEFAULT_MAX_OUTPUT_CHARS,
   DEFAULT_MAX_STEPS,
+  DEFAULT_RESERVED_OUTPUT_TOKENS,
   DEFAULT_SAFETY_MODE,
   ENV_KEYS,
   loadConfig,
@@ -74,6 +77,12 @@ describe('loadConfig', () => {
     }
     expect(result.config.safetyMode).toBe(DEFAULT_SAFETY_MODE);
     expect(result.config.maxSteps).toBe(DEFAULT_MAX_STEPS);
+    expect(result.config.maxOutputChars).toBe(DEFAULT_MAX_OUTPUT_CHARS);
+    expect(result.config.context.maxApproxTokens).toBe(DEFAULT_MAX_APPROX_TOKENS);
+    expect(result.config.context.reservedOutputTokens).toBe(DEFAULT_RESERVED_OUTPUT_TOKENS);
+    expect(DEFAULT_MAX_APPROX_TOKENS).toBe(256_000);
+    expect(DEFAULT_RESERVED_OUTPUT_TOKENS).toBe(16_000);
+    expect(DEFAULT_MAX_OUTPUT_CHARS).toBe(40_000);
   });
 
   it('detects an API key that is only whitespace', () => {

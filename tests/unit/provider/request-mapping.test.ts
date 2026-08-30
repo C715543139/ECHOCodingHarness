@@ -86,6 +86,31 @@ describe('request mapping', () => {
     });
   });
 
+  it('restores reasoning wire fields from an assistant message', () => {
+    const message: ModelMessage = {
+      role: 'assistant',
+      content: '',
+      reasoning: 'think',
+      reasoningContent: 'hidden',
+      reasoningDetails: [{ type: 'text', text: 'detail' }],
+      toolCalls: [{ id: 'call-1', name: 'read_file', arguments: { path: 'src/a.ts' } }],
+    };
+    expect(toWireMessage(message)).toEqual({
+      role: 'assistant',
+      content: '',
+      reasoning: 'think',
+      reasoning_content: 'hidden',
+      reasoning_details: [{ type: 'text', text: 'detail' }],
+      tool_calls: [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'read_file', arguments: '{"path":"src/a.ts"}' },
+        },
+      ],
+    });
+  });
+
   it('keeps assistant messages without tool calls simple', () => {
     const message: ModelMessage = { role: 'assistant', content: 'plain text' };
     expect(toWireMessage(message)).toEqual({ role: 'assistant', content: 'plain text' });

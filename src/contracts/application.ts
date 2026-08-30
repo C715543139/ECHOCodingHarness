@@ -6,7 +6,8 @@ import type { SafetyMode } from './safety.js';
 import type { SessionStore } from './session.js';
 
 export const EVENT_SCHEMA_VERSION_P0 = 1;
-export const EVENT_SCHEMA_VERSION = 2;
+export const EVENT_SCHEMA_VERSION_P1 = 2;
+export const EVENT_SCHEMA_VERSION = 3;
 
 export interface SessionRuntimeState {
   readonly sessionId: SessionId;

@@ -52,4 +52,19 @@ describe('Fake console transport', () => {
     running.createSession();
     expect(running.getSnapshot().sessions).toHaveLength(2);
   });
+
+  it('pages sessions and keeps process-wide running state when a later page is hidden', () => {
+    const transport = createFakeTransport({
+      sessionPageSize: 1,
+      sessions: [createIdleSession(), createRunningSession()],
+      selectedSessionId: 'ses_idle',
+    });
+
+    expect(transport.getSnapshot().sessions).toHaveLength(1);
+    expect(transport.getSnapshot().bootstrap.capabilities.submitTurnBlockedReason).toBe(
+      'turn_active',
+    );
+    transport.loadMoreSessions();
+    expect(transport.getSnapshot().sessions).toHaveLength(2);
+  });
 });

@@ -11,6 +11,7 @@ import {
   createRunningSession,
   createSessionRuntime,
 } from '../../../src/web/client/transport/fake-transport.js';
+import { ChatHarness } from './web-console-harness.js';
 
 describe('Composer shell', () => {
   afterEach(() => {
@@ -89,5 +90,54 @@ describe('Composer shell', () => {
 
     expect(screen.getByRole('button', { name: '停止' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '发送' })).toHaveProperty('disabled', true);
+  });
+
+  it('changes model and safety mode only when no Turn is running', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+      provider: {
+        baseUrl: 'https://provider.example/v1',
+        catalog: { source: 'discover', cachedModels: ['echo-model', 'echo-fast'] },
+        defaultModel: 'echo-model',
+        apiKeyConfigured: true,
+        writable: true,
+      },
+    });
+    render(<ChatHarness transport={transport} />);
+
+    await user.selectOptions(screen.getByLabelText('模型'), 'echo-fast');
+    await user.selectOptions(screen.getByLabelText('安全模式'), 'safe');
+    expect(transport.getSnapshot().selectedRuntime?.model).toBe('echo-fast');
+    expect(transport.getSnapshot().selectedRuntime?.safetyMode).toBe('safe');
+  });
+
+  it('requires a second confirmation before stopping the selected Session', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createRunningSession()],
+      selectedSessionId: 'ses_running',
+    });
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByRole('button', { name: '停止' }));
+    expect(transport.getSnapshot().sessions[0]?.phase).toBe('running');
+    await user.click(screen.getByRole('button', { name: '确认停止 run01' }));
+    expect(transport.getSnapshot().sessions[0]?.phase).toBe('cancelled');
+  });
+
+  it('does not submit when Enter is pressed on empty composer text', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+    });
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByLabelText('输入'));
+    await user.keyboard('{Enter}');
+    expect(transport.getSnapshot().chatTurns).toEqual([]);
+    expect(screen.queryByText('Fake Provider 已接受该 Turn。')).toBeNull();
   });
 });

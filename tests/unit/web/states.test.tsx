@@ -12,6 +12,7 @@ import {
   createSampleInspectorDetail,
   createSampleTraceRecord,
 } from '../../../src/web/client/transport/fake-transport.js';
+import { ChatHarness } from './web-console-harness.js';
 
 describe('Console state projection', () => {
   afterEach(() => {
@@ -60,5 +61,40 @@ describe('Console state projection', () => {
     expect(screen.getByText(/Completed/)).toBeTruthy();
     expect(screen.queryByText(/Running/)).toBeNull();
     expect(screen.queryByRole('button', { name: '停止' })).toBeNull();
+  });
+
+  it('shows loading, resync, failed, and cancelled Chat states as text', async () => {
+    const user = userEvent.setup();
+    const failed = createIdleSession({
+      id: 'ses_failed',
+      phase: 'failed',
+      title: 'Failed session',
+    });
+    const transport = createFakeTransport({
+      sessions: [failed],
+      selectedSessionId: failed.id,
+      loadingHistory: true,
+      resyncRequired: true,
+      chatTurns: [
+        {
+          turnId: 'turn_fail',
+          startedAt: '2026-08-30T09:01:00.000Z',
+          userText: 'broken goal',
+          responses: [{ step: 1, text: 'Provider 请求失败。', partial: false }],
+          toolSummaries: [],
+          status: 'failed',
+          stopReason: 'provider_error',
+        },
+      ],
+    });
+    render(<ChatHarness transport={transport} />);
+
+    expect(screen.getByText('正在加载历史…')).toBeTruthy();
+    expect(screen.getByTestId('resync-banner').textContent).toContain('需要完整同步');
+    expect(screen.getByText(/failed · provider_error/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '重新同步' }));
+    expect(screen.queryByTestId('resync-banner')).toBeNull();
+    expect(transport.getSnapshot().connection).toBe('connected');
   });
 });

@@ -5,6 +5,12 @@ import type {
   SessionSummaryDto,
   WorkspaceSummaryDto,
 } from '../../../contracts/web.js';
+import {
+  EMPTY_WEB_CONSOLE_VIEW,
+  hasWebConsoleActions,
+  type WebConsoleActions,
+  type WebConsoleView,
+} from '../view-model/console-controller.js';
 import { SESSION_PHASE_LABELS } from './labels.js';
 import styles from './shell.module.css';
 
@@ -28,6 +34,8 @@ export function SessionRail({
   onCreateSession,
   onSelectSession,
   onOpenSettings,
+  actions,
+  view = EMPTY_WEB_CONSOLE_VIEW,
 }: {
   readonly workspace: WorkspaceSummaryDto;
   readonly sessions: readonly SessionSummaryDto[];
@@ -38,8 +46,12 @@ export function SessionRail({
   readonly onCreateSession: () => void;
   readonly onSelectSession: (id: string) => void;
   readonly onOpenSettings: () => void;
+  readonly actions?: WebConsoleActions;
+  readonly view?: WebConsoleView;
 }) {
   const blockedMessage = createBlockedMessage(createBlockedReason);
+  const wired = hasWebConsoleActions(actions);
+  const hasMoreSessions = view.hasMoreSessions;
 
   return (
     <nav aria-label="Session" className={styles.rail}>
@@ -63,7 +75,18 @@ export function SessionRail({
       {sessions.length === 0 ? (
         <p className={styles.emptyHint}>尚无 Session。新建会话后开始对话。</p>
       ) : (
-        <ul className={styles.sessionList}>
+        <ul
+          className={styles.sessionList}
+          onScroll={(event) => {
+            if (!hasMoreSessions || !wired) {
+              return;
+            }
+            const list = event.currentTarget;
+            if (list.scrollTop + list.clientHeight >= list.scrollHeight - 8) {
+              actions.loadMoreSessions();
+            }
+          }}
+        >
           {sessions.map((session) => (
             <li key={session.id}>
               <button
@@ -85,6 +108,18 @@ export function SessionRail({
           ))}
         </ul>
       )}
+      {hasMoreSessions ? (
+        <button
+          className={styles.secondaryButton}
+          disabled={!wired}
+          onClick={() => {
+            actions?.loadMoreSessions();
+          }}
+          type="button"
+        >
+          加载更多
+        </button>
+      ) : null}
       <div className={styles.railFooter}>
         <button
           className={styles.settingsButton}

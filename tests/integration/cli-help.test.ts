@@ -18,6 +18,7 @@ describe('CLI metadata', () => {
     expect(help).toContain('run');
     expect(help).toContain('chat');
     expect(help).toContain('config');
+    expect(help).toContain('web');
     expect(cli.commands.find((item) => item.name() === 'run')?.helpInformation()).toContain(
       'GET /models',
     );
@@ -126,6 +127,40 @@ describe('CLI metadata', () => {
       }),
     );
     expect(exitCode).toBe(130);
+  });
+
+  it('parses web options and delegates without embedding HTTP routes', async () => {
+    let exitCode: number | undefined;
+    const webAction = vi.fn().mockResolvedValue({ exitCode: 0 });
+    const cli = createCli({
+      version: '9.8.7',
+      artifactRoot,
+      webAction,
+      setExitCode: (code) => {
+        exitCode = code;
+      },
+    });
+
+    await cli.parseAsync([
+      'node',
+      'echo-harness',
+      'web',
+      '--workspace',
+      '.',
+      '--port',
+      '0',
+      '--no-open',
+    ]);
+
+    expect(webAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: '.',
+        port: 0,
+        open: false,
+        artifactRoot,
+      }),
+    );
+    expect(exitCode).toBe(0);
   });
 
   it('throws a Commander error for missing run arguments instead of exiting the host process', async () => {

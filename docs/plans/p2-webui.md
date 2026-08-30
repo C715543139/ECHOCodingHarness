@@ -1,8 +1,8 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（A0/A1/A2 已实现，其余尚未实现）
+> 状态：Accepted plan（阶段 A 已实现，阶段 B/C 尚未实现）
 >
-> 版本：1.4
+> 版本：1.5
 >
 > 最后更新：2026-08-30
 
@@ -92,7 +92,8 @@ echo-harness web [--workspace <path>] [--port <port>] [--no-open]
 
 - 未提供 `--workspace` 时使用当前目录；
 - 只监听 `127.0.0.1`，默认由系统选择空闲端口；
-- 默认打开带一次性 bootstrap fragment 的页面；`--no-open` 打印同一经过验证的地址；
+- 默认打开服务器实际生成且已验证的 loopback bootstrap URL（可注入 opener，测试不打开真实浏览器）；
+  `--no-open` 不调用 opener，只打印同一地址；artifact smoke 使用 `--no-open`；
 - 启动输出实际端口和脱敏工作区名，不输出 API Key、Cookie 或绝对个人路径；
 - 关闭时立即拒绝新状态改变请求，取消唯一活动 Turn，最多等待 10 秒清理；
 - 清理完成退出 0，终态或资源清理失败以非零码报告。
@@ -273,12 +274,14 @@ echo-harness web
 3. **A2：共享 Provider 配置服务（已实现）**。已抽出 CLI/Web 共用的读取、严格校验、显式发现、
    写锁与原子写入。Web 使用受限 Provider merge（`saveProviderSettings`），CLI wizard 使用完整
    校验替换（`replacePersistentConfig`）；API Key 仍只来自环境变量。本任务不实现 HTTP 路由。
-4. **A3：Fastify 服务骨架**。固定工作区生命周期、bootstrap 认证、Host/Origin 防护、静态资源和
-   可注入路由测试。
-5. **A4：React 页面骨架**。设计 token、Session/Chat/Trace 主壳、Provider 设置导航壳和组件测试
-   环境；顶栏、侧栏和输入区按 [web-ui.md](../web-ui.md) 落位。
-6. **A5：Phase A 集成门禁**。统一路由装配、前端入口、package scripts 与 CI；跑全量测试并同步
-   文档状态。
+4. **A3：Fastify 服务骨架（已实现）**。已落地固定工作区生命周期、bootstrap 认证、Host/Origin 防护、
+   静态资源和可注入路由测试。不实现完整业务路由。
+5. **A4：React 页面骨架（已实现）**。已落地设计 token、Session/Chat/Trace 主壳、Provider 设置导航壳
+   和组件测试环境；顶栏、侧栏和输入区按 [web-ui.md](../web-ui.md) 落位。使用 Fake transport，不连接
+   真实 API。
+6. **A5：Phase A 集成门禁（已实现）**。已统一 Fastify 路由装配、React 根组件、package scripts、
+   `dist/web/` 构建顺序与 CI；`pnpm test:web` 与 `pnpm smoke:web-artifact` 进入质量门。业务
+   Session/Turn API 与 Playwright 流程仍待阶段 B。
 
 A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。Web DTO 与配置服务属于共享边界，
 阶段 A 完成前不得并行实现相互竞争的私有类型。

@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.6
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
@@ -10,7 +10,7 @@
 
 本文定义 ECHO Harness 各核心模块之间的稳定边界。可编译共享类型位于 `src/contracts/`；本文仍是语义与不变量的权威来源。P1-0 已冻结配置、应用服务、Session 查询、事件模式版本、配置错误码和退出语义；后续实现必须先符合本文，再改运行时。
 
-P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、[ADR-0005](./decisions/0005-restore-artifact-config.md) 与 [ADR-0006](./decisions/0006-reasoning-session-events.md) 为准。P2 Web 传输与 UI 契约分别冻结在 [web-api.md](./web-api.md) 和 [web-ui.md](./web-ui.md)，当前尚未实现，不改变本文件中已交付的领域接口。
+P1-2A 已使运行时执行本节配置规则。P1-2B 已实现 `GET /models` 发现、进程内缓存，以及发现失败不阻断已配置模型。P1-1A 已将 `run` 接到 `ApplicationService`。P1-1B 已实现 `echo-harness chat`、Slash 与粘贴边界。该过渡不得被解读为可以同时维持两套公共契约。P1 契约以 [ADR-0002](./decisions/0002-p1-config-artifact-root.md)、[ADR-0003](./decisions/0003-p1-application-service-session.md)、[ADR-0005](./decisions/0005-restore-artifact-config.md) 与 [ADR-0006](./decisions/0006-reasoning-session-events.md) 为准。P2 Web 传输与 UI 契约分别冻结在 [web-api.md](./web-api.md) 和 [web-ui.md](./web-ui.md)。Phase A 已交付固定工作区 loopback server/adapter、一次性 bootstrap 认证、React 主壳与 `echo-harness web` 启动契约（默认打开已验证的 bootstrap URL，`--no-open` 只打印同一地址）；业务 Session/Turn/审批 API 与阶段 B 能力尚未实现。这不改变本文件中已交付的领域接口。
 
 文中的“必须”“不得”是强约束，“应”是默认约束，“可以”表示可选能力。
 

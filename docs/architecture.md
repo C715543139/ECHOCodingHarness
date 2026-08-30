@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.6
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
@@ -13,8 +13,8 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；这些文档当前是设计契约，不表示 WebUI 已经实现。后续实现若与本文冲突，
-应先更新相应 ADR，再修改本文。
+[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳，不表示
+完整 Web Chat/Trace 已经交付。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 
@@ -309,7 +309,8 @@ Context Projector 按优先级构建上下文：
 
 1. `echo-harness run <goal>`：在指定工作区完成单次目标；
 2. `echo-harness chat`：P1 多轮交互；通过应用服务复用同一 Agent Loop；
-3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`。
+3. `echo-harness config`：P1 唯一配置向导，写入 `<artifact-root>/config/echo.config.json`；
+4. `echo-harness web`：P2 Phase A 已落地的固定工作区 loopback 控制台；默认打开服务器实际生成且已验证的 loopback bootstrap URL，`--no-open` 只打印同一地址。业务 Session/Turn API 仍待阶段 B。
 
 CLI 负责参数解析、bracketed paste、交互审批、事件渲染和退出码，不包含 Agent 决策逻辑。`EventRenderer` 只消费 `EchoEvent` 与最终 `AgentResult`，不得执行工具、改变会话状态或从终端文本反向推断状态。默认情况下，`run` 的执行进度与诊断写入 stderr，最终面向用户的结果写入 stdout；CI 和演示烟测必须可以通过非交互参数运行。
 
@@ -370,6 +371,8 @@ CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部�
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。
 
 P2 已完成计划、ADR、API 与 UI 契约冻结。A1 已把有界 Web DTO/Schema、幂等语义与 Policy Explain
-事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。`echo-harness web`、Fastify
-adapter、React 页面和浏览器测试尚未实现。实现状态只能在对应自动化、Windows 产物 smoke 和受控
-真实 Provider 验收完成后把 API 文档从设计契约改为已交付。
+事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。A3 已落地 Fastify loopback
+生命周期、一次性 bootstrap Cookie、Host/Origin/CSP 与单 SSE 所有权。A4 已落地 React 主壳与 Fake
+transport。A5 已统一路由装配、`dist/web/` 构建顺序、`pnpm test:web` / `pnpm smoke:web-artifact`
+与 CI 证据。业务 Session/Turn/审批 API、真实 HTTP 前端和 Playwright 流程仍待阶段 B。实现状态只能在
+对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。

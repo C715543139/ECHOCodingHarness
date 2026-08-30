@@ -113,6 +113,18 @@ Chat reuses the same application service as `run`. Typed idle lines may run `/he
 `/model`, `/model refresh`, `/safety`, and `/quit`. A bracketed paste is at most one Turn and never
 a Slash command. Ctrl+C cancels a running Turn and returns to the prompt; idle Ctrl+C exits `130`.
 
+## Local Web console
+
+```powershell
+node .\dist\cli.js web --workspace .
+node .\dist\cli.js web --workspace . --no-open
+```
+
+Phase A starts a `127.0.0.1` console for one fixed workspace. The default command opens the
+server-issued, verified loopback bootstrap URL. `--no-open` prints that same URL and does not
+open a browser. It does not yet provide live Session/Turn APIs or a connected Chat backend. See
+[ADR-0007](docs/decisions/0007-local-web-console.md).
+
 ## Resettable demonstration
 
 The fixed demo shows one continuous story: inspect code, observe a failing TypeScript test, locate

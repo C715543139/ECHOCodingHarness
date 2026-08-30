@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.4
+> 版本：1.5
 >
 > 最后更新：2026-08-30
 
@@ -81,6 +81,7 @@ Turn 执行期间，stdout 默认只承载最终面向用户的结果文本，�
 
 - `--help`；
 - `--version`；
+- `echo-harness web` 默认打开、`--no-open` 只打印的一次性 loopback bootstrap URL（非 TTY 下关闭 stdin 即停止服务）；
 - 未来明确选择的机器可读输出。
 
 ### 5.2 stderr

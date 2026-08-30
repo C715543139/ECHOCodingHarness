@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -11,7 +11,8 @@
 ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进程。本文件定义首个版本的威胁模型、信任边界与强制控制，目标是在开发工作区内提供可审查的自动化能力。
 
 ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
-[ADR-0007](./decisions/0007-local-web-console.md)；当前尚未实现。
+[ADR-0007](./decisions/0007-local-web-console.md)。Phase A 已落地 loopback 传输、bootstrap 认证与
+请求防护；业务 Session/Turn API 仍待阶段 B。
 
 ## 2. 需要保护的资产
 
@@ -313,8 +314,9 @@ P2 Web adapter 必须同时执行：
 - P2 不提供导出会话；浏览器不得拼接 DOM 生成下载文件。
 
 bootstrap token、Cookie、Authorization、Provider 响应头和 API Key 不得进入 URL query、应用日志、
-Session、错误详情或浏览器持久存储。URL fragment 只用于首次 bootstrap；`--no-open` 打印的
-fragment 是进程级短期访问材料，用户不应分享，成功兑换后即失效。
+Session、错误详情或浏览器持久存储。URL fragment 只用于首次 bootstrap。`echo-harness web` 默认打开服务器实际生成且已验证的
+loopback bootstrap URL；`--no-open` 只打印同一地址，不调用 opener。该 fragment 是进程级短期访问
+材料，用户不应分享，成功兑换后即失效。
 
 SSE 只直播已经授权 Session 的有界投影；同一进程级认证 Cookie 同时只允许一条流。断线补齐使用
 Session seq；无法连续恢复时要求客户端重新读取快照，不得通过重放 POST 修复。除 bootstrap 外，

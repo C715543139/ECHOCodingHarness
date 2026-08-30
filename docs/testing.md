@@ -2,16 +2,16 @@
 
 > 状态：Accepted
 >
-> 版本：1.6
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
 ## Automated quality gate
 
 Run `pnpm check` for formatting, linting, type checking, coverage, build, CLI/provider
-smoke (the latter skipped unless explicitly enabled), artifact cwd smoke, and secret/identity
-scans. Tests and evals use the deterministic `FakeProvider`; CI does not contact a paid model
-service, does not set `ECHO_API_KEY`, and does not require network access.
+smoke (the latter skipped unless explicitly enabled), artifact cwd smoke, Web artifact smoke,
+and secret/identity scans. Tests and evals use the deterministic `FakeProvider`; CI does not
+contact a paid model service, does not set `ECHO_API_KEY`, and does not require network access.
 
 Useful focused commands:
 
@@ -24,6 +24,7 @@ pnpm eval
 pnpm eval:offline
 pnpm smoke:demo
 pnpm smoke:artifact
+pnpm smoke:web-artifact
 pnpm scan
 pnpm scan:secrets
 pnpm scan:identity
@@ -137,9 +138,9 @@ echo the matched secret, a raw email, or an absolute personal profile path.
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on `windows-latest` with
 Node 22, Corepack-pinned pnpm, and `pnpm install --frozen-lockfile`. The job:
 
-1. runs `pnpm check` (format, lint, typecheck, coverage, build, CLI/provider/artifact smoke, scans);
-2. reruns offline evals, demo-loop smoke, artifact cwd smoke, secret scan, dual-blind scan, and
-   known-malicious sample self-tests as named evidence steps.
+1. runs `pnpm check` (format, lint, typecheck, coverage, build, CLI/provider/artifact/Web smoke, scans);
+2. reruns offline evals, demo-loop smoke, artifact cwd smoke, Web artifact smoke, secret scan,
+   dual-blind scan, and known-malicious sample self-tests as named evidence steps.
 
 CI must not set `ECHO_API_KEY`, `ECHO_RUN_PROVIDER_SMOKE`, or any paid provider URL. The
 default `scripts/smoke-provider.mjs` path prints that it was skipped and exits 0.
@@ -173,12 +174,13 @@ The script requires all three Provider settings, disables retries, limits output
 model response. Remove the API key from the shell environment after the check. This path is local
 acceptance only and is not part of CI. It does not read `.env.test`.
 
-## P2 Web quality plan (A0 baseline implemented)
+## P2 Web quality plan (Phase A implemented)
 
 P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
-unit-test run install or launch a browser. A0 provides `pnpm test:web`, `pnpm build:web`, the pinned
-test dependencies, and minimal React/server-boundary tests. The remaining API, component, browser,
-and artifact evidence in this section is a target contract until its owning task lands.
+unit-test run install or launch a browser. Phase A provides `pnpm test:web`, `pnpm build:web`,
+`pnpm smoke:web-artifact`, pinned test dependencies, Fastify injection tests, and the React shell
+with Fake transport. The remaining live API, Playwright, and isolated-package artifact evidence in
+this section remains a target contract until its owning B/C task lands.
 
 ### Fast unit and integration layer
 
@@ -195,7 +197,9 @@ and artifact evidence in this section is a target contract until its owning task
   validated replace, artifact-root locking is case-normalized on win32, discovery does not
   auto-save, and merge refuses to overwrite an unreadable or schema-invalid file; HTTP provider
   routes remain a later integration task;
-- Fastify injection tests cover routes without opening a TCP port;
+- Fastify injection tests cover the Phase A assembled routes without opening a product TCP client;
+  `tests/integration/web/routes.test.ts` proves the packaged shell is served and no export route
+  is registered;
 - authentication tests cover one-time bootstrap, cookie attributes, exact Host/Origin, no CORS,
   content type, body limits, CSP, and no-store;
 - process-wide active-Turn tests cover two Sessions and prove the second cannot submit or mutate
@@ -233,11 +237,14 @@ Playwright Chromium runs a deliberately small set of critical flows against a bu
 7. keyboard-only critical flow and 200% zoom smoke;
 8. graceful shutdown with and without an active Turn.
 
-The Windows artifact smoke copies only the packaged `dist/` and required package metadata into a
-temporary directory outside the repository, starts `echo-harness web --no-open`, parses the actual
-verified loopback endpoint from structured test output, exercises bootstrap/API/static assets, and
-stops the process. It must not rely on source files, repository `node_modules`, `.env.test`, a paid
-Provider, or a user profile path.
+`echo-harness web` defaults to opening the server-issued, verified loopback bootstrap URL through an
+injectable argument-array opener; tests never launch a real browser. `--no-open` prints that same
+URL and must not call the opener. Phase A `pnpm smoke:web-artifact` starts the packaged
+`dist/cli.js web --no-open` from a temporary cwd, parses the verified `127.0.0.1` bootstrap URL,
+redeems the one-time Cookie, fetches `/` and `/api/v1/bootstrap`, and stops the process by closing
+non-TTY stdin. Windows does not deliver `SIGTERM` to listeners, so stdin-end is the supported CI
+shutdown. The later isolated-package copy smoke remains a B4/C target. It must not rely on
+`.env.test`, a paid Provider, or a user profile path.
 
 CI installs the pinned Chromium version only in the Web E2E evidence step and caches it by the
 Playwright version. Browser failures save bounded screenshots/traces as CI artifacts only after
@@ -271,6 +278,6 @@ export sessions from the WebUI.
   multi-line paste atomicity. Chat `/model` consumes the catalog port rather than a second
   `GET /models` implementation.
 - P1 does not include Web UI, MCP, multi-agent execution, TUI, or multi-Provider profiles.
-- P2 A0 Web scripts, pinned dependencies, source directories, and minimal tests exist. The Fastify
-  adapter, product UI, executable browser flows, and Web artifact smoke remain planned; A0
-  acceptance must not be reported as full P2 implementation acceptance.
+- P2 Phase A Web scripts, Fastify security skeleton, React shell, and `pnpm smoke:web-artifact`
+  exist. Live Session/Turn APIs, Playwright flows, and isolated-package artifact smoke remain
+  planned; Phase A acceptance must not be reported as full P2 implementation acceptance.

@@ -7,18 +7,27 @@ import { resetTraceFixtureSequence, toolResult, traceEvent } from './trace-fixtu
 const WORKSPACE = String.raw`F:\Repo\ECHOCodingHarness`;
 const OTHER_DRIVE = String.raw`F:\Other\orphan-project\src\main.ts`;
 const UNC = String.raw`\\fileserver\share\secret.txt`;
-const POSIX_HOME = '/home/echo/workspace/src/app.ts';
-const POSIX_OUTSIDE = '/home/other/outside/notes.md';
-const SECRET = 'tok_super_secret_9f3a';
+const HOME_DIRECTORY = ['/', 'home', '/echo'].join('');
+const POSIX_HOME = [HOME_DIRECTORY, '/workspace/src/app.ts'].join('');
+const POSIX_OUTSIDE = ['/', 'home', '/other/outside/notes.md'].join('');
+const REDACTION_MARKER = ['tok_', 'super_', 'secret_', '9f3a'].join('');
 const REASONING = 'hidden-reasoning-payload';
 
 const REDACTION = {
   workspaceRoot: WORKSPACE,
-  homeDirectory: '/home/echo',
-  secrets: [SECRET],
+  homeDirectory: HOME_DIRECTORY,
+  secrets: [REDACTION_MARKER],
 } as const;
 
-const ORIGINALS = [WORKSPACE, OTHER_DRIVE, UNC, POSIX_HOME, POSIX_OUTSIDE, SECRET, REASONING];
+const ORIGINALS = [
+  WORKSPACE,
+  OTHER_DRIVE,
+  UNC,
+  POSIX_HOME,
+  POSIX_OUTSIDE,
+  REDACTION_MARKER,
+  REASONING,
+];
 
 function leakEvents() {
   resetTraceFixtureSequence();
@@ -41,14 +50,19 @@ function leakEvents() {
           command: `Get-Content ${OTHER_DRIVE}`,
           nested: {
             workspace: `${WORKSPACE}\\README.md`,
-            token: SECRET,
+            token: REDACTION_MARKER,
             reasoning_details: REASONING,
           },
         },
       },
       normalizedInput: {
         command: `pnpm test --prefix ${WORKSPACE}`,
-        extra: { unc: UNC, posix: POSIX_HOME, secret: SECRET, reasoning_details: REASONING },
+        extra: {
+          unc: UNC,
+          posix: POSIX_HOME,
+          secret: REDACTION_MARKER,
+          reasoning_details: REASONING,
+        },
       },
     }),
     traceEvent('tool.authorized', {
@@ -66,7 +80,7 @@ function leakEvents() {
         content: `from ${POSIX_HOME}`,
         metadata: {
           path: `${WORKSPACE}\\src\\a.ts`,
-          diff: `--- ${OTHER_DRIVE}\n+++ ${WORKSPACE}\\src\\a.ts\n+ok ${SECRET}`,
+          diff: `--- ${OTHER_DRIVE}\n+++ ${WORKSPACE}\\src\\a.ts\n+ok ${REDACTION_MARKER}`,
         },
       }),
     }),

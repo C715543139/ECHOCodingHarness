@@ -35,10 +35,10 @@ export const P2_B4_PENDING_WIRING = [
     reason: 'Packaged App still mounts Fake transport; C1 wires the live adapter.',
   },
   {
-    id: 'trace-virtualization',
+    id: 'trace-http-pagination',
     matrixId: 'P2-3-09',
-    owner: 'p2-b3',
-    reason: 'Large Trace lists render every Fake record; windowing is a B3/C1 concern.',
+    owner: 'p2-c1',
+    reason: 'B3 virtualizes the bounded page; C1 wires HTTP pagination and older-page navigation.',
   },
   {
     id: 'quality-script-ci',

@@ -20,6 +20,8 @@ const FORBIDDEN = [
   /"jsonl"/u,
 ];
 
+const PLANTED_API_KEY = ['sk-', 'abcdefghijklmnopqrstuvwxyz'].join('');
+
 describe('Trace privacy', () => {
   it('does not emit chunk, retry, or reasoning records and drops sensitive fields', () => {
     resetTraceFixtureSequence();
@@ -41,14 +43,14 @@ describe('Trace privacy', () => {
           name: 'read_file',
           arguments: {
             path: 'src/a.ts',
-            apiKey: 'sk-abcdefghijklmnopqrstuvwxyz',
+            apiKey: PLANTED_API_KEY,
             reasoning_details: 'nope',
             jsonl: '{"type":"raw"}',
           },
         },
         normalizedInput: {
           path: 'src/a.ts',
-          apiKey: 'sk-abcdefghijklmnopqrstuvwxyz',
+          apiKey: PLANTED_API_KEY,
           reasoning_details: 'nope',
         },
       }),

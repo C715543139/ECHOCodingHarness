@@ -126,9 +126,11 @@ export function TraceView({
                   }}
                 >
                   <TraceRow
+                    index={index}
                     previousTurnId={index === 0 ? undefined : visible[index - 1]?.turnId}
                     record={record}
                     selected={record.id === selectedRecordId}
+                    total={visible.length}
                     onSelect={onSelectRecord}
                   />
                 </div>
@@ -138,10 +140,12 @@ export function TraceView({
         ) : (
           visible.map((record, index) => (
             <TraceRow
+              index={index}
               key={record.id}
               previousTurnId={index === 0 ? undefined : visible[index - 1]?.turnId}
               record={record}
               selected={record.id === selectedRecordId}
+              total={visible.length}
               onSelect={onSelectRecord}
             />
           ))
@@ -152,19 +156,23 @@ export function TraceView({
 }
 
 function TraceRow({
+  index,
   record,
   selected,
+  total,
   previousTurnId,
   onSelect,
 }: {
+  readonly index: number;
   readonly record: TraceRecordDto;
   readonly selected: boolean;
+  readonly total: number;
   readonly previousTurnId: string | undefined;
   readonly onSelect: (id: string) => void;
 }) {
   const grouped = previousTurnId !== record.turnId;
   return (
-    <div className={styles.traceRow} role="listitem">
+    <div aria-posinset={index + 1} aria-setsize={total} className={styles.traceRow} role="listitem">
       {grouped ? <p className={styles.traceGroup}>Turn {record.turnId}</p> : null}
       <button
         aria-current={selected}

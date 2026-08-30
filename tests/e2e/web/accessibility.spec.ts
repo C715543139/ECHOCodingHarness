@@ -8,7 +8,9 @@ test.describe('accessibility', () => {
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByTestId('connection-status')).toContainText('已连接');
     await expect(page.getByTestId('connection-dot-connected')).toBeVisible();
-    await expect(page.locator('[aria-live="polite"]')).toContainText('已连接');
+    await expect(page.locator('[aria-live="polite"]').filter({ hasText: /^已连接$/u })).toHaveCount(
+      1,
+    );
 
     await page.screenshot({
       path: testInfo.outputPath('accessibility.png'),

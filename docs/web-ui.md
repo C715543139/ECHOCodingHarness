@@ -1,8 +1,8 @@
 # ECHO Harness WebUI 产品与交互规格
 
-> 状态：Accepted design contract（尚未实现）
+> 状态：Accepted design contract（A4 已落地 React 主壳与 Fake transport；Chat/Trace 功能与 HTTP 尚未实现）
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-30
 

@@ -1,0 +1,40 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--echo-color-bg);
+  color: var(--echo-color-text);
+  font-family: var(--echo-font-ui);
+  line-height: 1.45;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--echo-font-mono);
+}
+
+:focus-visible {
+  outline: 0.125rem solid var(--echo-color-focus);
+  outline-offset: 0.125rem;
+}

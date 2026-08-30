@@ -18,7 +18,26 @@ test.describe('large Trace list', () => {
     await expect(last).toBeVisible();
     await expect(last.getByRole('button')).toHaveAttribute('data-seq', '200');
     await last.getByRole('button').click();
-    await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+    const inspector = page.getByRole('complementary', { name: 'Inspector' });
+    await expect(inspector).toBeVisible();
+    const inspectorResizer = page.getByRole('separator', { name: '调整 Inspector 宽度' });
+    await expect(inspectorResizer).toHaveAttribute('aria-valuemin', '256');
+    await expect(inspectorResizer).toHaveAttribute('aria-valuemax', '480');
+    await inspectorResizer.focus();
+    await inspectorResizer.press('End');
+    await expect(inspectorResizer).toHaveAttribute('aria-valuenow', '480');
+    await inspectorResizer.press('Home');
+    await expect(inspectorResizer).toHaveAttribute('aria-valuenow', '256');
+    expect(Math.round((await inspector.boundingBox())?.width ?? 0)).toBe(256);
+
+    const inspectorScroll = page.getByTestId('inspector-scroll');
+    const inspectorOverflow = await inspectorScroll.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      overflowX: getComputedStyle(element).overflowX,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(inspectorOverflow.overflowX).toBe('hidden');
+    expect(inspectorOverflow.scrollWidth).toBeLessThanOrEqual(inspectorOverflow.clientWidth);
 
     await list.evaluate((element) => {
       element.scrollTop = 120;

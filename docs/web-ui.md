@@ -51,7 +51,8 @@ Session rail | Chat or Trace | Inspector
 
 ### 2.2 响应式
 
-- `>= 1200px`：Session rail 默认 17.5rem，可在 208–420 px 内调宽，Inspector 按需显示；
+- `>= 1200px`：Session rail 默认 17.5rem，可在 208–420 px 内调宽；Inspector 按需显示，默认
+  19rem，可在 256–480 px 内调宽；
 - `768–1199px`：Session rail 可折叠，Inspector 作为右侧抽屉；
 - `< 768px`：Session、主视图和 Inspector 使用单列分层导航；
 - 首版以桌面开发工作流为主要验收目标，但 200% 缩放时不得丢失核心操作；
@@ -88,8 +89,9 @@ Session rail | Chat or Trace | Inspector
 | 成功 / 警告 / 危险 | `--echo-color-success` / `-warning` / `-danger` | `#15803d` / `#b45309` / `#b91c1c` |
 | 运行提示条 | `--echo-color-info-soft` | `#eff4fe` |
 
-`--echo-rail-width` 的桌面默认值为 `17.5rem`，运行时可由侧栏分隔条覆盖。所有语义前景色与其所在
-背景的对比度不低于 WCAG 2.2 AA 正文要求；语义色只作为文字标签的补充，
+`--echo-rail-width` 的桌面默认值为 `17.5rem`，`--echo-inspector-width` 的桌面默认值为 `19rem`，
+运行时均可由对应侧栏分隔条覆盖。所有语义前景色与其所在背景的对比度不低于 WCAG 2.2 AA 正文
+要求；语义色只作为文字标签的补充，
 不得成为状态的唯一线索。圆角使用 `--echo-radius-sm|--echo-radius|--echo-radius-lg`，阴影使用
 `--echo-shadow-card|-raised|-dialog`，布局宽度使用 `--echo-rail-width`（17.5rem 默认）与
 `--echo-inspector-width`（19rem）。
@@ -108,9 +110,9 @@ React 主壳与审批场景，并已通过 Web 产物隐私扫描；它只用于
 路径，也不提供工作区选择按钮。
 
 桌面侧栏右缘提供可访问的调宽分隔条，范围为 208–420 px；支持拖动、左右方向键、`Home` / `End`，
-双击恢复 280 px。工作区行显示“当前工作区”和脱敏名称，不显示文件夹图标；名称与 Session 标题
-共用 `--echo-text-lg` 字号并允许长名称换行，悬停或聚焦时可读取完整名称。不得用本机绝对路径替代
-它。
+双击恢复 280 px。工作区行显示“当前工作区”和脱敏名称，不显示文件夹图标；“会话”与“当前
+工作区”共用字号、字重和字距，名称与 Session 标题共用 `--echo-text-lg` 字号、字重和行高并允许
+长名称换行，悬停或聚焦时可读取完整名称。不得用本机绝对路径替代它。
 
 Session 条目显示：
 
@@ -239,7 +241,9 @@ Turn 和 Step 使用轻量分隔线分组，默认从旧到新排列。
 4. 限制：截断、裁剪、取消、拒绝或输出上限；
 5. 关联：对应审批、工具调用、验证或 Turn 终态。
 
-无内容的区块不显示。长文本、命令、JSON 和 diff 使用有界代码视图，可复制已经脱敏的内容；默认
+无内容的区块不显示。桌面 Inspector 默认 304 px，可在 256–480 px 内拖动或使用键盘调整，双击分隔
+条恢复默认宽度；响应式单列布局不显示分隔条。Inspector 只有纵向内部滚动，字段、命令、JSON、diff
+和关联 ID 自动换行，不产生横向滚动条。代码和 diff 使用有界代码视图，可复制已经脱敏的内容；默认
 折叠超长结果，并明确标记截断。Inspector 不提供原始 JSONL 和隐藏 reasoning 开关。示意图可能只画出
 元数据、参数与结果，实现仍必须按上述五类区块投影。
 

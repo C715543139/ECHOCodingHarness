@@ -204,6 +204,9 @@ Trace 不使用顶部图形时间线。记录按 Session seq 从旧到新排列�
 - Verification：真实 `run_command`、退出码、耗时和截断；成功只表示命令退出码为 0；
 - Turn：终态、stop reason、Step/工具数和实际证据。
 
+桌面 Inspector 默认 304 px，可在 256–480 px 内有界调宽；内容只纵向滚动，长字段、代码、diff 与
+关联 ID 自动换行，不产生横向滚动条。窄屏继续消费同一 Inspector 投影并隐藏宽度调整柄。
+
 默认不展示 `model.reasoning`，也不把它当作完成或验证证据。前端不得根据命令文本自行判断 Policy。
 
 ### 7.3 明确不做的导出
@@ -214,7 +217,8 @@ P2-3 不实现 Session Markdown/JSON 导出或对应下载入口。
 
 - Trace 顺序在直播、刷新、补页和恢复后稳定；
 - 长 Session 分页并虚拟化；上滚时不被新增记录抢夺位置；
-- Inspector 内容与选中 record ID 精确对应，并按契约投影元数据、参数、结果、限制与关联；
+- Inspector 内容与选中 record ID 精确对应，并按契约投影元数据、参数、结果、限制与关联；桌面宽度
+  可有界调整且内容不产生横向滚动；
 - `Verified` 只能由实际 `run_command` 终态产生，且只表示退出码成功；无证据显示 `Not verified`。
 
 ## 8. P2-4：体验、测试、产物与验收

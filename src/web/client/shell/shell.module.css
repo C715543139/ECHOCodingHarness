@@ -258,12 +258,16 @@
   gap: 0.0625rem;
 }
 
-.workspaceCaption {
-  margin: 0;
+.workspaceCaption,
+.railSectionLabel {
   color: var(--echo-color-muted);
   font-size: var(--echo-text-sm);
   font-weight: 500;
   letter-spacing: 0.04em;
+}
+
+.workspaceCaption {
+  margin: 0;
 }
 
 .workspaceName,
@@ -281,10 +285,6 @@
 .railSectionLabel {
   margin: var(--echo-space-1) 0 0;
   padding: 0 var(--echo-space-1);
-  color: var(--echo-color-muted);
-  font-size: var(--echo-text-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
 }
 
 .sessionList {
@@ -819,13 +819,42 @@
 /* ---------- inspector ---------- */
 
 .inspector {
+  position: relative;
   min-width: 0;
   height: 100%;
   min-height: 0;
-  padding: var(--echo-space-4);
-  overflow: auto;
+  overflow: hidden;
   border-left: 0.0625rem solid var(--echo-color-border);
   background: var(--echo-color-surface);
+}
+
+.inspectorResizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  width: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.inspectorResizer:hover,
+.inspectorResizer:focus-visible {
+  background: var(--echo-color-accent-soft-border);
+}
+
+.inspectorScroll {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--echo-space-4);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .inspectorHeader {
@@ -842,9 +871,11 @@
 
 .inspectorIdentity {
   margin: var(--echo-space-1) 0 0;
+  overflow-wrap: anywhere;
 }
 
 .inspectorSection {
+  min-width: 0;
   margin-top: var(--echo-space-4);
   padding-top: var(--echo-space-3);
   border-top: 0.0625rem solid var(--echo-color-border);
@@ -859,6 +890,7 @@
 
 .inspectorField {
   display: grid;
+  min-width: 0;
   grid-template-columns: 5.5rem minmax(0, 1fr);
   gap: var(--echo-space-2);
   margin: 0 0 var(--echo-space-1);
@@ -870,20 +902,38 @@
 }
 
 .inspectorFieldValue {
+  min-width: 0;
   overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.boundedBlock,
+.boundedBlock details,
+.boundedBlock code {
+  min-width: 0;
 }
 
 .boundedBlock pre,
 .inspector pre {
   max-height: 16rem;
   margin: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--echo-space-2);
   border: 0.0625rem solid var(--echo-color-border);
   border-radius: var(--echo-radius-sm);
   background: var(--echo-color-surface-subtle);
   font-size: var(--echo-text-sm);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.relatedList,
+.relatedList li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .boundedActions {
@@ -1113,7 +1163,8 @@
     overflow: hidden;
   }
 
-  .railResizer {
+  .railResizer,
+  .inspectorResizer {
     display: none;
   }
 

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 
 test.describe('bootstrap and first Session', () => {
   test('creates the first Fake Provider session from an empty console', async ({ page }) => {
@@ -57,6 +57,23 @@ test.describe('bootstrap and first Session', () => {
       chatOverflowX: 'hidden',
       chatOverflowY: 'auto',
     });
+
+    const typography = async (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          letterSpacing: style.letterSpacing,
+          lineHeight: style.lineHeight,
+        };
+      });
+    const workspaceCaption = page.getByText('当前工作区', { exact: true });
+    const sessionCaption = page.getByText('会话', { exact: true });
+    const workspaceName = page.getByTestId('workspace-name');
+    const sessionTitle = rail.locator('button[title] > span').first();
+    expect(await typography(sessionCaption)).toEqual(await typography(workspaceCaption));
+    expect(await typography(workspaceName)).toEqual(await typography(sessionTitle));
 
     const modelSelect = page.getByLabel('模型');
     const safetySelect = page.getByLabel('安全模式');

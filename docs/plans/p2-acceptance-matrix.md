@@ -62,7 +62,7 @@
 | P2-3-01 | Trace 只含八类业务记录并按 seq 排序 | projection | `tests/unit/web/trace-projector.test.ts`, `tests/integration/web/production-assembly.test.ts` | Accepted |
 | P2-3-02 | chunk、内部重试和 reasoning 不形成记录 | projection / scan | `tests/unit/web/trace-privacy.test.ts`, `tests/unit/web/trace-redaction.test.ts`, `scripts/accept-web-provider.mjs` | Accepted |
 | P2-3-03 | 直播、刷新、补页和恢复顺序一致 | integration / browser | `tests/unit/web/trace-upsert.test.ts`, `tests/unit/web/http-transport.test.ts`, `tests/integration/web/production-assembly.test.ts`, `scripts/accept-web-provider.mjs` | Accepted |
-| P2-3-04 | 选中记录只展示匹配的结构化 Inspector | component / browser | `tests/unit/web/inspector.test.tsx`, `tests/integration/web/production-assembly.test.ts`, `tests/unit/web/http-transport.test.ts` | Accepted |
+| P2-3-04 | 选中记录只展示匹配的结构化 Inspector；桌面可有界调宽且长内容不产生横向滚动 | component / browser | `tests/unit/web/inspector.test.tsx`, `tests/unit/web/states.test.tsx`, `tests/integration/web/production-assembly.test.ts`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/trace-large-session.spec.ts` | Accepted |
 | P2-3-05 | Context 显示预算与裁剪，不泄漏完整内容 | projection | `tests/unit/web/context-detail.test.ts` | Accepted |
 | P2-3-06 | Policy Explain 只消费结构化 decision/rule | projection | `tests/unit/web/policy-detail.test.ts` | Accepted |
 | P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Accepted |
@@ -111,8 +111,8 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 
 - 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
   时补录；
-- `pnpm check`：117 个测试文件、642 项测试通过；
-- 覆盖率：statements 85.02%、branches 76.94%、functions 89.15%、lines 86.82%；
+- `pnpm check`：117 个测试文件、643 项测试通过；
+- 覆盖率：statements 85.00%、branches 76.92%、functions 89.23%、lines 86.81%；
 - Web E2E：Playwright Chromium 10/10 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
   断线恢复、审批、Provider 秘密与 200 条 Trace；
 - Windows 非仓库 cwd 隔离产物 smoke：通过；

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -49,6 +49,43 @@ describe('Console state projection', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+  });
+
+  it('resizes Inspector by pointer or keyboard within bounded widths', async () => {
+    const user = userEvent.setup();
+    const record = createSampleTraceRecord();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+      view: 'trace',
+      traceRecords: [record],
+      inspectorDetails: { [record.id]: createSampleInspectorDetail(record) },
+    });
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByRole('button', { name: /用户 user/ }));
+    const separator = screen.getByRole('separator', { name: '调整 Inspector 宽度' });
+    const shell = separator.closest('aside')?.parentElement;
+    expect(shell?.style.getPropertyValue('--echo-inspector-width')).toBe('304px');
+    expect(separator.getAttribute('aria-valuemin')).toBe('256');
+    expect(separator.getAttribute('aria-valuemax')).toBe('480');
+
+    separator.focus();
+    await user.keyboard('{ArrowLeft}{End}');
+    expect(separator.getAttribute('aria-valuenow')).toBe('480');
+    expect(shell?.style.getPropertyValue('--echo-inspector-width')).toBe('480px');
+
+    Object.defineProperty(separator, 'setPointerCapture', {
+      configurable: true,
+      value: () => undefined,
+    });
+    fireEvent.pointerDown(separator, { button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerUp(window, { pointerId: 1 });
+    expect(separator.getAttribute('aria-valuenow')).toBe('256');
+
+    await user.dblClick(separator);
+    expect(separator.getAttribute('aria-valuenow')).toBe('304');
   });
 
   it('does not project a running phase and a terminal phase onto the same session row', () => {

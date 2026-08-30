@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 import { ChatView } from './shell/chat-view.js';
 import { ConnectionStatus } from './shell/connection-status.js';
 import { InspectorPane } from './shell/inspector-pane.js';
+import { INSPECTOR_DEFAULT_WIDTH, InspectorResizer } from './shell/inspector-resizer.js';
 import { RAIL_DEFAULT_WIDTH, RailResizer } from './shell/rail-resizer.js';
 import { SessionRail } from './shell/session-rail.js';
 import { SettingsModal } from './shell/settings-modal.js';
@@ -12,7 +13,10 @@ import { createFakeTransport } from './transport/fake-transport.js';
 import type { WebConsoleTransport } from './transport/types.js';
 import { catalogModels } from './view-model/provider-catalog.js';
 
-type ShellStyle = CSSProperties & { '--echo-rail-width'?: string };
+type ShellStyle = CSSProperties & {
+  '--echo-inspector-width'?: string;
+  '--echo-rail-width'?: string;
+};
 
 export function App({ transport }: { readonly transport?: WebConsoleTransport } = {}) {
   const [ownedTransport] = useState(() => transport ?? createFakeTransport());
@@ -24,14 +28,16 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT_WIDTH);
+  const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH);
   const selected = snapshot.sessions.find((session) => session.id === snapshot.selectedSessionId);
   const inspectorOpen = snapshot.inspectorDetail !== undefined;
   const shellClass = `${styles.shell}${inspectorOpen ? ` ${styles.shellWithInspector}` : ''}${
     railCollapsed ? ` ${styles.shellRailCollapsed}` : ''
   }`;
-  const shellStyle: ShellStyle | undefined = railCollapsed
-    ? undefined
-    : { '--echo-rail-width': `${String(railWidth)}px` };
+  const shellStyle: ShellStyle = {
+    ...(railCollapsed ? {} : { '--echo-rail-width': `${String(railWidth)}px` }),
+    ...(inspectorOpen ? { '--echo-inspector-width': `${String(inspectorWidth)}px` } : {}),
+  };
   const controllerView = {
     catalogModels: catalogModels(snapshot.providerDraft),
     loadingHistory: snapshot.loadingHistory,
@@ -154,6 +160,7 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
           onClose={() => {
             ownedTransport.selectTraceRecord(undefined);
           }}
+          resizer={<InspectorResizer onWidth={setInspectorWidth} width={inspectorWidth} />}
         />
       )}
       {snapshot.settingsOpen ? (

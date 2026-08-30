@@ -54,25 +54,27 @@ describe('Web SSE ownership', () => {
     try {
       const cookie = await harness.bootstrap();
       const url = `${harness.origin}/api/v1/sessions/session-1/events`;
-      const first = await openSse(url, cookie);
-      expect(first.status).toBe(200);
-      expect(first.text).toContain('event: heartbeat');
-      expect(first.text).not.toMatch(/^id:/mu);
+      const firstPromise = openSse(url, cookie);
+      const secondPromise = openSse(url, cookie);
+      const [first, second] = await Promise.all([firstPromise, secondPromise]);
+      const statuses = [first.status, second.status].toSorted((left, right) => left - right);
+      expect(statuses).toEqual([200, 409]);
+      const winner = first.status === 200 ? first : second;
+      const loser = first.status === 409 ? first : second;
+      expect(winner.text).toContain('event: heartbeat');
+      expect(winner.text).not.toMatch(/^id:/mu);
+      expect(loser.status).toBe(409);
 
-      const conflict = await fetch(url, { headers: { cookie: `${WEB_AUTH_COOKIE}=${cookie}` } });
-      expect(conflict.status).toBe(409);
-      expect(await conflict.json()).toMatchObject({ error: { code: 'STREAM_ACTIVE' } });
-
-      first.request.destroy();
+      winner.request.destroy();
       await new Promise<void>((resolve) => {
-        first.request.once('close', () => resolve());
+        winner.request.once('close', () => resolve());
       });
 
-      const second = await openSse(url, cookie);
-      expect(second.status).toBe(200);
-      expect(second.text).toContain('event: heartbeat');
-      expect(second.text).not.toMatch(/^id:/mu);
-      second.request.destroy();
+      const reconnect = await openSse(url, cookie);
+      expect(reconnect.status).toBe(200);
+      expect(reconnect.text).toContain('event: heartbeat');
+      expect(reconnect.text).not.toMatch(/^id:/mu);
+      reconnect.request.destroy();
     } finally {
       await harness.server.close();
     }

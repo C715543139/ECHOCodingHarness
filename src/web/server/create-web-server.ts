@@ -198,7 +198,7 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
   const close = async (timeoutMs = WEB_SHUTDOWN_TIMEOUT_MS): Promise<void> => {
     state.serviceState = 'stopping';
     if (state.sseOwner !== undefined) {
-      clearInterval(state.sseOwner.timer);
+      if (state.sseOwner.timer !== undefined) clearInterval(state.sseOwner.timer);
       state.sseOwner.reply.raw.end();
       state.sseOwner = undefined;
     }

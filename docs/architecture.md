@@ -96,8 +96,9 @@ User / Browser / Demo Script
 ```
 
 P1-1A 已将 `run` 接到应用服务；核心层不直接依赖终端渲染。所有用户可见进度先表示为领域事件，再由
-CLI 渲染。P2 Web adapter 将调用同一应用服务、共享配置服务和查询投影，不能直接读取 JSONL 或解析
-CLI 文本。
+CLI 渲染。P2 Web adapter 调用同一应用服务、共享配置服务和查询投影，不能直接读取 JSONL 或解析
+CLI 文本。P2-B1 增加进程级 `ActiveTurnCoordinator` 与独立可装配的 Session/Turn/审批/SSE 路由模块
+（`registerSessionApiRoutes`）；共享 `register-routes.ts` 装配仍由 C1 完成。
 
 ## 5. 模块划分
 
@@ -151,7 +152,7 @@ CLI 文本。
 
 ### 5.5 Application service
 
-P1 增加应用服务，作为 CLI 与 P2 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。P1-1B 已实现 Chat 输入适配器、Slash 与 `--resume`；Chat 通过可注入的模型目录端口列出 `/model` 候选项，不自行实现第二套 `GET /models` 发现。
+P1 增加应用服务，作为 CLI 与 P2 WebUI 的唯一编排入口：创建/恢复 Session、执行与取消 Turn、提交绑定 Turn/`toolCallId`/`approvalKey` 的审批并返回 accepted 或 duplicate/expired/not_pending、读写当前模型和安全模式、按 Turn/Step 查询事件。它不渲染终端，也不解析人类可读输出。P1-1A 已实现该服务并让 `run` 调用它。P1-2A 已实现配置加载；P1-2B 已实现单 Provider 模型目录与进程内缓存。P1-1B 已实现 Chat 输入适配器、Slash 与 `--resume`；Chat 通过可注入的模型目录端口列出 `/model` 候选项，不自行实现第二套 `GET /models` 发现。P2-B1 在应用服务之上增加进程级单活动 Turn 仲裁器，Web 路由只调用该服务与冻结 DTO，不复制 Agent/Policy/Session 状态机。
 
 ### 5.6 Shared config service
 

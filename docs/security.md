@@ -12,7 +12,8 @@ ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进�
 
 ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
 [ADR-0007](./decisions/0007-local-web-console.md)。Phase A 已落地 loopback 传输、bootstrap 认证与
-请求防护；业务 Session/Turn API 仍待阶段 B。
+请求防护；P2-B1 已实现独立可装配的 Session/Turn/审批/SSE 路由模块（Cookie/Host/Origin/no-store/
+幂等与关闭语义由测试装配覆盖），共享 `register-routes.ts` 装配仍待 C1。
 
 ## 2. 需要保护的资产
 

@@ -1,6 +1,6 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（阶段 A 已实现，阶段 B/C 尚未实现）
+> 状态：Accepted plan（阶段 A 已实现；P2-B1 Session/Turn/SSE 路由模块已实现，尚未装配进 `register-routes.ts`；B2/B3/B4 与阶段 C 尚未实现）
 >
 > 版本：1.5
 >
@@ -288,7 +288,7 @@ A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。W
 
 ### 阶段 B：可并行核心
 
-- B1：Session/Turn/审批 API、单活动 Turn 与 SSE；
+- B1：Session/Turn/审批 API、单活动 Turn 与 SSE（路由模块已实现，C1 装配）；
 - B2：Session rail、Chat、输入区和 Provider 设置；
 - B3：Trace 投影与 Inspector DTO；
 - B4：安全、浏览器测试夹具和产物构建管线。

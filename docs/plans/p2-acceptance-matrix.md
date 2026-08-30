@@ -1,8 +1,8 @@
 # P2 需求、测试与验收证据矩阵
 
-> 状态：Accepted plan（阶段 A 已实现，阶段 B/C 尚未实现）
+> 状态：Accepted plan（阶段 A 已实现；P2-B1 路由模块已实现但未装配进生产 `register-routes.ts`，矩阵对应项仅标 Partial / route module accepted；其余阶段 B/C 尚未实现）
 >
-> 版本：1.5
+> 版本：1.6
 >
 > 最后更新：2026-08-30
 
@@ -26,14 +26,14 @@
 | P2-1-05 | DTO 不含秘密、绝对路径、堆栈或 reasoning | unit / scan | `tests/unit/web/dto-redaction.test.ts`；真实投影器尚未实现 | Planned (contract frozen) |
 | P2-1-06 | CLI/Web 共用配置 Schema、artifact-root 与原子写入 | unit / integration | `tests/unit/config/config-service.test.ts`（A2 已落地）, `tests/integration/web/provider-config.test.ts` | Planned |
 | P2-1-07 | 自动发现显式执行、不自动保存、错误脱敏 | integration | `tests/integration/web/provider-discovery.test.ts` | Planned |
-| P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts` | Planned |
-| P2-1-09 | 相同 requestId 重放同一响应且不重复副作用；不同请求指纹返回幂等冲突 | contract / integration | `tests/unit/web/idempotency.test.ts`; HTTP 注入仍待 A3：`tests/integration/web/idempotency.test.ts` | Contract accepted |
-| P2-1-10 | SSE 判别联合、backlog 与 live 无缝衔接并按 seq 去重 | contract / integration | `tests/unit/web/sse-contract.test.ts`; 传输衔接仍待 B1：`tests/integration/web/sse.test.ts` | Contract accepted |
-| P2-1-11 | 无法连续补齐时显式 resync，不重放 POST | integration / browser | `tests/integration/web/sse-resync.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Planned |
-| P2-1-12 | 关闭时取消活动 Turn，10 秒内清理或非零退出 | integration / artifact | `tests/integration/web/shutdown.test.ts`（监听关闭已落地）；活动 Turn 取消仍待 B1：`scripts/smoke-web-artifact.mjs` | Partial (lifecycle accepted) |
+| P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts` | Partial (route module accepted; C1 assembly pending) |
+| P2-1-09 | 相同 requestId 重放同一响应且不重复副作用；不同请求指纹返回幂等冲突 | contract / integration | `tests/unit/web/idempotency.test.ts`, `tests/integration/web/idempotency.test.ts` | Partial (route module accepted; C1 assembly pending) |
+| P2-1-10 | SSE 判别联合、backlog 与 live 无缝衔接并按 seq 去重 | contract / integration | `tests/unit/web/sse-contract.test.ts`, `tests/unit/web/sse-hub.test.ts`, `tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts` | Partial (route module accepted; C1 assembly pending) |
+| P2-1-11 | 无法连续补齐时显式 resync，不重放 POST | integration / browser | `tests/integration/web/sse-resync.test.ts`; 浏览器重连仍待 B2：`tests/e2e/web/reconnect.spec.ts` | Partial (API resync accepted) |
+| P2-1-12 | 关闭时取消活动 Turn，10 秒内清理或非零退出 | integration / artifact | `tests/integration/web/shutdown.test.ts`（监听关闭已落地）；`ActiveTurnCoordinator.shutdown` 已实现，生产 `createWebServer` 装配仍待 C1：`scripts/smoke-web-artifact.mjs` | Partial (lifecycle + coordinator accepted) |
 | P2-1-13 | 每种 Policy 结论持久化稳定 rule ID 与原因，旧 Session 可读 | contract / session | `tests/unit/security/policy-explain.test.ts` | Accepted |
-| P2-1-14 | 进程级 Cookie 只允许一条 SSE，heartbeat 不推进 seq | integration | `tests/integration/web/sse-ownership.test.ts`（所有权与无 id heartbeat 已落地）；seq 补齐仍待 B1 | Partial (ownership accepted) |
-| P2-1-15 | 能力状态表与写操作响应 DTO 在空闲、活动 Session、其它 Session 和关闭状态一致 | contract / API | `tests/unit/web/runtime-capabilities.test.ts`, `tests/unit/web/dto-redaction.test.ts`; HTTP 投影仍待 A3：`tests/integration/web/runtime-capabilities.test.ts` | Contract accepted |
+| P2-1-14 | 进程级 Cookie 只允许一条 SSE，heartbeat 不推进 seq | integration | `tests/integration/web/sse-ownership.test.ts`（A3 骨架）；`tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts`（B1 模块所有权、并发 409、无 id heartbeat）；生产装配仍待 C1 | Partial (route module accepted; C1 assembly pending) |
+| P2-1-15 | 能力状态表与写操作响应 DTO 在空闲、活动 Session、其它 Session 和关闭状态一致 | contract / API | `tests/unit/web/runtime-capabilities.test.ts`, `tests/unit/web/dto-redaction.test.ts`, `tests/integration/web/runtime-capabilities.test.ts` | Partial (route module accepted; C1 assembly pending) |
 
 ## 3. P2-2：Session、Chat 与设置
 
@@ -49,7 +49,7 @@
 | P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/e2e/web/runtime-settings.spec.ts` | Planned |
 | P2-2-09 | Provider 设置只有一个导航页并共用配置服务；发现列表只读且只有默认模型可写 | component / browser | `tests/unit/web/provider-settings.test.tsx`, `tests/e2e/web/provider-settings.spec.ts` | Planned |
 | P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/e2e/web/provider-secret.spec.ts` | Planned |
-| P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`（文字状态已落地）；HTTP `SessionViewDto` 仍待 B1：`tests/integration/web/session-view.test.ts` | Partial (rail accepted) |
+| P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`（文字状态已落地）；`tests/integration/web/session-view.test.ts`（HTTP `SessionViewDto` 已落地，C1 装配仍待） | Partial (rail + API accepted) |
 | P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`（A4 壳层已落地）；浏览器流程仍待 B2：`tests/e2e/web/runtime-settings.spec.ts` | Partial (composer accepted) |
 | P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`（A4 壳层已落地）；真实 SSE 重连仍待 B2：`tests/e2e/web/reconnect.spec.ts` | Partial (header accepted) |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |

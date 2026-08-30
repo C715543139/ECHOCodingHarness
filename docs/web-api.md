@@ -1,8 +1,8 @@
 # ECHO Harness 本地 Web API 契约
 
-> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结；A3/A5 已实现 loopback 传输、bootstrap 认证、请求防护与路由装配，业务 Session/Turn 路由尚未实现）
+> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结；A3/A5 已实现 loopback 传输、bootstrap 认证、请求防护与路由装配；B1 已实现独立可装配的 Session/Turn/审批/SSE 路由模块，共享 `register-routes.ts` 装配仍待 C1）
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -540,7 +540,13 @@ data: {"type":"record.upsert","sessionId":"...","seq":42,"delta":{...}}
 
 同一进程级认证 Cookie 最多保持一个 Session SSE，因此多个标签页也共享这一限制。存在活动 Turn
 时，该流必须绑定活动 Turn 所属 Session；浏览其他历史 Session 使用普通 GET。没有活动 Turn 时，
-客户端可以把流切换到当前选中 Session。第二条并发流返回 `409 STREAM_ACTIVE` 且不影响已有流。
+客户端可以把流切换到当前选中 Session。第二条并发流必须在 hijack 之前以 `409 STREAM_ACTIVE`
+拒绝，且不影响已有流。
+
+服务端补齐顺序是 subscribe-buffer-snapshot-drain-live：先原子取得进程级 SSE 租约并订阅到缓冲，
+再读取一致快照并发送 backlog，再按 `seq` 排空缓冲并去重，然后转入 live。事件同时出现在快照与缓
+冲时只发送一次；快照缺失但缓冲存在的事件必须发出。加载或投影失败、以及 write 失败都必须释放租
+约与订阅。
 
 允许事件：
 

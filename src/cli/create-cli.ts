@@ -7,6 +7,7 @@ import { PROJECT_NAME, PROJECT_TAGLINE, PROJECT_VERSION } from '../core/project.
 import { runChat, type ChatCommandOptions } from './chat.js';
 import { runConfigCommand } from './config-wizard.js';
 import { runGoal, type RunGoalOptions, type RunGoalOutcome } from './run.js';
+import { runWeb, type WebCommandOptions } from './web.js';
 
 export interface CreateCliOptions {
   readonly version?: string;
@@ -19,6 +20,7 @@ export interface CreateCliOptions {
     interactive: boolean;
     signal: AbortSignal;
   }) => Promise<{ exitCode: number }>;
+  readonly webAction?: (options: WebCommandOptions) => Promise<{ exitCode: number }>;
   readonly setExitCode?: (code: number) => void;
 }
 
@@ -192,6 +194,40 @@ export function createCli(options: CreateCliOptions = {}): Command {
         const outcome = await (options.configAction ?? runConfigCommand)({
           artifactRoot: resolveCliArtifactRoot(options),
           interactive,
+          signal: controller.signal,
+        });
+        setExitCode(outcome.exitCode);
+      } finally {
+        process.off('SIGINT', cancel);
+      }
+    });
+
+  cli
+    .command('web')
+    .description(
+      'Start a loopback Web console for one fixed workspace and print a one-time bootstrap URL.',
+    )
+    .option('-w, --workspace <path>', 'Workspace directory (defaults to current directory).')
+    .option('--port <port>', 'Loopback TCP port (default: an ephemeral port).', (value: string) => {
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 65535) {
+        throw new InvalidArgumentError('port must be an integer between 0 and 65535');
+      }
+      return parsed;
+    })
+    .option('--no-open', 'Print the URL without opening a browser.')
+    .action(async (commandOptions: { workspace?: string; port?: number; open: boolean }) => {
+      void commandOptions.open;
+      const controller = new AbortController();
+      const cancel = (): void => controller.abort();
+      process.once('SIGINT', cancel);
+      try {
+        const outcome = await (options.webAction ?? runWeb)({
+          ...(commandOptions.workspace === undefined
+            ? {}
+            : { workspace: commandOptions.workspace }),
+          ...(commandOptions.port === undefined ? {} : { port: commandOptions.port }),
+          artifactRoot: resolveCliArtifactRoot(options),
           signal: controller.signal,
         });
         setExitCode(outcome.exitCode);

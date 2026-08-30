@@ -2,7 +2,7 @@
 
 > 状态：Accepted plan（阶段 A 已实现，阶段 B/C 尚未实现）
 >
-> 版本：1.5
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
@@ -78,10 +78,10 @@
 | P2-4-03 | 状态不只依赖颜色，live region 不逐 token 播报 | accessibility | `tests/e2e/web/accessibility.spec.ts` | Planned |
 | P2-4-04 | 200% 缩放、窄屏抽屉和 reduced motion 可用 | browser | `tests/e2e/web/responsive.spec.ts` | Planned |
 | P2-4-05 | 构建产物包含 CLI 与 `dist/web/` 静态资源 | artifact | `scripts/smoke-web-artifact.mjs` | Accepted |
-| P2-4-06 | 非仓库 cwd 可启动、认证、创建 Session 并关闭 | Windows artifact | `scripts/smoke-web-artifact.mjs` | Planned |
+| P2-4-06 | 非仓库 cwd 可启动、认证、创建 Session 并关闭 | Windows artifact | `scripts/smoke-web-isolated-artifact.mjs`（启动、认证、静态/API、关闭已落地；`POST /api/v1/sessions` 仍待 B1，脚本记录 pending-wiring） | Partial (lifecycle accepted) |
 | P2-4-07 | P0/P1 `run`、`chat`、`config` 与 Session 不退化 | regression | existing suite + `pnpm check` | Accepted |
 | P2-4-08 | CI 不使用真实 Key/付费 Provider | workflow / scan | `.github/workflows/ci.yml`, scan tests | Accepted |
-| P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | Web artifact scan step | Planned |
+| P2-4-09 | 截图、trace 与页面通过秘密/身份/路径扫描 | CI evidence | `scripts/scan-web-artifacts.mjs`（独立扫描已落地：含 error-context、fail-closed zip/超限、绝对路径与 reasoning 字段）；CI 仅上传扫描通过的产物，接线仍待 C1 | Partial (scanner accepted) |
 | P2-4-10 | 受控真实 Provider 完成 Chat、刷新与 Trace | local acceptance | `scripts/accept-web-provider.mjs` | Planned |
 | P2-4-11 | 最终交付树不含临时示意图或说明；权威文档不再依赖这些视觉资产 | docs / review | 收尾提交确认临时 PNG 与说明已移除 | Planned |
 

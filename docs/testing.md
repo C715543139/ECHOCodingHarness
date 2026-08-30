@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.7
+> 版本：1.9
 >
 > 最后更新：2026-08-30
 
@@ -179,8 +179,13 @@ acceptance only and is not part of CI. It does not read `.env.test`.
 P2 keeps the existing `pnpm check` contract and adds layered Web evidence without making every
 unit-test run install or launch a browser. Phase A provides `pnpm test:web`, `pnpm build:web`,
 `pnpm smoke:web-artifact`, pinned test dependencies, Fastify injection tests, and the React shell
-with Fake transport. The remaining live API, Playwright, and isolated-package artifact evidence in
-this section remains a target contract until its owning B/C task lands.
+with Fake transport. B4 adds independent Fake Provider Web scenarios, a Fastify security fixture,
+Playwright Chromium specs under `tests/e2e/web/`, isolated-package Web artifact smoke, and
+screenshot/trace privacy scanning. The scanner reads `error-context.md` and other page artifacts,
+fail-closes `trace.zip` as `unscannable-archive`, and fail-closes files larger than 8 MiB as
+`oversized-artifact`. C1 may upload Playwright artifacts only after this scan passes.
+`pnpm test:web:e2e`, isolated smoke, and the Web artifact scan step stay unwired in package scripts
+and CI until C1.
 
 ### Fast unit and integration layer
 
@@ -243,12 +248,24 @@ URL and must not call the opener. Phase A `pnpm smoke:web-artifact` starts the p
 `dist/cli.js web --no-open` from a temporary cwd, parses the verified `127.0.0.1` bootstrap URL,
 redeems the one-time Cookie, fetches `/` and `/api/v1/bootstrap`, and stops the process by closing
 non-TTY stdin. Windows does not deliver `SIGTERM` to listeners, so stdin-end is the supported CI
-shutdown. The later isolated-package copy smoke remains a B4/C target. It must not rely on
-`.env.test`, a paid Provider, or a user profile path.
+shutdown. B4 adds `scripts/smoke-web-isolated-artifact.mjs`: it copies `dist/*.js`, `dist/web/`, and
+minimal `package.json` metadata into a temporary package, starts `web --no-open` from a separate
+non-repo cwd, redeems the Cookie, fetches `/` and `/api/v1/bootstrap`, and shuts down via stdin-end.
+pnpm and Web child processes receive an explicit Windows env allowlist (`PATH`, `SystemRoot`,
+`ComSpec`, `PATHEXT`, `TEMP`, `TMP`, and similar runtime variables). The Web process gets only a
+controlled `ECHO_API_KEY`; other `ECHO_*` and common CI/cloud/token/key variables are not inherited.
+Windows invokes `pnpm.cmd` with a fixed argument array and `shell: false`. Temp cleanup failures are
+reported without expanding the delete scope beyond that `os.tmpdir()` tree. It does not use source,
+repository `node_modules`, `.env.test`, or a user profile workspace. Session create remains pending
+B1; the script records that gap instead of forging a Session. C1 wires the script into `pnpm check`
+/ CI. It must not rely on `.env.test`, a paid Provider, or a user profile path.
 
 CI installs the pinned Chromium version only in the Web E2E evidence step and caches it by the
 Playwright version. Browser failures save bounded screenshots/traces as CI artifacts only after
-secret and identity scanning. P0/P1 CLI tests remain required in the same gate.
+`scripts/scan-web-artifacts.mjs` passes. Findings include secrets, identity, `reasoning_details` /
+`reasoningContent` / `model.reasoning`, absolute Windows drive/UNC/`/home`/`/Users` paths,
+unscannable zip archives, and oversized files. Scan output must not echo secrets or paths. P0/P1
+CLI tests remain required in the same gate.
 
 P2 local real-Provider acceptance is explicit and non-CI: start the packaged Web console with a
 temporary authorized workspace, complete one bounded Chat Turn, refresh/resume it, inspect Trace,
@@ -279,5 +296,7 @@ export sessions from the WebUI.
   `GET /models` implementation.
 - P1 does not include Web UI, MCP, multi-agent execution, TUI, or multi-Provider profiles.
 - P2 Phase A Web scripts, Fastify security skeleton, React shell, and `pnpm smoke:web-artifact`
-  exist. Live Session/Turn APIs, Playwright flows, and isolated-package artifact smoke remain
-  planned; Phase A acceptance must not be reported as full P2 implementation acceptance.
+  exist. B4 landed independent Playwright Fake specs, isolated-package smoke with a min env
+  allowlist, and fail-closed Web artifact scanning;
+  live Session/Turn APIs and package/CI wiring remain C1. Phase A acceptance must not be reported as
+  full P2 implementation acceptance.

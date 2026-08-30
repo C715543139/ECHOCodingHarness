@@ -2,7 +2,7 @@
 
 > 状态：Accepted plan（阶段 A 已实现，阶段 B/C 尚未实现）
 >
-> 版本：1.5
+> 版本：1.7
 >
 > 最后更新：2026-08-30
 
@@ -291,7 +291,7 @@ A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。W
 - B1：Session/Turn/审批 API、单活动 Turn 与 SSE；
 - B2：Session rail、Chat、输入区和 Provider 设置；
 - B3：Trace 投影与 Inspector DTO；
-- B4：安全、浏览器测试夹具和产物构建管线。
+- B4：安全、浏览器测试夹具和产物构建管线（已实现独立 Fake 夹具、fail-closed 产物扫描与隔离 smoke 最小环境；package scripts / CI 接线留给 C1，C1 只上传扫描通过的产物）。
 
 B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。共享路由装配和主壳由集成任务
 统一合并。

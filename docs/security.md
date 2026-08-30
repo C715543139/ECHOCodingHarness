@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.4
+> 版本：1.6
 >
 > 最后更新：2026-08-30
 
@@ -12,7 +12,8 @@ ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进�
 
 ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
 [ADR-0007](./decisions/0007-local-web-console.md)。Phase A 已落地 loopback 传输、bootstrap 认证与
-请求防护；业务 Session/Turn API 仍待阶段 B。
+请求防护；业务 Session/Turn API 仍待阶段 B。B4 增加独立 Fastify 安全夹具与 fail-closed Web 产物隐私
+扫描，以及隔离产物 smoke 的最小子进程环境，不改变产品路由装配。
 
 ## 2. 需要保护的资产
 
@@ -228,7 +229,7 @@ PowerShell 不是沙箱。获准执行的程序可能自行访问工作区外文
 - 常见云服务、包仓库和版本控制令牌；
 - 由 ECHO 内部使用的授权头或临时凭据。
 
-为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。当前允许列表已在 `src/execution/powershell.ts` 固化，并由 Windows 单元与集成测试覆盖。
+为保证 Node、pnpm 和 PowerShell 可运行，可以保留 `PATH`、必要的系统目录和非敏感运行变量。`PSModulePath` 不继承用户环境，而由 `SystemRoot`/`WINDIR`（大小写不敏感）构造为系统 `WindowsPowerShell\v1.0\Modules`。当前允许列表已在 `src/execution/powershell.ts` 固化，并由 Windows 单元与集成测试覆盖。隔离 Web 产物 smoke 对 pnpm 与 Web 子进程使用同类显式 allowlist，只向 Web 进程注入受控 `ECHO_API_KEY`，并在 Windows 上以 `pnpm.cmd`、固定参数、`shell: false` 调用 pnpm。
 
 ## 11. 日志、事件与脱敏
 

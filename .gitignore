@@ -12,11 +12,12 @@ coverage/
 .env.*
 !.env.example
 
-# Logs and temporary files
-*.log
-*.tmp
-tmp/
-temp/
+# Playwright local output (B4 writes artifacts under os.tmpdir(); keep defaults ignored)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 
 # Editors and operating systems
 .idea/

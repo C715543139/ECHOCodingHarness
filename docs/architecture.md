@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.7
+> 版本：1.9
 >
 > 最后更新：2026-08-30
 
@@ -374,5 +374,7 @@ P2 已完成计划、ADR、API 与 UI 契约冻结。A1 已把有界 Web DTO/Sch
 事实落到类型和聚焦测试；A2 已抽出 CLI/Web 共用的 Provider 配置服务。A3 已落地 Fastify loopback
 生命周期、一次性 bootstrap Cookie、Host/Origin/CSP 与单 SSE 所有权。A4 已落地 React 主壳与 Fake
 transport。A5 已统一路由装配、`dist/web/` 构建顺序、`pnpm test:web` / `pnpm smoke:web-artifact`
-与 CI 证据。业务 Session/Turn/审批 API、真实 HTTP 前端和 Playwright 流程仍待阶段 B。实现状态只能在
+与 CI 证据。业务 Session/Turn/审批 API 仍待阶段 B。B4 已落地独立 Fake Provider Web 场景、Fastify
+安全夹具、Playwright Fake 入口、隔离产物 smoke（最小子进程环境）与 fail-closed Web 产物隐私扫描；
+共享路由/页面/package/CI 接线留给 C1，且 C1 只上传扫描通过的 Playwright 产物。实现状态只能在
 对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。

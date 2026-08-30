@@ -82,7 +82,7 @@ describe('Chat streaming projection', () => {
     expect(send).toHaveProperty('disabled', false);
   });
 
-  it('pauses tail follow after an upward scroll and restores it from 有新内容', async () => {
+  it('pauses tail follow after an upward scroll and restores it from 回到最新', async () => {
     const user = userEvent.setup();
     const transport = createFakeTransport({
       sessions: [createIdleSession()],
@@ -102,8 +102,13 @@ describe('Chat streaming projection', () => {
       transport.advanceStream('later text');
     });
 
-    expect(screen.getByRole('button', { name: '有新内容' })).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: '有新内容' }));
-    expect(screen.queryByRole('button', { name: '有新内容' })).toBeNull();
+    const toast = screen.getByRole('button', { name: '回到最新' });
+    expect(toast.parentElement?.className).toContain('toastLayer');
+    expect(toast.compareDocumentPosition(screen.getByLabelText('输入'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    await user.click(toast);
+    expect(screen.queryByRole('button', { name: '回到最新' })).toBeNull();
   });
 });

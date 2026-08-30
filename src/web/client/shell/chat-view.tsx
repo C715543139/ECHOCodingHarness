@@ -170,22 +170,6 @@ export function ChatView({
           </article>
         ))}
       </div>
-      {hasNewContent ? (
-        <button
-          className={styles.newContent}
-          onClick={() => {
-            setFollowTail(true);
-            const node = scrollRef.current;
-            if (node !== null) {
-              node.scrollTop = node.scrollHeight;
-            }
-            setHasNewContent(false);
-          }}
-          type="button"
-        >
-          有新内容
-        </button>
-      ) : null}
       {pending === undefined ? (
         approvalError === undefined ? null : (
           <p className={styles.blockReason}>{approvalError}</p>
@@ -232,6 +216,24 @@ export function ChatView({
           ) : null}
         </div>
       ) : null}
+      <div className={styles.toastLayer}>
+        {hasNewContent ? (
+          <button
+            className={styles.newContent}
+            onClick={() => {
+              setFollowTail(true);
+              const node = scrollRef.current;
+              if (node !== null) {
+                node.scrollTop = node.scrollHeight;
+              }
+              setHasNewContent(false);
+            }}
+            type="button"
+          >
+            回到最新
+          </button>
+        ) : null}
+      </div>
       <form
         className={styles.composer}
         onSubmit={(event) => {

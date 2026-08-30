@@ -74,21 +74,6 @@ export function TraceView({
 
   return (
     <div className={styles.tracePane}>
-      {list.followTail ? null : (
-        <button
-          className={styles.newEvents}
-          onClick={() => {
-            setList((current) => resumeTraceFollow(current));
-            const viewport = viewportRef.current;
-            if (viewport !== null) {
-              viewport.scrollTop = viewport.scrollHeight;
-            }
-          }}
-          type="button"
-        >
-          {list.unseenCount > 0 ? `新事件 ${String(list.unseenCount)}` : '回到最新'}
-        </button>
-      )}
       <div aria-hidden="true" className={styles.traceColumns}>
         <span>时间</span>
         <span>事件</span>
@@ -154,6 +139,23 @@ export function TraceView({
               onSelect={onSelectRecord}
             />
           ))
+        )}
+      </div>
+      <div className={styles.toastLayer}>
+        {list.followTail ? null : (
+          <button
+            className={styles.newEvents}
+            onClick={() => {
+              setList((current) => resumeTraceFollow(current));
+              const viewport = viewportRef.current;
+              if (viewport !== null) {
+                viewport.scrollTop = viewport.scrollHeight;
+              }
+            }}
+            type="button"
+          >
+            回到最新
+          </button>
         )}
       </div>
     </div>

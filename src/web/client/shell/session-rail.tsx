@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 import type {
   RuntimeBlockReason,
@@ -34,6 +34,7 @@ export function SessionRail({
   createBlockedReason,
   collapsed = false,
   onToggleCollapsed,
+  resizer,
   onCreateSession,
   onSelectSession,
   onOpenSettings,
@@ -48,6 +49,7 @@ export function SessionRail({
   readonly createBlockedReason: RuntimeBlockReason | undefined;
   readonly collapsed?: boolean;
   readonly onToggleCollapsed?: () => void;
+  readonly resizer?: ReactNode;
   readonly onCreateSession: () => void;
   readonly onSelectSession: (id: string) => void;
   readonly onOpenSettings: () => void;
@@ -78,6 +80,18 @@ export function SessionRail({
     );
   }
 
+  const workspaceRow = (
+    <div className={styles.workspaceRow}>
+      <Glyph name="folder" />
+      <div className={styles.workspaceBlock}>
+        <p className={styles.workspaceCaption}>工作区</p>
+        <p className={styles.workspaceName} data-testid="workspace-name" title={workspace.name}>
+          {workspace.name}
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <nav aria-label="Session" className={styles.rail}>
       <div className={styles.railHeader}>
@@ -101,12 +115,7 @@ export function SessionRail({
       {blockedMessage === undefined || canCreateSession ? null : (
         <p className={styles.blockReason}>{blockedMessage}</p>
       )}
-      <div className={styles.workspaceRow}>
-        <Glyph name="folder" />
-        <p className={styles.workspaceName} data-testid="workspace-name" title={workspace.name}>
-          {workspace.name}
-        </p>
-      </div>
+      {workspaceRow}
       <p className={styles.railSectionLabel}>会话</p>
       {sessions.length === 0 ? (
         <p className={styles.emptyHint}>尚无 Session。新建会话后开始对话。</p>
@@ -167,6 +176,7 @@ export function SessionRail({
           设置
         </button>
       </div>
+      {resizer}
     </nav>
   );
 }

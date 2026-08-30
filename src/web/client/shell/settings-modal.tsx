@@ -186,7 +186,7 @@ export function SettingsModal({
                     获取模型
                   </button>
                 </div>
-                <ul aria-label="发现的模型" className={styles.modelList}>
+                <ul aria-label="发现的模型" className={styles.modelList} tabIndex={0}>
                   {models.map((model) => (
                     <li className={styles.modelListItem} key={model}>
                       {model}
@@ -228,7 +228,7 @@ export function SettingsModal({
                     添加
                   </button>
                 </div>
-                <ul aria-label="手动模型" className={styles.modelList}>
+                <ul aria-label="手动模型" className={styles.modelList} tabIndex={0}>
                   {models.map((model) => (
                     <li className={styles.modelListItem} key={model}>
                       {model}

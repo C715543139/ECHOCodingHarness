@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -100,6 +100,34 @@ describe('Session rail', () => {
     expect(expand.getAttribute('aria-expanded')).toBe('false');
     await user.click(expand);
     expect(screen.getByRole('button', { name: '新会话' })).toBeTruthy();
+  });
+
+  it('resizes the expanded rail by pointer or keyboard within bounded widths', async () => {
+    const user = userEvent.setup();
+    render(<App transport={createFakeTransport()} />);
+
+    const separator = screen.getByRole('separator', { name: '调整会话栏宽度' });
+    const shell = separator.closest('nav')?.parentElement;
+    expect(shell?.style.getPropertyValue('--echo-rail-width')).toBe('280px');
+    expect(separator.getAttribute('aria-valuemin')).toBe('208');
+    expect(separator.getAttribute('aria-valuemax')).toBe('420');
+
+    separator.focus();
+    await user.keyboard('{ArrowRight}{End}');
+    expect(separator.getAttribute('aria-valuenow')).toBe('420');
+    expect(shell?.style.getPropertyValue('--echo-rail-width')).toBe('420px');
+
+    Object.defineProperty(separator, 'setPointerCapture', {
+      configurable: true,
+      value: () => undefined,
+    });
+    fireEvent.pointerDown(separator, { button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 180, pointerId: 1 });
+    fireEvent.pointerUp(window, { pointerId: 1 });
+    expect(separator.getAttribute('aria-valuenow')).toBe('208');
+
+    await user.dblClick(separator);
+    expect(separator.getAttribute('aria-valuenow')).toBe('280');
   });
 });
 

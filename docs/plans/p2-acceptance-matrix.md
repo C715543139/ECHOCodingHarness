@@ -43,7 +43,7 @@
 | P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`, `tests/unit/web/http-transport.test.ts`, `scripts/accept-web-provider.mjs` | Accepted |
 | P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
-| P2-2-05 | 上滚暂停尾随并提供“有新内容”恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx` | Accepted |
+| P2-2-05 | 上滚暂停尾随并提供底部“回到最新”浮层恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/inspector.test.tsx` | Accepted |
 | P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/integration/web/turns.test.ts`, `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/integration/web/turns.test.ts`, `tests/unit/web/approval.test.tsx`, `tests/e2e/web/approval.spec.ts` | Accepted |
 | P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/integration/web/runtime-capabilities.test.ts`, `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
@@ -53,6 +53,7 @@
 | P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
+| P2-2-15 | 桌面侧栏可有界调宽；文档不整体滚动；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
 

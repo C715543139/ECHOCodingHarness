@@ -121,7 +121,9 @@ describe('Trace Inspector selection', () => {
     viewport.dispatchEvent(new Event('scroll', { bubbles: true }));
 
     await user.click(screen.getByRole('button', { name: 'append-tail' }));
-    expect(screen.getByRole('button', { name: /新事件/u })).toBeTruthy();
+    const toast = screen.getByRole('button', { name: '回到最新' });
+    expect(toast.parentElement?.className).toContain('toastLayer');
+    expect(toast.compareDocumentPosition(viewport)).toBe(Node.DOCUMENT_POSITION_PRECEDING);
     const after = screen.getAllByRole('button', { name: /用户 user completed/u });
     expect(after[0]?.textContent).toBe(firstLabel);
     expect(after.length).toBeLessThan(180);

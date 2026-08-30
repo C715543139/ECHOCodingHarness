@@ -1,8 +1,8 @@
 # P2 需求、测试与验收证据矩阵
 
-> 状态：Accepted plan（A0/A1 已实现，其余尚未实现）
+> 状态：Accepted plan（A0/A1/A2 已实现，其余尚未实现）
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -24,7 +24,7 @@
 | P2-1-03 | 一次性 bootstrap 兑换 HttpOnly Strict Cookie | API security | `tests/integration/web/auth.test.ts` | Planned |
 | P2-1-04 | 精确 Host/Origin、无 CORS、JSON content-type 与 CSP | API security | `tests/integration/web/request-guard.test.ts` | Planned |
 | P2-1-05 | DTO 不含秘密、绝对路径、堆栈或 reasoning | unit / scan | `tests/unit/web/dto-redaction.test.ts`；真实投影器尚未实现 | Planned (contract frozen) |
-| P2-1-06 | CLI/Web 共用配置 Schema、artifact-root 与原子写入 | unit / integration | `tests/unit/config/config-service.test.ts`, `tests/integration/web/provider-config.test.ts` | Planned |
+| P2-1-06 | CLI/Web 共用配置 Schema、artifact-root 与原子写入 | unit / integration | `tests/unit/config/config-service.test.ts`（A2 已落地）, `tests/integration/web/provider-config.test.ts` | Planned |
 | P2-1-07 | 自动发现显式执行、不自动保存、错误脱敏 | integration | `tests/integration/web/provider-discovery.test.ts` | Planned |
 | P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts` | Planned |
 | P2-1-09 | 相同 requestId 重放同一响应且不重复副作用；不同请求指纹返回幂等冲突 | contract / integration | `tests/unit/web/idempotency.test.ts`; HTTP 注入仍待 A3：`tests/integration/web/idempotency.test.ts` | Contract accepted |

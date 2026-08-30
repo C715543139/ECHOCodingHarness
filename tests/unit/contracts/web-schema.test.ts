@@ -123,7 +123,7 @@ describe('Web JSON Schema freeze', () => {
     ).not.toEqual([]);
     expect(
       validateWebJsonSchema(WEB_JSON_SCHEMAS.workspaceSummary, {
-        name: '/home/name/repo',
+        name: '/srv/echo-fixture/repo',
         fingerprint: 'fp_ok',
       }),
     ).not.toEqual([]);

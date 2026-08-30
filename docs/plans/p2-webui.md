@@ -1,8 +1,8 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（A0/A1 已实现，其余尚未实现）
+> 状态：Accepted plan（A0/A1/A2 已实现，其余尚未实现）
 >
-> 版本：1.3
+> 版本：1.4
 >
 > 最后更新：2026-08-30
 
@@ -270,8 +270,9 @@ echo-harness web
    Policy Explain 事实。`PolicyDecision` 携带稳定 `ruleId`，新 Writer 写入授权/审批/拒绝事件，旧 Session
    缺少字段时按可选兼容读取，不提升 Session schema。DTO 脱敏约束已冻结，真实投影器尚未实现，
    P2-1-05 不得标为 Accepted。本任务不实现 HTTP 路由或页面。
-3. **A2：共享 Provider 配置服务**。抽出 CLI 背后的读取、校验、发现和原子写入；API Key 仍只来自
-   环境变量。
+3. **A2：共享 Provider 配置服务（已实现）**。已抽出 CLI/Web 共用的读取、严格校验、显式发现、
+   写锁与原子写入。Web 使用受限 Provider merge（`saveProviderSettings`），CLI wizard 使用完整
+   校验替换（`replacePersistentConfig`）；API Key 仍只来自环境变量。本任务不实现 HTTP 路由。
 4. **A3：Fastify 服务骨架**。固定工作区生命周期、bootstrap 认证、Host/Origin 防护、静态资源和
    可注入路由测试。
 5. **A4：React 页面骨架**。设计 token、Session/Chat/Trace 主壳、Provider 设置导航壳和组件测试

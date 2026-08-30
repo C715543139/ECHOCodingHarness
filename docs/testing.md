@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.5
+> 版本：1.6
 >
 > 最后更新：2026-08-30
 
@@ -190,8 +190,11 @@ and artifact evidence in this section is a target contract until its owning task
   properties. Idempotency tests prove concurrent waiters settle on the same terminal response
   without a parameterless abort. P2-1-05 remains Planned until a real projector exists;
 - remaining Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
-- shared Provider config service tests prove CLI/Web use the same schema, artifact root, locking,
-  atomic replacement, and redacted errors;
+- shared Provider config service tests in `tests/unit/config/config-service.test.ts` prove Web
+  `saveProviderSettings` is a restricted Provider merge, CLI `replacePersistentConfig` is a full
+  validated replace, artifact-root locking is case-normalized on win32, discovery does not
+  auto-save, and merge refuses to overwrite an unreadable or schema-invalid file; HTTP provider
+  routes remain a later integration task;
 - Fastify injection tests cover routes without opening a TCP port;
 - authentication tests cover one-time bootstrap, cookie attributes, exact Host/Origin, no CORS,
   content type, body limits, CSP, and no-store;

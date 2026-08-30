@@ -130,7 +130,8 @@ Chat/Trace 双投影和按需 Inspector 可以展示 ECHO 的 Context、Harness 
 - P2 必须新增 Web DTO 与投影层，不能直接序列化内部类或全部 `EchoEvent` payload；
 - P2 必须补齐稳定 Policy rule ID 与授权原因的持久事实，并保持旧 Session 可读；
 - `ApplicationService` 需要一个进程级活动 Turn 仲裁器，现有每 Session 保护仍保留；
-- 配置写入逻辑需从 CLI 向导中抽成共享服务，并保持原子替换与严格校验；
+- 配置写入逻辑已从 CLI 向导抽成 `createProviderConfigService`：Web 是受限 Provider merge，CLI
+  wizard 是完整 validated replace，并保持原子替换、写锁与严格校验；
 - 构建顺序必须使 Vite 静态资源进入最终 `dist/web/`，且 tsup 不清除它；
 - CI 需要浏览器端组件测试、Fastify 注入测试和 Windows Chromium 端到端 smoke；
 - P2 文档与实现状态必须同步，未实现前不得宣称 `echo-harness web` 可用。

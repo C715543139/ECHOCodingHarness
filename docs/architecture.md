@@ -13,8 +13,9 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳，不表示
-完整 Web Chat/Trace 已经交付。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳。B3 已提供
+独立的 `src/web/trace` 业务记录投影与 Inspector，不读取 JSONL、不解析 CLI 文本；完整 Web Chat/HTTP
+装配仍待后续任务。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 

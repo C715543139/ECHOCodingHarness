@@ -12,6 +12,7 @@ import {
   type WebConsoleView,
 } from '../view-model/console-controller.js';
 import { ApprovalCard } from './approval-card.js';
+import { Glyph } from './glyph.js';
 import { TOOL_SUMMARY_LABELS } from './labels.js';
 import styles from './shell.module.css';
 
@@ -143,20 +144,26 @@ export function ChatView({
         ) : null}
         {turns.map((turn) => (
           <article className={styles.turn} data-turn-id={turn.turnId} key={turn.turnId}>
-            <h3>用户</h3>
-            <p>{turn.userText}</p>
+            <h3 className={styles.srOnly}>用户</h3>
+            <div className={styles.userRow}>
+              <p className={styles.userBubble}>{turn.userText}</p>
+            </div>
             {turn.responses.map((response) => (
-              <p data-partial={String(response.partial)} key={response.step}>
+              <p
+                className={styles.agentText}
+                data-partial={String(response.partial)}
+                key={response.step}
+              >
                 {response.text}
               </p>
             ))}
             {turn.toolSummaries.map((summary) => (
-              <p className={styles.toolSummary} key={summary.toolCallId}>
+              <p className={styles.toolCard} data-status={summary.status} key={summary.toolCallId}>
                 {summary.name} · {TOOL_SUMMARY_LABELS[summary.status]}
                 {summary.resultSummary === undefined ? '' : ` · ${summary.resultSummary}`}
               </p>
             ))}
-            <p className={styles.muted}>
+            <p className={styles.turnStatus}>
               {turn.status}
               {turn.stopReason === undefined ? '' : ` · ${turn.stopReason}`}
             </p>
@@ -195,6 +202,7 @@ export function ChatView({
       )}
       {session.phase === 'running' ? (
         <div className={styles.runBanner} role="status">
+          <Glyph className={`${styles.glyph} ${styles.bannerIcon}`} name="info" />
           <p>当前 Session 正在运行。</p>
           {capabilities.canCancelTurn ? (
             confirmStop ? (
@@ -206,6 +214,7 @@ export function ChatView({
                 }}
                 type="button"
               >
+                <Glyph name="stop" />
                 {`确认停止 ${session.shortId}`}
               </button>
             ) : (
@@ -216,6 +225,7 @@ export function ChatView({
                 }}
                 type="button"
               >
+                <Glyph name="stop" />
                 停止
               </button>
             )
@@ -232,72 +242,74 @@ export function ChatView({
           onSubmit();
         }}
       >
-        <div className={styles.runtimeRow}>
+        <div className={styles.composerCard}>
           <label className={styles.field}>
-            模型
-            <select
-              disabled={!capabilities.canChangeRuntime || !wired}
+            <span className={styles.srOnly}>输入</span>
+            <textarea
+              disabled={!capabilities.canSubmitTurn}
               onChange={(event) => {
-                actions?.changeRuntime({ model: event.target.value });
+                onComposerText(event.target.value);
               }}
-              value={session.model}
-            >
-              {modelOptions.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            安全模式
-            <select
-              disabled={!capabilities.canChangeRuntime || !wired}
-              onChange={(event) => {
-                const mode = SAFETY_MODES.find((item) => item === event.target.value);
-                if (mode !== undefined) {
-                  actions?.changeRuntime({ safetyMode: mode });
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  if (!submitEnabled) {
+                    return;
+                  }
+                  onSubmit();
                 }
               }}
-              value={session.safetyMode}
-            >
-              {SAFETY_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode}
-                </option>
-              ))}
-            </select>
+              placeholder="描述目标或下一步。Enter 发送，Shift+Enter 换行。"
+              value={composerText}
+            />
           </label>
-          <p className={styles.muted} data-testid="context-usage">
-            {contextLabel}
-          </p>
-        </div>
-        <label className={styles.field}>
-          输入
-          <textarea
-            disabled={!capabilities.canSubmitTurn}
-            onChange={(event) => {
-              onComposerText(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                if (!submitEnabled) {
-                  return;
-                }
-                onSubmit();
-              }
-            }}
-            value={composerText}
-          />
-        </label>
-        {blockedMessage === undefined ? null : (
-          <p className={styles.blockReason}>{blockedMessage}</p>
-        )}
-        <div className={styles.actions}>
-          <button className={styles.sendButton} disabled={!submitEnabled} type="submit">
-            发送
-          </button>
+          {blockedMessage === undefined ? null : (
+            <p className={styles.blockReason}>{blockedMessage}</p>
+          )}
+          <div className={styles.composerControls}>
+            <label className={styles.field}>
+              模型
+              <select
+                disabled={!capabilities.canChangeRuntime || !wired}
+                onChange={(event) => {
+                  actions?.changeRuntime({ model: event.target.value });
+                }}
+                value={session.model}
+              >
+                {modelOptions.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              安全模式
+              <select
+                disabled={!capabilities.canChangeRuntime || !wired}
+                onChange={(event) => {
+                  const mode = SAFETY_MODES.find((item) => item === event.target.value);
+                  if (mode !== undefined) {
+                    actions?.changeRuntime({ safetyMode: mode });
+                  }
+                }}
+                value={session.safetyMode}
+              >
+                {SAFETY_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className={styles.contextUsage} data-testid="context-usage">
+              {contextLabel}
+            </p>
+            <button className={styles.sendButton} disabled={!submitEnabled} type="submit">
+              发送
+              <Glyph name="send" />
+            </button>
+          </div>
         </div>
       </form>
       <div aria-live="polite" className={styles.live}>

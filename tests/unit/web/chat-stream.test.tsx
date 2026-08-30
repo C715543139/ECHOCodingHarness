@@ -8,6 +8,7 @@ import { App } from '../../../src/web/client/App.js';
 import {
   createFakeTransport,
   createIdleSession,
+  createSampleChatTurn,
 } from '../../../src/web/client/transport/fake-transport.js';
 
 describe('Chat streaming projection', () => {
@@ -37,6 +38,48 @@ describe('Chat streaming projection', () => {
     expect(screen.getByText('Hello from Fake Provider')).toBeTruthy();
     expect(screen.getByText('Hello from Fake Provider').getAttribute('data-partial')).toBe('true');
     expect(screen.queryByText('Hel')).toBeNull();
+  });
+
+  it('separates the user bubble, tool card status, and one composer card', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+      chatTurnsBySession: {
+        ses_idle: [
+          createSampleChatTurn({
+            userText: 'run the suite',
+            status: 'completed',
+            toolSummaries: [
+              {
+                toolCallId: 'call_1',
+                name: 'run_command',
+                status: 'completed',
+                resultSummary: 'exit 0',
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    render(<App transport={transport} />);
+
+    const bubble = screen.getByText('run the suite');
+    expect(bubble.tagName).toBe('P');
+    expect(screen.getByRole('heading', { name: '用户' })).toBeTruthy();
+
+    const tool = screen.getByText('run_command · completed · exit 0');
+    expect(tool.getAttribute('data-status')).toBe('completed');
+
+    const input = screen.getByLabelText('输入');
+    const send = screen.getByRole('button', { name: '发送' });
+    const card = input.closest('form')?.firstElementChild;
+    expect(card?.contains(input)).toBe(true);
+    expect(card?.contains(send)).toBe(true);
+    expect(card?.contains(screen.getByTestId('context-usage'))).toBe(true);
+
+    await user.type(input, 'x');
+    expect(send).toHaveProperty('disabled', false);
   });
 
   it('pauses tail follow after an upward scroll and restores it from 有新内容', async () => {

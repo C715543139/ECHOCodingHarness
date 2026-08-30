@@ -1,4 +1,5 @@
 import type { ApprovalChoiceDto, ApprovalRequestDto } from '../../../contracts/web.js';
+import { Glyph } from './glyph.js';
 import { APPROVAL_CHOICE_LABELS } from './labels.js';
 import styles from './shell.module.css';
 
@@ -37,8 +38,11 @@ export function ApprovalCard({
       }}
       tabIndex={0}
     >
-      <h3>等待审批</h3>
-      <p>
+      <h3 className={styles.approvalTitle}>
+        <Glyph name="shield" />
+        等待审批
+      </h3>
+      <p className={styles.approvalAction}>
         {approval.toolName} · {approval.actionSummary}
       </p>
       <p className={styles.muted}>{approval.riskReason}</p>
@@ -58,7 +62,7 @@ export function ApprovalCard({
         </button>
         <button
           aria-keyshortcuts="y"
-          className={styles.choiceButton}
+          className={styles.primaryButton}
           disabled={disabled}
           onClick={() => {
             onDecide('allow_once');

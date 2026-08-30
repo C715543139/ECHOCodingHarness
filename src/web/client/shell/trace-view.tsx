@@ -1,15 +1,69 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
 import type { TraceRecordDto } from '../../../contracts/web.js';
+import {
+  applyTraceUpserts,
+  createTraceListState,
+  pauseTraceFollow,
+  resumeTraceFollow,
+  visibleTraceRecords,
+} from '../../trace/upsert.js';
 import styles from './shell.module.css';
+
+const VIRTUALIZE_AFTER = 40;
+const ROW_HEIGHT = 72;
+const OVERSCAN = 6;
 
 export function TraceView({
   records,
   selectedRecordId,
   onSelectRecord,
+  pageSize = 100,
 }: {
   readonly records: readonly TraceRecordDto[];
   readonly selectedRecordId: string | undefined;
   readonly onSelectRecord: (id: string) => void;
+  readonly pageSize?: number;
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const previousRecords = useRef<readonly TraceRecordDto[]>([]);
+  const [list, setList] = useState(() => createTraceListState(pageSize));
+  const [windowStart, setWindowStart] = useState(0);
+
+  useEffect(() => {
+    const previous = previousRecords.current;
+    previousRecords.current = records;
+    const incoming = records.filter((record) => {
+      const prior = previous.find((item) => item.id === record.id);
+      return prior === undefined || record.seq > prior.seq;
+    });
+    const overlap = previous.some((record) => records.some((item) => item.id === record.id));
+    const disjoint = previous.length > 0 && !overlap;
+    if (disjoint) {
+      setWindowStart(0);
+      const viewport = viewportRef.current;
+      if (viewport !== null) viewport.scrollTop = 0;
+    }
+    setList((current) => {
+      const base = disjoint ? createTraceListState(pageSize) : { ...current, pageSize };
+      return incoming.length === 0 ? base : applyTraceUpserts(base, incoming);
+    });
+  }, [pageSize, records]);
+
+  const visible = useMemo(() => visibleTraceRecords(list), [list]);
+  const virtualized = visible.length > VIRTUALIZE_AFTER;
+  const maxStart = Math.max(0, visible.length - 1);
+  const clampedStart = Math.min(windowStart, maxStart);
+  const windowCount = virtualized
+    ? Math.min(visible.length, clampedStart + Math.ceil(480 / ROW_HEIGHT) + OVERSCAN * 2)
+    : visible.length;
+  const rendered = virtualized ? visible.slice(clampedStart, windowCount) : visible;
+
+  useEffect(() => {
+    if (windowStart === clampedStart) return;
+    setWindowStart(clampedStart);
+  }, [clampedStart, windowStart]);
+
   if (records.length === 0) {
     return (
       <div className={styles.scroll}>
@@ -19,27 +73,121 @@ export function TraceView({
   }
 
   return (
-    <div className={styles.scroll} role="list">
-      {records.map((record) => (
+    <div className={styles.tracePane}>
+      {list.followTail ? null : (
         <button
-          aria-current={record.id === selectedRecordId}
-          aria-label={`${record.label} ${record.type} ${record.status}`}
-          className={styles.traceButton}
-          key={record.id}
+          className={styles.newEvents}
           onClick={() => {
-            onSelectRecord(record.id);
+            setList((current) => resumeTraceFollow(current));
+            const viewport = viewportRef.current;
+            if (viewport !== null) {
+              viewport.scrollTop = viewport.scrollHeight;
+            }
           }}
           type="button"
         >
-          <strong>
-            {record.time.slice(11, 19)} · {record.type} · {record.label}
-          </strong>
-          <span className={styles.sessionMeta}>
-            {record.status}
-            {record.parameterSummary === undefined ? '' : ` · ${record.parameterSummary}`}
-          </span>
+          {list.unseenCount > 0 ? `新事件 ${String(list.unseenCount)}` : '回到最新'}
         </button>
-      ))}
+      )}
+      <div
+        className={styles.scroll}
+        onScroll={(event) => {
+          const target = event.currentTarget;
+          const distance = target.scrollHeight - target.scrollTop - target.clientHeight;
+          const scrolledAway =
+            target.scrollTop > 0 && (target.clientHeight === 0 || distance > ROW_HEIGHT);
+          if (scrolledAway) {
+            setList((current) => (current.followTail ? pauseTraceFollow(current) : current));
+          } else if (distance <= 8 && target.clientHeight > 0 && !list.followTail) {
+            setList((current) => resumeTraceFollow(current));
+          }
+          if (virtualized) {
+            const start = Math.max(0, Math.floor(target.scrollTop / ROW_HEIGHT) - OVERSCAN);
+            setWindowStart(start);
+          }
+        }}
+        ref={viewportRef}
+        role="list"
+      >
+        {virtualized ? (
+          <div
+            className={styles.traceVirtual}
+            style={{ height: `${String(visible.length * ROW_HEIGHT)}px` }}
+          >
+            {rendered.map((record, offset) => {
+              const index = clampedStart + offset;
+              return (
+                <div
+                  className={styles.traceVirtualRow}
+                  key={record.id}
+                  style={{
+                    top: `${String(index * ROW_HEIGHT)}px`,
+                    height: `${String(ROW_HEIGHT)}px`,
+                  }}
+                >
+                  <TraceRow
+                    previousTurnId={index === 0 ? undefined : visible[index - 1]?.turnId}
+                    record={record}
+                    selected={record.id === selectedRecordId}
+                    onSelect={onSelectRecord}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          visible.map((record, index) => (
+            <TraceRow
+              key={record.id}
+              previousTurnId={index === 0 ? undefined : visible[index - 1]?.turnId}
+              record={record}
+              selected={record.id === selectedRecordId}
+              onSelect={onSelectRecord}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TraceRow({
+  record,
+  selected,
+  previousTurnId,
+  onSelect,
+}: {
+  readonly record: TraceRecordDto;
+  readonly selected: boolean;
+  readonly previousTurnId: string | undefined;
+  readonly onSelect: (id: string) => void;
+}) {
+  const grouped = previousTurnId !== record.turnId;
+  return (
+    <div className={styles.traceRow} role="listitem">
+      {grouped ? <p className={styles.traceGroup}>Turn {record.turnId}</p> : null}
+      <button
+        aria-current={selected}
+        aria-label={`${record.label} ${record.type} ${record.status}`}
+        className={styles.traceButton}
+        data-seq={String(record.seq)}
+        onClick={() => {
+          onSelect(record.id);
+        }}
+        type="button"
+      >
+        <strong>
+          {record.time.slice(11, 19)} · {record.type} · {record.label}
+        </strong>
+        <span className={styles.sessionMeta}>
+          {record.status}
+          {record.durationMs === undefined ? '' : ` · ${String(record.durationMs)} ms`}
+          {record.parameterSummary === undefined ? '' : ` · ${record.parameterSummary}`}
+        </span>
+        {record.resultSummary === undefined ? null : (
+          <span className={styles.traceResult}>{record.resultSummary}</span>
+        )}
+      </button>
     </div>
   );
 }

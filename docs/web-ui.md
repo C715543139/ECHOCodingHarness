@@ -1,6 +1,6 @@
 # ECHO Harness WebUI 产品与交互规格
 
-> 状态：Accepted design contract（A4 主壳 + B2 Session/Chat/设置已对 Fake transport 落地；Trace/Inspector 功能与真实 HTTP 尚未实现）
+> 状态：Accepted design contract（A4 主壳、B2 Session/Chat/设置组件及 B3 Trace 投影、Inspector 与有界列表已落地；真实 HTTP 与根组件装配仍待 C1）
 >
 > 版本：1.3
 >

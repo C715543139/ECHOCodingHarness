@@ -13,8 +13,9 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳，B2 已把
-Session/Chat/设置接到 Fake transport，不表示真实 HTTP 或 Trace 已经交付。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
+[web-ui.md](./web-ui.md)；Phase A 已落地契约、配置服务、Fastify 安全骨架与 React 主壳；B1 已提供
+Session/Turn/SSE 路由模块，B2 已把 Session/Chat/设置接到 Fake transport，B3 已提供独立的
+`src/web/trace` 业务记录投影与 Inspector。上述模块尚待 C1 完成真实 HTTP 与根组件装配。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
 

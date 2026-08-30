@@ -1,6 +1,6 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（阶段 A 已实现；P2-B1 Session/Turn/SSE 路由模块与 B2 Session/Chat/设置组件已实现；真实 HTTP 根装配、B3/B4 与阶段 C 尚未实现）
+> 状态：Accepted plan（阶段 A 与 P2-B1/B2/B3 独立模块已实现；真实 HTTP 根装配、B4 与阶段 C 尚未实现）
 >
 > 版本：1.6
 >
@@ -269,8 +269,8 @@ echo-harness web
 2. **A1：Web 契约与 Policy Explain 事实（已实现）**。已冻结全部跨 HTTP/SSE 边界 DTO 的运行时 JSON Schema
    （Page/ApiResponse 由统一工厂生成，长度与数组上限集中定义）、错误码、幂等终态语义和三层
    Policy Explain 事实。`PolicyDecision` 携带稳定 `ruleId`，新 Writer 写入授权/审批/拒绝事件，旧 Session
-   缺少字段时按可选兼容读取，不提升 Session schema。DTO 脱敏约束已冻结，真实投影器尚未实现，
-   P2-1-05 不得标为 Accepted。本任务不实现 HTTP 路由或页面。
+   缺少字段时按可选兼容读取，不提升 Session schema。DTO 脱敏约束已冻结。B3 已落地 `projectTrace`
+   投影器，P2-1-05 仍因 HTTP 装配未接而保持 Partial。本任务不实现 HTTP 路由或页面。
 3. **A2：共享 Provider 配置服务（已实现）**。已抽出 CLI/Web 共用的读取、严格校验、显式发现、
    写锁与原子写入。Web 使用受限 Provider merge（`saveProviderSettings`），CLI wizard 使用完整
    校验替换（`replacePersistentConfig`）；API Key 仍只来自环境变量。本任务不实现 HTTP 路由。
@@ -290,7 +290,7 @@ A0 完成后 A1 与 A2 可并行。A1/A2 契约冻结后 A3 与 A4 可并行。W
 
 - B1：Session/Turn/审批 API、单活动 Turn 与 SSE（路由模块已实现，C1 装配）；
 - B2：Session rail、Chat、输入区和 Provider 设置（已实现：冻结 DTO + Fake transport 组件层，动作为显式窄接口注入，无模块级全局 controller；真实 HTTP 与根装配留 C1）；
-- B3：Trace 投影与 Inspector DTO；
+- B3：Trace 投影与 Inspector DTO（已实现独立 `src/web/trace` 投影、稳定 seq/upsert、Inspector 与有界列表；未改 App/路由装配）；
 - B4：安全、浏览器测试夹具和产物构建管线。
 
 B2/B3 使用阶段 A 的 DTO 与 Fake transport，不直接修改 Agent Loop。共享路由装配和主壳由集成任务

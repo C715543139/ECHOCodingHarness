@@ -1,6 +1,6 @@
 # P2 需求、测试与验收证据矩阵
 
-> 状态：Accepted plan（阶段 A 已实现；P2-B1 路由模块与 B2 组件证据已落地，生产根装配仍待 C1；B3/B4 与阶段 C 尚未实现）
+> 状态：Accepted plan（阶段 A 与 P2-B1/B2/B3 独立模块证据已落地，生产根装配仍待 C1；B4 与阶段 C 尚未实现）
 >
 > 版本：1.6
 >
@@ -23,7 +23,7 @@
 | P2-1-02 | 工作区启动时固定，API 不接受路径 | API security | `tests/integration/web/workspace-boundary.test.ts` | Accepted |
 | P2-1-03 | 一次性 bootstrap 兑换 HttpOnly Strict Cookie | API security | `tests/integration/web/auth.test.ts` | Accepted |
 | P2-1-04 | 精确 Host/Origin、无 CORS、JSON content-type 与 CSP | API security | `tests/integration/web/request-guard.test.ts` | Accepted |
-| P2-1-05 | DTO 不含秘密、绝对路径、堆栈或 reasoning | unit / scan | `tests/unit/web/dto-redaction.test.ts`；真实投影器尚未实现 | Planned (contract frozen) |
+| P2-1-05 | DTO 不含秘密、绝对路径、堆栈或 reasoning | unit / scan | `tests/unit/web/dto-redaction.test.ts`, `tests/unit/web/trace-privacy.test.ts`（B3 投影已脱敏）；HTTP 装配仍待 C1 | Partial (projection accepted) |
 | P2-1-06 | CLI/Web 共用配置 Schema、artifact-root 与原子写入 | unit / integration | `tests/unit/config/config-service.test.ts`（A2 已落地）, `tests/integration/web/provider-config.test.ts` | Planned |
 | P2-1-07 | 自动发现显式执行、不自动保存、错误脱敏 | integration | `tests/integration/web/provider-discovery.test.ts` | Planned |
 | P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts` | Partial (route module accepted; C1 assembly pending) |
@@ -58,15 +58,15 @@
 
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
-| P2-3-01 | Trace 只含八类业务记录并按 seq 排序 | projection | `tests/unit/web/trace-projector.test.ts` | Planned |
-| P2-3-02 | chunk、内部重试和 reasoning 不形成记录 | projection / scan | `tests/unit/web/trace-privacy.test.ts` | Planned |
-| P2-3-03 | 直播、刷新、补页和恢复顺序一致 | integration / browser | `tests/e2e/web/trace-order.spec.ts` | Planned |
-| P2-3-04 | 选中记录只展示匹配的结构化 Inspector | component / browser | `tests/unit/web/inspector.test.tsx`, `tests/e2e/web/trace-inspector.spec.ts` | Planned |
-| P2-3-05 | Context 显示预算与裁剪，不泄漏完整内容 | projection | `tests/unit/web/context-detail.test.ts` | Planned |
-| P2-3-06 | Policy Explain 只消费结构化 decision/rule | projection | `tests/unit/web/policy-detail.test.ts` | Planned |
-| P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Planned |
-| P2-3-08 | Verified 只来源于真实命令终态且不夸大退出码含义 | projection / browser | `tests/unit/web/verification-detail.test.ts` | Planned |
-| P2-3-09 | 大型 Trace 分页、虚拟化且上滚不跳动 | component / performance | `tests/e2e/web/trace-large-session.spec.ts` | Planned |
+| P2-3-01 | Trace 只含八类业务记录并按 seq 排序 | projection | `tests/unit/web/trace-projector.test.ts` | Partial (projection accepted) |
+| P2-3-02 | chunk、内部重试和 reasoning 不形成记录 | projection / scan | `tests/unit/web/trace-privacy.test.ts`, `tests/unit/web/trace-redaction.test.ts` | Partial (projection accepted) |
+| P2-3-03 | 直播、刷新、补页和恢复顺序一致 | integration / browser | `tests/unit/web/trace-upsert.test.ts`（乱序/重复 upsert 与分页已落地）；浏览器恢复仍待 C1：`tests/e2e/web/trace-order.spec.ts` | Partial (upsert accepted) |
+| P2-3-04 | 选中记录只展示匹配的结构化 Inspector | component / browser | `tests/unit/web/inspector.test.tsx`（选择与结构化详情已落地）；浏览器流程仍待 C1：`tests/e2e/web/trace-inspector.spec.ts` | Partial (component accepted) |
+| P2-3-05 | Context 显示预算与裁剪，不泄漏完整内容 | projection | `tests/unit/web/context-detail.test.ts` | Partial (projection accepted) |
+| P2-3-06 | Policy Explain 只消费结构化 decision/rule | projection | `tests/unit/web/policy-detail.test.ts` | Partial (projection accepted) |
+| P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Partial (projection accepted) |
+| P2-3-08 | Verified 只来源于真实命令终态且不夸大退出码含义 | projection / browser | `tests/unit/web/verification-detail.test.ts` | Partial (projection accepted) |
+| P2-3-09 | 大型 Trace 分页、虚拟化且上滚不跳动 | component / performance | `tests/unit/web/inspector.test.tsx`、`tests/unit/web/trace-upsert.test.ts`（窗口与虚拟化已落地）；大型 Session 浏览器仍待 C1：`tests/e2e/web/trace-large-session.spec.ts` | Partial (list accepted) |
 | P2-3-10 | 不注册 Session 导出路由或页面入口 | API / component | `tests/integration/web/routes.test.ts`（A5 已证明无导出路由）；`tests/unit/web/session-actions.test.tsx`（B2 已证明无页面入口） | Accepted |
 
 ## 5. P2-4：体验、产物与回归

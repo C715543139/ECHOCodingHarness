@@ -192,7 +192,8 @@ section remains a target contract until its owning B/C task lands.
   deterministic fixtures and do not start HTTP routes or pages. Schema tests cover centralized
   bounds, absolute-path names, oversize strings/arrays, unknown fields, and forbidden secret
   properties. Idempotency tests prove concurrent waiters settle on the same terminal response
-  without a parameterless abort. P2-1-05 remains Planned until a real projector exists;
+  without a parameterless abort. P2-1-05 is Partial: B3 `projectTrace` redacts secrets,
+  reasoning and absolute paths, but HTTP response assembly remains C1;
 - remaining Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
 - shared Provider config service tests in `tests/unit/config/config-service.test.ts` prove Web
   `saveProviderSettings` is a restricted Provider merge, CLI `replacePersistentConfig` is a full
@@ -219,6 +220,10 @@ section remains a target contract until its owning B/C task lands.
   `tests/integration/web/sse-resync.test.ts`). These prove the independently assembled B1 module;
   production `register-routes.ts` wiring remains C1;
 - Trace projection tests exclude chunks and reasoning and preserve stable Turn/Step order.
+  B3 evidence: `tests/unit/web/trace-projector.test.ts`, `trace-privacy.test.ts`,
+  `trace-redaction.test.ts`, `trace-upsert.test.ts`, `context-detail.test.ts`,
+  `policy-detail.test.ts`, `diff-detail.test.ts`, `verification-detail.test.ts`,
+  `inspector.test.tsx`. HTTP and browser assembly remain C1.
   P2 does not implement session export.
 
 ### React component layer

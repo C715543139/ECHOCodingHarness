@@ -339,6 +339,10 @@ DTO、JSON Schema、错误码、能力状态表、写操作响应、SSE 判别�
 侵入 Agent Loop。工作区在启动时固定，Provider API Key 不进入浏览器，进程同时只允许一个活动 Turn。
 远程展示页、多用户、跨工作区控制台、第二种 Session 存储和导出会话仍不属于当前承诺。
 
+Chat 按 [ADR-0008](./decisions/0008-safe-web-markdown.md) 只对聚合 `model.text` 使用安全
+CommonMark/GFM 渲染；用户输入保持纯文本。原始 HTML 与自动远程图片加载被禁用，Markdown 展示层不
+改变 Session 事实、上下文投影或 Agent Loop。
+
 ## 16. 独立实现与原创边界
 
 ECHO 可以借鉴公开项目中通用的软件设计思想，例如显式循环、统一工具管线、事件驱动状态和重复调用保护，但：

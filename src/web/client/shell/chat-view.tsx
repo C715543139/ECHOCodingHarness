@@ -14,6 +14,7 @@ import {
 import { ApprovalCard } from './approval-card.js';
 import { Glyph } from './glyph.js';
 import { TOOL_SUMMARY_LABELS } from './labels.js';
+import { MarkdownMessage } from './markdown-message.js';
 import styles from './shell.module.css';
 
 const SAFETY_MODES = ['safe', 'balanced', 'auto'] as const;
@@ -159,13 +160,13 @@ export function ChatView({
               <p className={styles.userBubble}>{turn.userText}</p>
             </div>
             {turn.responses.map((response) => (
-              <p
+              <div
                 className={styles.agentText}
                 data-partial={String(response.partial)}
                 key={response.step}
               >
-                {response.text}
-              </p>
+                <MarkdownMessage>{response.text}</MarkdownMessage>
+              </div>
             ))}
             {turn.toolSummaries.map((summary) => (
               <p className={styles.toolCard} data-status={summary.status} key={summary.toolCallId}>

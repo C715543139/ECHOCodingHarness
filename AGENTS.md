@@ -24,6 +24,7 @@ The following documents are the Accepted P0/P1 implementation baseline and P2 de
 - `docs/decisions/0005-restore-artifact-config.md`
 - `docs/decisions/0006-reasoning-session-events.md`
 - `docs/decisions/0007-local-web-console.md`
+- `docs/decisions/0008-safe-web-markdown.md`
 - `docs/plans/p1-cli.md`
 - `docs/plans/p1-5-reasoning-context.md`
 - `docs/plans/p2-webui.md`

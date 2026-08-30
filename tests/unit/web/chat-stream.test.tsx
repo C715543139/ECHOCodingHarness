@@ -36,7 +36,12 @@ describe('Chat streaming projection', () => {
     expect(articles).toHaveLength(1);
     expect(articles[0]?.getAttribute('data-turn-id')).toBe('turn_1');
     expect(screen.getByText('Hello from Fake Provider')).toBeTruthy();
-    expect(screen.getByText('Hello from Fake Provider').getAttribute('data-partial')).toBe('true');
+    expect(
+      screen
+        .getByText('Hello from Fake Provider')
+        .closest('[data-partial]')
+        ?.getAttribute('data-partial'),
+    ).toBe('true');
     expect(screen.queryByText('Hel')).toBeNull();
   });
 
@@ -84,6 +89,61 @@ describe('Chat streaming projection', () => {
 
     await user.type(input, 'x');
     expect(send).toHaveProperty('disabled', false);
+  });
+
+  it('renders only agent responses as safe GFM Markdown', () => {
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+      chatTurns: [
+        createSampleChatTurn({
+          userText: '# 用户输入',
+          responses: [
+            {
+              step: 1,
+              partial: false,
+              text: [
+                '## 结果',
+                '',
+                '- **测试通过**',
+                '',
+                '`pnpm test`',
+                '',
+                '| 项目 | 状态 |',
+                '| --- | --- |',
+                '| tests | ok |',
+                '',
+                '[文档](https://example.com)',
+                '',
+                '[危险链接](javascript:alert(1))',
+                '',
+                '![架构图](https://example.com/tracker.png)',
+                '',
+                '<script>window.__unsafe = true</script>',
+              ].join('\n'),
+            },
+          ],
+        }),
+      ],
+    });
+    render(<App transport={transport} />);
+
+    const turn = screen.getByRole('article');
+    expect(within(turn).getByText('# 用户输入').tagName).toBe('P');
+    expect(within(turn).queryByRole('heading', { name: '用户输入' })).toBeNull();
+    expect(within(turn).getByRole('heading', { level: 2, name: '结果' })).toBeTruthy();
+    expect(within(turn).getByText('测试通过').tagName).toBe('STRONG');
+    expect(within(turn).getByText('pnpm test').tagName).toBe('CODE');
+    expect(within(turn).getByRole('table')).toBeTruthy();
+    const link = within(turn).getByRole('link', { name: '文档' });
+    expect(link.getAttribute('href')).toBe('https://example.com');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noreferrer noopener');
+    expect(within(turn).queryByRole('link', { name: '危险链接' })).toBeNull();
+    expect(within(turn).getByText('危险链接').tagName).toBe('SPAN');
+    expect(within(turn).queryByRole('img')).toBeNull();
+    expect(within(turn).getByText('[图片：架构图]')).toBeTruthy();
+    expect(turn.textContent).not.toContain('window.__unsafe');
   });
 
   it('pauses tail follow after an upward scroll and restores it from 回到最新', async () => {

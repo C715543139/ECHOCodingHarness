@@ -85,8 +85,25 @@ export function createCompletedChatTurn(): ChatTurnDto {
   return {
     turnId: 'turn_done',
     startedAt: '2026-08-30T10:01:00.000Z',
-    userText: '列出工作区文件',
-    responses: [{ step: 1, text: 'Fake Provider 已接受该 Turn。', partial: false }],
+    userText: '# 列出工作区文件',
+    responses: [
+      {
+        step: 1,
+        partial: false,
+        text: [
+          '## 完成结果',
+          '',
+          '- **状态**：通过',
+          '- 命令：`pnpm test`',
+          '',
+          '| 项目 | 结果 |',
+          '| --- | --- |',
+          '| tests | passed |',
+          '',
+          '![构建图](https://example.com/build.png)',
+        ].join('\n'),
+      },
+    ],
     toolSummaries: [],
     status: 'completed',
     stopReason: 'completed',

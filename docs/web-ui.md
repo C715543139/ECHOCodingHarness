@@ -145,6 +145,13 @@ Chat 按 Turn 显示用户输入、聚合代理正文、工具摘要、审批与
 刷新后不重放逐 token 动画。Chat 阅读区使用独立响应式留白：桌面端四周至少为
 `--echo-space-6`，水平留白随视口增长但不超过 `4rem`，窄屏回落到紧凑间距，且不改变滚动所有权。
 
+聚合代理正文使用 `react-markdown` 与 `remark-gfm` 渲染 CommonMark/GFM 的标题、列表、引用、表格、
+任务列表、删除线、链接、行内代码和代码块。用户消息保持纯文本，输入中的 Markdown 标记不得改变用户
+气泡结构。模型输出按不可信内容处理：原始 HTML 被丢弃，不启用 `rehype-raw` 或
+`dangerouslySetInnerHTML`；链接只允许相对地址、锚点、`http`、`https` 和 `mailto`，并以
+`noopener noreferrer` 在新标签页打开；图片不发起网络请求，只显示 alt 文本占位说明。具体安全选择见
+[ADR-0008](./decisions/0008-safe-web-markdown.md)。
+
 默认隐藏：
 
 - `model.reasoning` 与 reasoning details；

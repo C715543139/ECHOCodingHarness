@@ -64,6 +64,7 @@ A3/A4 不得另起包名或第二套目录。生产静态资源仍写入 `dist/w
 ### 3.1 前端
 
 - React 19、Vite 8、TypeScript strict；
+- `react-markdown` 与 `remark-gfm` 只渲染聚合模型正文，不启用原始 HTML；
 - CSS Modules、CSS 自定义属性与语义设计 token；
 - React 本地状态与领域适配器，不引入 Redux 等第二套状态机；
 - 不引入完整组件库或 Tailwind；使用原生语义控件和一套可访问图标；
@@ -153,6 +154,7 @@ P2 不实现删除、fork、跨工作区搜索或批量管理。
 - 显示用户输入、聚合 `model.text`、工具摘要、审批和 Turn 终态；
 - Chat 阅读区使用独立的响应式四周留白；相同的 Turn 状态与 stop reason 只显示一次，不同原因仍
   保留；
+- 聚合 `model.text` 支持安全的 CommonMark/GFM，用户输入仍按纯文本显示；远程图片不自动加载；
 - 当前直播使用 SSE 更新同一条记录，刷新只读聚合 Session 事实；
 - Turn 终态到达后立即清除当前或其他 Session 视图中的全局运行限制，不依赖刷新或切换页面；
 - 固定输入区提供模型、`safe` / `balanced` / `auto`、只读上下文用量、发送按钮，以及运行提示条上的

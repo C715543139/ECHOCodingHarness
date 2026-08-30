@@ -243,6 +243,8 @@ Vitest, Testing Library, `user-event`, and a DOM environment cover:
   (`tests/unit/web/chat-projection.test.ts`, `tests/unit/web/chat-stream.test.tsx`,
   `tests/unit/web/approval.test.tsx`, `tests/unit/web/composer.test.tsx`,
   `tests/unit/web/console-isolation.test.tsx`);
+- safe model Markdown semantics, plain-text user messages, skipped raw HTML, isolated links, and
+  non-loading image placeholders (`tests/unit/web/chat-stream.test.tsx`);
 - Web Chat/settings extras are injected as a Fake-agnostic `WebConsoleActions` /
   `WebConsoleView` pair. There is no module-level controller; A4 `App.tsx` omits these
   props and controller-owned buttons stay disabled until C1 wires the root;

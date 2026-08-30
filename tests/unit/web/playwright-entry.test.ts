@@ -39,6 +39,7 @@ describe('independent Playwright entry', () => {
       'approval.spec.ts',
       'bootstrap.spec.ts',
       'keyboard.spec.ts',
+      'markdown.spec.ts',
       'provider-secret.spec.ts',
       'reconnect.spec.ts',
       'responsive.spec.ts',

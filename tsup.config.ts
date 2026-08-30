@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  clean: true,
+  // Vite writes dist/web after tsup. Node rebuilds must not wipe those assets.
+  clean: false,
   dts: true,
   entry: {
     cli: 'src/cli.ts',

@@ -21,6 +21,7 @@ export interface CreateCliOptions {
     signal: AbortSignal;
   }) => Promise<{ exitCode: number }>;
   readonly webAction?: (options: WebCommandOptions) => Promise<{ exitCode: number }>;
+  readonly openUrl?: (url: string) => Promise<void>;
   readonly setExitCode?: (code: number) => void;
 }
 
@@ -205,7 +206,7 @@ export function createCli(options: CreateCliOptions = {}): Command {
   cli
     .command('web')
     .description(
-      'Start a loopback Web console for one fixed workspace and print a one-time bootstrap URL.',
+      'Start a loopback Web console for one fixed workspace and open a one-time bootstrap URL.',
     )
     .option('-w, --workspace <path>', 'Workspace directory (defaults to current directory).')
     .option('--port <port>', 'Loopback TCP port (default: an ephemeral port).', (value: string) => {
@@ -217,22 +218,31 @@ export function createCli(options: CreateCliOptions = {}): Command {
     })
     .option('--no-open', 'Print the URL without opening a browser.')
     .action(async (commandOptions: { workspace?: string; port?: number; open: boolean }) => {
-      void commandOptions.open;
       const controller = new AbortController();
       const cancel = (): void => controller.abort();
       process.once('SIGINT', cancel);
+      process.once('SIGTERM', cancel);
+      // Windows cannot deliver SIGTERM to a listener; non-TTY stdin close is the smoke/CI stop.
+      if (process.stdin.isTTY !== true) {
+        process.stdin.resume();
+        process.stdin.once('end', cancel);
+      }
       try {
         const outcome = await (options.webAction ?? runWeb)({
           ...(commandOptions.workspace === undefined
             ? {}
             : { workspace: commandOptions.workspace }),
           ...(commandOptions.port === undefined ? {} : { port: commandOptions.port }),
+          open: commandOptions.open,
           artifactRoot: resolveCliArtifactRoot(options),
           signal: controller.signal,
+          ...(options.openUrl === undefined ? {} : { openUrl: options.openUrl }),
         });
         setExitCode(outcome.exitCode);
       } finally {
         process.off('SIGINT', cancel);
+        process.off('SIGTERM', cancel);
+        process.stdin.off('end', cancel);
       }
     });
 

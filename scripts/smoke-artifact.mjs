@@ -76,9 +76,10 @@ try {
   if (
     !help.stdout.includes('run') ||
     !help.stdout.includes('chat') ||
-    !help.stdout.includes('config')
+    !help.stdout.includes('config') ||
+    !help.stdout.includes('web')
   ) {
-    throw new Error('Artifact CLI help did not list run, chat, and config.');
+    throw new Error('Artifact CLI help did not list run, chat, config, and web.');
   }
 
   const missing = runCli({

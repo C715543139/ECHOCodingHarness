@@ -156,6 +156,7 @@ describe('CLI metadata', () => {
       expect.objectContaining({
         workspace: '.',
         port: 0,
+        open: false,
         artifactRoot,
       }),
     );

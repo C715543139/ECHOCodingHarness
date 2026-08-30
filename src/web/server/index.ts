@@ -9,3 +9,4 @@ export {
   type CreateWebServerOptions,
   type StartedWebServer,
 } from './create-web-server.js';
+export { registerWebRoutes, type WebRouteDependencies } from './register-routes.js';

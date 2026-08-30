@@ -24,7 +24,7 @@ describe('Web workspace boundary', () => {
 
       const query = await harness.inject({
         method: 'GET',
-        url: '/api/v1/bootstrap?workspace=C:%5CUsers%5Cname%5Crepo',
+        url: '/api/v1/bootstrap?workspace=C:%5CUsers%5Cfixture%5Crepo',
         cookies: cookie,
       });
       expect(query.statusCode).toBe(400);
@@ -34,7 +34,7 @@ describe('Web workspace boundary', () => {
         method: 'POST',
         url: '/api/v1/auth/bootstrap',
         headers: { origin: harness.origin, 'content-type': 'application/json' },
-        payload: { token: 'unused-token-value', workspace: '/home/name/repo' },
+        payload: { token: 'unused-token-value', workspace: '/home/fixture/repo' },
       });
       expect(posted.statusCode).toBe(400);
       expect(posted.json()).toMatchObject({ error: { code: 'WORKSPACE_MISMATCH' } });

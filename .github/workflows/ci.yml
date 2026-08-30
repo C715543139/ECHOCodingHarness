@@ -53,6 +53,9 @@ jobs:
       - name: Artifact cwd smoke
         run: pnpm smoke:artifact
 
+      - name: Web artifact smoke
+        run: pnpm smoke:web-artifact
+
       - name: Scan secrets
         run: pnpm scan:secrets
 

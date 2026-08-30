@@ -182,7 +182,14 @@ and artifact evidence in this section is a target contract until its owning task
 
 ### Fast unit and integration layer
 
-- Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
+- Web DTO, JSON Schema, RuntimeCapabilities, SSE union, and requestId idempotency tests live under
+  `tests/unit/web/` and `tests/unit/contracts/web-schema.test.ts`; three-layer Policy Explain facts
+  are covered by `tests/unit/security/policy-explain.test.ts`. These A1 contract tests use
+  deterministic fixtures and do not start HTTP routes or pages. Schema tests cover centralized
+  bounds, absolute-path names, oversize strings/arrays, unknown fields, and forbidden secret
+  properties. Idempotency tests prove concurrent waiters settle on the same terminal response
+  without a parameterless abort. P2-1-05 remains Planned until a real projector exists;
+- remaining Web DTO and projection tests use deterministic Session fixtures and the `FakeProvider`;
 - shared Provider config service tests prove CLI/Web use the same schema, artifact root, locking,
   atomic replacement, and redacted errors;
 - Fastify injection tests cover routes without opening a TCP port;

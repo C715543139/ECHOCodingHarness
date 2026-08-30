@@ -41,6 +41,7 @@ describe('shared contracts', () => {
       action: 'deny',
       reason: 'outside workspace',
       hard: true,
+      ruleId: 'policy.path.workspace_escape',
     } satisfies PolicyDecision;
     const toolExecution = {
       status: 'failed',

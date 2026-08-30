@@ -33,6 +33,7 @@ const askPolicy: SafetyPolicy = {
     action: 'ask',
     reason: 'confirm test operation',
     approvalKey: 'approval-key',
+    ruleId: 'policy.test.ask',
   }),
 };
 
@@ -65,7 +66,11 @@ async function createService(options: {
     providerIdentity: identity,
     tools: new ToolRegistry(options.tools ?? []),
     policy: options.policy ?? {
-      evaluate: vi.fn().mockResolvedValue({ action: 'allow', reason: 'allow' }),
+      evaluate: vi.fn().mockResolvedValue({
+        action: 'allow',
+        reason: 'allow',
+        ruleId: 'policy.test.allow',
+      }),
     },
     contextBuilder: new EventContextBuilder({ systemPrompt: 'system constraints' }),
     workspaceRoot: options.workspace,

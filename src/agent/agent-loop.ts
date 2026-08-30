@@ -678,7 +678,11 @@ export class AgentLoop {
       await this.emit(
         state,
         'tool.denied',
-        { result: deniedResult(call, decision.reason), hard: decision.hard },
+        {
+          result: deniedResult(call, decision.reason),
+          hard: decision.hard,
+          policyRuleId: decision.ruleId,
+        },
         stepId,
         state.turnId,
       );
@@ -690,7 +694,12 @@ export class AgentLoop {
       await this.emit(
         state,
         'approval.requested',
-        { toolCallId: call.id, reason: decision.reason, approvalKey: decision.approvalKey },
+        {
+          toolCallId: call.id,
+          reason: decision.reason,
+          approvalKey: decision.approvalKey,
+          policyRuleId: decision.ruleId,
+        },
         stepId,
         state.turnId,
       );
@@ -742,14 +751,23 @@ export class AgentLoop {
         await this.emit(
           state,
           'approval.denied',
-          { toolCallId: call.id, reason: normalized.message },
+          {
+            toolCallId: call.id,
+            reason: normalized.message,
+            policyRuleId: decision.ruleId,
+            outcome: 'failed',
+          },
           stepId,
           state.turnId,
         );
         await this.emit(
           state,
           'tool.denied',
-          { result: deniedResult(call, normalized.message), hard: false },
+          {
+            result: deniedResult(call, normalized.message),
+            hard: false,
+            policyRuleId: decision.ruleId,
+          },
           stepId,
           state.turnId,
         );
@@ -763,14 +781,18 @@ export class AgentLoop {
         await this.emit(
           state,
           'approval.denied',
-          { toolCallId: call.id, reason },
+          { toolCallId: call.id, reason, policyRuleId: decision.ruleId, outcome: 'denied' },
           stepId,
           state.turnId,
         );
         await this.emit(
           state,
           'tool.denied',
-          { result: deniedResult(call, reason), hard: false },
+          {
+            result: deniedResult(call, reason),
+            hard: false,
+            policyRuleId: decision.ruleId,
+          },
           stepId,
           state.turnId,
         );
@@ -794,7 +816,12 @@ export class AgentLoop {
     await this.emit(
       state,
       'tool.authorized',
-      { toolCallId: call.id, source },
+      {
+        toolCallId: call.id,
+        source,
+        policyRuleId: decision.ruleId,
+        reason: decision.reason,
+      },
       stepId,
       state.turnId,
     );

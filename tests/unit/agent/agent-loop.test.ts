@@ -2,12 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type {
   EchoEvent,
+  EchoEventOf,
   SafetyPolicy,
   SessionStore,
   ToolDefinition,
 } from '../../../src/contracts/index.js';
 import { EventContextBuilder } from '../../../src/context/index.js';
-import { AgentLoop } from '../../../src/agent/index.js';
+import { AgentLoop, type ApprovalHandler } from '../../../src/agent/index.js';
 import { FakeProvider } from '../../../src/provider/index.js';
 import { ToolRegistry } from '../../../src/tools/index.js';
 
@@ -71,7 +72,11 @@ class PersistThenFailOnceStore implements SessionStore {
 }
 
 const allowPolicy: SafetyPolicy = {
-  evaluate: vi.fn().mockResolvedValue({ action: 'allow', reason: 'test allow' }),
+  evaluate: vi.fn().mockResolvedValue({
+    action: 'allow',
+    reason: 'test allow',
+    ruleId: 'policy.test.allow',
+  }),
 };
 
 function tool(name = 'inspect'): ToolDefinition<unknown, { value: string }> {
@@ -95,6 +100,7 @@ function createLoop(options: {
   policy?: SafetyPolicy;
   maxSteps?: number;
   repeatedToolCallLimit?: number;
+  approvalHandler?: ApprovalHandler;
 }) {
   return new AgentLoop({
     provider: options.provider,
@@ -109,6 +115,7 @@ function createLoop(options: {
     repeatedToolCallLimit: options.repeatedToolCallLimit ?? 3,
     contextBudget: { maxApproxTokens: 4_000, reservedOutputTokens: 500 },
     toolLimits: { timeoutMs: 1_000, maxOutputChars: 4_000 },
+    ...(options.approvalHandler === undefined ? {} : { approvalHandler: options.approvalHandler }),
     idFactory: (() => {
       let id = 0;
       return (kind: string) => `${kind}-${String(++id)}`;
@@ -203,7 +210,12 @@ describe('AgentLoop', () => {
     ]);
     const store = new MemoryStore();
     const policy: SafetyPolicy = {
-      evaluate: vi.fn().mockResolvedValue({ action: 'deny', reason: 'forbidden', hard: true }),
+      evaluate: vi.fn().mockResolvedValue({
+        action: 'deny',
+        reason: 'forbidden',
+        hard: true,
+        ruleId: 'policy.test.deny',
+      }),
     };
 
     const result = await createLoop({ provider, store, tools: [tool()], policy }).run('inspect');
@@ -212,6 +224,9 @@ describe('AgentLoop', () => {
     expect(
       store.events.filter((item) => item.type.startsWith('tool.')).map((item) => item.type),
     ).toEqual(['tool.requested', 'tool.denied']);
+    expect(store.events.find((item) => item.type === 'tool.denied')).toMatchObject({
+      payload: { hard: true, policyRuleId: 'policy.test.deny' },
+    });
   });
 
   it('limits repeated equivalent tool calls before executing the threshold call', async () => {
@@ -358,11 +373,12 @@ describe('AgentLoop', () => {
       evaluate: vi.fn().mockImplementation((request) =>
         Promise.resolve(
           request.sessionApprovals.has('approval-key')
-            ? { action: 'allow', reason: 'session approval' }
+            ? { action: 'allow', reason: 'session approval', ruleId: 'policy.test.session' }
             : {
                 action: 'ask',
                 reason: 'confirm',
                 approvalKey: 'approval-key',
+                ruleId: 'policy.test.ask',
               },
         ),
       ),
@@ -410,6 +426,75 @@ describe('AgentLoop', () => {
     expect(approvalHandler.requestApproval).toHaveBeenCalledOnce();
     expect(store.events.filter((item) => item.type === 'approval.granted')).toHaveLength(1);
     expect(inspect.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('persists structured approval.denied outcome for handler failure, user deny, and non-interactive deny', async () => {
+    const askPolicy: SafetyPolicy = {
+      evaluate: vi.fn().mockResolvedValue({
+        action: 'ask',
+        reason: 'confirm',
+        approvalKey: 'approval-key',
+        ruleId: 'policy.test.ask',
+      }),
+    };
+    const askTurn = {
+      events: [
+        { type: 'tool_call' as const, call: { id: 'call-1', name: 'inspect', arguments: {} } },
+        { type: 'completed' as const, finishReason: 'tool_calls' as const },
+      ],
+    };
+
+    const failedStore = new MemoryStore();
+    await createLoop({
+      provider: new FakeProvider([askTurn]),
+      store: failedStore,
+      tools: [tool()],
+      policy: askPolicy,
+      approvalHandler: {
+        requestApproval: vi.fn().mockRejectedValue(new Error('backend unavailable')),
+      },
+    }).run('ask');
+    const failedDenied = failedStore.events.find(
+      (item): item is EchoEventOf<'approval.denied'> => item.type === 'approval.denied',
+    );
+    expect(failedDenied?.payload).toMatchObject({
+      reason: 'The approval request could not be completed.',
+      policyRuleId: 'policy.test.ask',
+      outcome: 'failed',
+    });
+
+    const userStore = new MemoryStore();
+    await createLoop({
+      provider: new FakeProvider([askTurn]),
+      store: userStore,
+      tools: [tool()],
+      policy: askPolicy,
+      approvalHandler: { requestApproval: vi.fn().mockResolvedValue('deny' as const) },
+    }).run('ask');
+    const userDenied = userStore.events.find(
+      (item): item is EchoEventOf<'approval.denied'> => item.type === 'approval.denied',
+    );
+    expect(userDenied?.payload).toMatchObject({
+      reason: 'The user denied this operation.',
+      policyRuleId: 'policy.test.ask',
+      outcome: 'denied',
+    });
+
+    const defaultStore = new MemoryStore();
+    await createLoop({
+      provider: new FakeProvider([askTurn]),
+      store: defaultStore,
+      tools: [tool()],
+      policy: askPolicy,
+    }).run('ask');
+    const defaultDenied = defaultStore.events.find(
+      (item): item is EchoEventOf<'approval.denied'> => item.type === 'approval.denied',
+    );
+    expect(defaultDenied?.payload).toMatchObject({
+      reason: 'Approval is required and non-interactive execution defaults to deny.',
+      policyRuleId: 'policy.test.ask',
+      outcome: 'denied',
+    });
   });
 
   it('continues a persisted session without emitting a second session.started event', async () => {

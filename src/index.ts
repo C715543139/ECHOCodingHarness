@@ -21,6 +21,6 @@ export * from './context/index.js';
 export * from './contracts/index.js';
 export { PROJECT_NAME, PROJECT_TAGLINE, PROJECT_VERSION } from './core/project.js';
 export * from './provider/index.js';
-export { CentralSafetyPolicy } from './security/index.js';
+export { CentralSafetyPolicy, POLICY_RULE_IDS } from './security/index.js';
 export * from './session/index.js';
 export * from './tools/index.js';

@@ -307,7 +307,9 @@ describe('ProcessModelCatalog', () => {
       provider,
       providerIdentity: identity,
       tools: new ToolRegistry([]),
-      policy: { evaluate: async () => ({ action: 'allow', reason: 'allow' }) },
+      policy: {
+        evaluate: async () => ({ action: 'allow', reason: 'allow', ruleId: 'policy.test.allow' }),
+      },
       contextBuilder: new EventContextBuilder({ systemPrompt: 'system' }),
       workspaceRoot: directory,
       maxSteps: 2,
@@ -364,7 +366,9 @@ describe('ProcessModelCatalog', () => {
       provider,
       providerIdentity: identity,
       tools: new ToolRegistry([]),
-      policy: { evaluate: async () => ({ action: 'allow', reason: 'allow' }) },
+      policy: {
+        evaluate: async () => ({ action: 'allow', reason: 'allow', ruleId: 'policy.test.allow' }),
+      },
       contextBuilder: new EventContextBuilder({ systemPrompt: 'system' }),
       workspaceRoot: directory,
       maxSteps: 2,

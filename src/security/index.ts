@@ -1,1 +1,6 @@
-export { CentralSafetyPolicy, DEFAULT_SAFETY_MODE } from './central-safety-policy.js';
+export {
+  CentralSafetyPolicy,
+  DEFAULT_SAFETY_MODE,
+  POLICY_RULE_IDS,
+  type PolicyRuleId,
+} from './central-safety-policy.js';

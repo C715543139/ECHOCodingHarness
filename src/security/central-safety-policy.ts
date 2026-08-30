@@ -7,19 +7,49 @@ import type {
   SafetyMode,
   SafetyPolicy,
 } from '../contracts/index.js';
+import { redactText } from '../session/redaction.js';
 
 export const DEFAULT_SAFETY_MODE: SafetyMode = 'balanced';
+
+export const POLICY_RULE_IDS = {
+  pathUncOrDevice: 'policy.path.unc_or_device',
+  pathWorkspaceEscape: 'policy.path.workspace_escape',
+  pathGitInternal: 'policy.path.git_internal',
+  toolReadWorkspace: 'policy.tool.read_workspace',
+  toolWriteSafeAsk: 'policy.tool.write_safe_ask',
+  toolWriteModeAllow: 'policy.tool.write_mode_allow',
+  toolUnrecognized: 'policy.tool.unrecognized',
+  commandMissing: 'policy.command.missing',
+  commandBoundary: 'policy.command.boundary',
+  commandGitInternal: 'policy.command.git_internal',
+  commandCredential: 'policy.command.credential',
+  commandPrivilege: 'policy.command.privilege',
+  commandDestructive: 'policy.command.destructive',
+  commandDependency: 'policy.command.dependency',
+  commandGitMutation: 'policy.command.git_mutation',
+  commandNetwork: 'policy.command.network',
+  commandDelete: 'policy.command.delete',
+  commandScript: 'policy.command.script',
+  commandCompound: 'policy.command.compound',
+  commandValidation: 'policy.command.validation',
+  commandRead: 'policy.command.read',
+  commandLocalWrite: 'policy.command.local_write',
+  commandUnclassified: 'policy.command.unclassified',
+  approvalSessionEquivalent: 'policy.approval.session_equivalent',
+} as const;
+
+export type PolicyRuleId = (typeof POLICY_RULE_IDS)[keyof typeof POLICY_RULE_IDS];
 
 const READ_FILE_TOOLS = new Set(['list_files', 'read_file', 'search_text']);
 const WRITE_FILE_TOOLS = new Set(['apply_patch', 'write_file']);
 const PATH_KEYS = new Set(['directory', 'directories', 'file', 'files', 'path', 'paths', 'target']);
 
 type RiskClassification =
-  | Readonly<{ kind: 'hard_deny'; reason: string }>
-  | Readonly<{ kind: 'ask'; reason: string }>
-  | Readonly<{ kind: 'read'; reason: string }>
-  | Readonly<{ kind: 'validation'; reason: string }>
-  | Readonly<{ kind: 'local_write'; reason: string }>;
+  | Readonly<{ kind: 'hard_deny'; reason: string; ruleId: PolicyRuleId }>
+  | Readonly<{ kind: 'ask'; reason: string; ruleId: PolicyRuleId }>
+  | Readonly<{ kind: 'read'; reason: string; ruleId: PolicyRuleId }>
+  | Readonly<{ kind: 'validation'; reason: string; ruleId: PolicyRuleId }>
+  | Readonly<{ kind: 'local_write'; reason: string; ruleId: PolicyRuleId }>;
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -46,12 +76,28 @@ function approvalKey(toolName: string, normalizedInput: unknown): string {
   return `approval:${toolName}:${digest}`;
 }
 
-function askOrApproved(request: PolicyRequest, reason: string): PolicyDecision {
+function safeReason(reason: string, workspaceRoot: string): string {
+  return redactText(reason, { workspaceRoot });
+}
+
+function askOrApproved(
+  request: PolicyRequest,
+  reason: string,
+  ruleId: PolicyRuleId,
+): PolicyDecision {
   const key = approvalKey(request.toolName, request.normalizedInput);
+  const redacted = safeReason(reason, request.workspaceRoot);
   if (request.sessionApprovals.has(key)) {
-    return { action: 'allow', reason: `Approved for this equivalent session operation: ${reason}` };
+    return {
+      action: 'allow',
+      reason: safeReason(
+        `Approved for this equivalent session operation: ${redacted}`,
+        request.workspaceRoot,
+      ),
+      ruleId: POLICY_RULE_IDS.approvalSessionEquivalent,
+    };
   }
-  return { action: 'ask', reason, approvalKey: key };
+  return { action: 'ask', reason: redacted, approvalKey: key, ruleId };
 }
 
 function normalizedRoot(workspaceRoot: string): string {
@@ -84,16 +130,25 @@ function declaredPathViolation(
   normalizedInput: unknown,
   workspaceRoot: string,
   denyGitWrites: boolean,
-): string | undefined {
+): Readonly<{ reason: string; ruleId: PolicyRuleId }> | undefined {
   for (const candidate of collectDeclaredPaths(normalizedInput)) {
     if (/^(?:\\\\[?.]\\|\\\\)/u.test(candidate)) {
-      return 'UNC and device paths are outside the supported workspace boundary.';
+      return {
+        reason: 'UNC and device paths are outside the supported workspace boundary.',
+        ruleId: POLICY_RULE_IDS.pathUncOrDevice,
+      };
     }
     if (!isInsideWorkspace(candidate, workspaceRoot)) {
-      return 'The normalized target escapes the fixed workspace root.';
+      return {
+        reason: 'The normalized target escapes the fixed workspace root.',
+        ruleId: POLICY_RULE_IDS.pathWorkspaceEscape,
+      };
     }
     if (denyGitWrites && /(?:^|[\\/])\.git(?:[\\/]|$)/iu.test(candidate)) {
-      return 'Writing Git internal data is forbidden.';
+      return {
+        reason: 'Writing Git internal data is forbidden.',
+        ruleId: POLICY_RULE_IDS.pathGitInternal,
+      };
     }
   }
   return undefined;
@@ -159,7 +214,13 @@ function isBroadDelete(command: string, workspaceRoot: string): boolean {
 
 function classifyCommand(command: string, workspaceRoot: string): RiskClassification {
   const boundaryViolation = commandBoundaryViolation(command, workspaceRoot);
-  if (boundaryViolation !== undefined) return { kind: 'hard_deny', reason: boundaryViolation };
+  if (boundaryViolation !== undefined) {
+    return {
+      kind: 'hard_deny',
+      reason: boundaryViolation,
+      ruleId: POLICY_RULE_IDS.commandBoundary,
+    };
+  }
 
   if (
     /(?:^|[\s"'(\\/])\.git(?=[\\/\s"')]|$)/iu.test(command) &&
@@ -168,6 +229,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     return {
       kind: 'hard_deny',
       reason: 'Direct command writes to Git internal data are forbidden.',
+      ruleId: POLICY_RULE_IDS.commandGitInternal,
     };
   }
 
@@ -179,7 +241,11 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     /GetEnvironmentVariables\s*\(/iu.test(command) ||
     /(?:^|[\\/])(?:\.ssh|\.aws|\.azure)(?:[\\/]|$)/iu.test(command)
   ) {
-    return { kind: 'hard_deny', reason: 'Credential access or environment export is forbidden.' };
+    return {
+      kind: 'hard_deny',
+      reason: 'Credential access or environment export is forbidden.',
+      ruleId: POLICY_RULE_IDS.commandCredential,
+    };
   }
 
   if (
@@ -190,6 +256,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     return {
       kind: 'hard_deny',
       reason: 'Privilege escalation or system security changes are forbidden.',
+      ruleId: POLICY_RULE_IDS.commandPrivilege,
     };
   }
 
@@ -212,6 +279,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     return {
       kind: 'hard_deny',
       reason: 'Encoded execution or broad destructive effects are forbidden.',
+      ruleId: POLICY_RULE_IDS.commandDestructive,
     };
   }
 
@@ -220,7 +288,11 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
       command,
     )
   ) {
-    return { kind: 'ask', reason: 'Dependency or software changes require approval.' };
+    return {
+      kind: 'ask',
+      reason: 'Dependency or software changes require approval.',
+      ruleId: POLICY_RULE_IDS.commandDependency,
+    };
   }
   if (
     /\bgit\s+(?:add|commit|push|pull|fetch|clone|checkout|switch|merge|rebase|reset|clean|tag|stash|restore|rm|mv)\b|\bgit\s+branch\b[\s\S]*(?:-[dDmM]\b|--delete\b)/iu.test(
@@ -230,6 +302,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     return {
       kind: 'ask',
       reason: 'Git writes, history changes, or remote operations require approval.',
+      ruleId: POLICY_RULE_IDS.commandGitMutation,
     };
   }
   if (
@@ -237,10 +310,18 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
       command,
     )
   ) {
-    return { kind: 'ask', reason: 'External network access requires approval.' };
+    return {
+      kind: 'ask',
+      reason: 'External network access requires approval.',
+      ruleId: POLICY_RULE_IDS.commandNetwork,
+    };
   }
   if (DELETE_COMMAND_PATTERN.test(command)) {
-    return { kind: 'ask', reason: 'Deletion requires approval.' };
+    return {
+      kind: 'ask',
+      reason: 'Deletion requires approval.',
+      ruleId: POLICY_RULE_IDS.commandDelete,
+    };
   }
   if (
     /(?:^|[\s;&|])(?:&\s*)?\.\.?[\\/][^\s]+\.(?:ps1|cmd|bat)\b|\bpowershell(?:\.exe)?\b[\s\S]*\s-File\b|\b(?:node|python|py)\s+[^\s-][^\s]*\.(?:js|mjs|cjs|py)\b/iu.test(
@@ -250,12 +331,14 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     return {
       kind: 'ask',
       reason: 'Executing an unclassified repository script requires approval.',
+      ruleId: POLICY_RULE_IDS.commandScript,
     };
   }
   if (/[;&|]|(?:^|[^>])>(?:>|[^=])/u.test(command)) {
     return {
       kind: 'ask',
       reason: 'Compound commands, pipelines, and redirection require approval.',
+      ruleId: POLICY_RULE_IDS.commandCompound,
     };
   }
   if (
@@ -263,7 +346,11 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
       command,
     )
   ) {
-    return { kind: 'validation', reason: 'Known project validation command.' };
+    return {
+      kind: 'validation',
+      reason: 'Known project validation command.',
+      ruleId: POLICY_RULE_IDS.commandValidation,
+    };
   }
   if (
     /^\s*git\s+(?:status|diff|log|show|rev-parse)(?:\s|$)/iu.test(command) ||
@@ -272,30 +359,45 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
       command,
     )
   ) {
-    return { kind: 'read', reason: 'Known read-only diagnostic command.' };
+    return {
+      kind: 'read',
+      reason: 'Known read-only diagnostic command.',
+      ruleId: POLICY_RULE_IDS.commandRead,
+    };
   }
   if (
     /^\s*(?:Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Rename-Item)\b/iu.test(command)
   ) {
-    return { kind: 'local_write', reason: 'Explicitly scoped workspace command write.' };
+    return {
+      kind: 'local_write',
+      reason: 'Explicitly scoped workspace command write.',
+      ruleId: POLICY_RULE_IDS.commandLocalWrite,
+    };
   }
-  return { kind: 'ask', reason: 'The command effect is not explicitly classified as safe.' };
+  return {
+    kind: 'ask',
+    reason: 'The command effect is not explicitly classified as safe.',
+    ruleId: POLICY_RULE_IDS.commandUnclassified,
+  };
 }
 
 function modeDecision(
   request: PolicyRequest,
   classification: Exclude<RiskClassification, { kind: 'hard_deny' }>,
 ): PolicyDecision {
-  if (classification.kind === 'ask') return askOrApproved(request, classification.reason);
-  if (classification.kind === 'read') return { action: 'allow', reason: classification.reason };
+  const reason = safeReason(classification.reason, request.workspaceRoot);
+  if (classification.kind === 'ask') return askOrApproved(request, reason, classification.ruleId);
+  if (classification.kind === 'read') {
+    return { action: 'allow', reason, ruleId: classification.ruleId };
+  }
   if (classification.kind === 'validation') {
     return request.mode === 'safe'
-      ? askOrApproved(request, classification.reason)
-      : { action: 'allow', reason: classification.reason };
+      ? askOrApproved(request, reason, classification.ruleId)
+      : { action: 'allow', reason, ruleId: classification.ruleId };
   }
   return request.mode === 'auto'
-    ? { action: 'allow', reason: classification.reason }
-    : askOrApproved(request, classification.reason);
+    ? { action: 'allow', reason, ruleId: classification.ruleId }
+    : askOrApproved(request, reason, classification.ruleId);
 }
 
 export class CentralSafetyPolicy implements SafetyPolicy {
@@ -307,38 +409,71 @@ export class CentralSafetyPolicy implements SafetyPolicy {
       denyGitWrites,
     );
     if (pathViolation !== undefined) {
-      return Promise.resolve({ action: 'deny', reason: pathViolation, hard: true });
+      return Promise.resolve({
+        action: 'deny',
+        reason: safeReason(pathViolation.reason, request.workspaceRoot),
+        hard: true,
+        ruleId: pathViolation.ruleId,
+      });
     }
 
     if (READ_FILE_TOOLS.has(request.toolName)) {
-      return Promise.resolve({ action: 'allow', reason: 'Workspace-scoped read operation.' });
+      return Promise.resolve({
+        action: 'allow',
+        reason: safeReason('Workspace-scoped read operation.', request.workspaceRoot),
+        ruleId: POLICY_RULE_IDS.toolReadWorkspace,
+      });
     }
     if (WRITE_FILE_TOOLS.has(request.toolName)) {
       return Promise.resolve(
         request.mode === 'safe'
-          ? askOrApproved(request, 'Workspace file writes require approval in safe mode.')
-          : { action: 'allow', reason: 'Workspace-scoped file write allowed by this mode.' },
+          ? askOrApproved(
+              request,
+              'Workspace file writes require approval in safe mode.',
+              POLICY_RULE_IDS.toolWriteSafeAsk,
+            )
+          : {
+              action: 'allow',
+              reason: safeReason(
+                'Workspace-scoped file write allowed by this mode.',
+                request.workspaceRoot,
+              ),
+              ruleId: POLICY_RULE_IDS.toolWriteModeAllow,
+            },
       );
     }
     if (request.toolName !== 'run_command') {
       return Promise.resolve({
         action: 'deny',
-        reason: 'Unrecognized tools cannot bypass the centralized safety policy.',
+        reason: safeReason(
+          'Unrecognized tools cannot bypass the centralized safety policy.',
+          request.workspaceRoot,
+        ),
         hard: true,
+        ruleId: POLICY_RULE_IDS.toolUnrecognized,
       });
     }
     if (!isRecord(request.normalizedInput) || typeof request.normalizedInput.command !== 'string') {
       return Promise.resolve({
         action: 'deny',
-        reason: 'run_command requires a normalized command string.',
+        reason: safeReason(
+          'run_command requires a normalized command string.',
+          request.workspaceRoot,
+        ),
         hard: false,
+        ruleId: POLICY_RULE_IDS.commandMissing,
       });
     }
 
     const classification = classifyCommand(request.normalizedInput.command, request.workspaceRoot);
     return Promise.resolve(
       classification.kind === 'hard_deny'
-        ? { action: 'deny', reason: classification.reason, hard: true }
+        ? {
+            action: 'deny',
+            reason: safeReason(classification.reason, request.workspaceRoot),
+            hard: true,
+            ruleId: classification.ruleId,
+          }
         : modeDecision(request, classification),
     );
   }

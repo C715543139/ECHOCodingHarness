@@ -1,8 +1,8 @@
 # ECHO Harness 本地 Web API 契约
 
-> 状态：Accepted design contract（尚未实现）
+> 状态：Accepted design contract（类型与 Schema 已由 A1 冻结，HTTP 路由尚未实现）
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-08-30
 
@@ -219,8 +219,10 @@ interface ProviderConfigDto {
 }
 ```
 
-`WorkspaceSummaryDto.name` 只能是工作区目录的脱敏显示名；`fingerprint` 是不可逆标识。不得返回绝对
-路径。Session title 来自脱敏用户目标或短 ID，不包含模型生成的未经检查身份信息。
+`WorkspaceSummaryDto.name` 只能是工作区目录的 basename（1–255，禁止 `/` `\` `:`、控制字符以及 `.` /
+`..`），不得接收 Windows 或 POSIX 绝对路径；`fingerprint` 是不可逆标识。Session title 来自脱敏用户
+目标或短 ID，不包含模型生成的未经检查身份信息。运行时 JSON Schema 对全部跨 HTTP/SSE 边界 DTO 强制
+这些长度与数组上限；`Page` 与 `ApiResponse` 由统一工厂生成。
 
 `RuntimeCapabilitiesDto` 是服务端对当前选中 Session 和进程状态的事实投影，前端不得自行推导权限：
 

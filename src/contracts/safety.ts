@@ -1,9 +1,9 @@
 export type SafetyMode = 'safe' | 'balanced' | 'auto';
 
 export type PolicyDecision =
-  | Readonly<{ action: 'allow'; reason: string }>
-  | Readonly<{ action: 'ask'; reason: string; approvalKey: string }>
-  | Readonly<{ action: 'deny'; reason: string; hard: boolean }>;
+  | Readonly<{ action: 'allow'; reason: string; ruleId: string }>
+  | Readonly<{ action: 'ask'; reason: string; approvalKey: string; ruleId: string }>
+  | Readonly<{ action: 'deny'; reason: string; hard: boolean; ruleId: string }>;
 
 export interface PolicyRequest {
   readonly mode: SafetyMode;

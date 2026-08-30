@@ -224,9 +224,9 @@ interface ToolResultMessage {
 type SafetyMode = "safe" | "balanced" | "auto";
 
 type PolicyDecision =
-  | { action: "allow"; reason: string }
-  | { action: "ask"; reason: string; approvalKey: string }
-  | { action: "deny"; reason: string; hard: boolean };
+  | { action: "allow"; reason: string; ruleId: string }
+  | { action: "ask"; reason: string; approvalKey: string; ruleId: string }
+  | { action: "deny"; reason: string; hard: boolean; ruleId: string };
 
 interface PolicyRequest {
   mode: SafetyMode;
@@ -248,6 +248,11 @@ interface SafetyPolicy {
 - 非交互模式遇到 `ask` 时按显式配置处理，默认拒绝；
 - 会话级批准只适用于等价的规范化操作，不得泛化为关闭安全检查；
 - 工作区外访问始终为硬拒绝。
+- P2 新 Writer 的每种 `PolicyDecision` 必须携带稳定 `ruleId`，且 `reason` 必须已经脱敏，不得包含绝对路径、家目录或秘密；
+- 对应授权、审批或拒绝事件写入可选 `policyRuleId` 与脱敏原因；旧 Session 缺少这些字段时只标记 `legacy_unrecorded`，不得由前端补算，也不单独提升 Session schema。
+- Policy Explain 事实按 `toolCallId` 聚合完整事件序列，并严格区分三层：`policy`（`action`/`ruleId`/`reason`/`hard?`）、`approval`（`not_required`/`pending`/`allowed_once`/`allowed_session`/`denied`/`failed`）与 `execution`（`not_started`/`authorized`/`running`/`completed`/`failed`/`denied`/`cancelled`）。
+- 原始 `action=ask` 在用户批准或拒绝后仍保持 `ask`，不得因后续 `tool.authorized` 或 `tool.denied` 改写为 `allow` 或 `deny`。
+- `approval.denied` 的 `failed` 与 `denied` 只由可选结构化字段 `outcome` 判别：新 Writer 必须写入 `outcome: "failed"`（审批处理器失败）或 `outcome: "denied"`（用户拒绝或非交互默认拒绝）；不得根据 `reason` 展示文案推断。旧事件缺少 `outcome` 时按 `denied` 兼容读取，不提升事件或 Session schema。
 
 ## 6. 会话事件
 
@@ -323,7 +328,7 @@ Provider 的 `text_delta` 仍是实时传输事件，但版本 3 Writer 必须�
 跨 Step 重用或空白 ID 均映射为不可重试的 `provider_protocol` 错误；该响应不得产生
 `tool.requested`，也不得执行任何工具。
 
-`approval.requested` 记录待审批操作及风险原因；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录用户拒绝。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
+`approval.requested` 记录待审批操作及风险原因，P2 新 Writer 必须附加 `policyRuleId`；`approval.granted` 记录本次或当前 Session 的授权范围；`approval.denied` 记录拒绝或审批失败，并可回写触发该审批的 `policyRuleId`。P2 新 Writer 必须持久化结构化 `outcome: "denied" | "failed"`：用户选择 deny 与无 handler 的非交互默认拒绝写 `denied`，审批处理器抛错且未取消写 `failed`。`reason` 仍是脱敏展示文案，不参与分类。旧 Session 缺少 `outcome` 时按 `denied` 兼容读取，不得由展示文本补算，也不提升事件 schema。`tool.authorized` 与 `tool.denied` 在新 Writer 下同样携带 `policyRuleId` 与脱敏原因。旧事件字段缺失时 Reader 必须保持可读。首批 payload 类型在 `src/contracts/events.ts` 中固化，后续实现只能通过共享契约变更细化。事件的公共字段和状态语义应保持稳定，以便 CLI 与未来界面复用。
 
 P0 事件模式版本为 `1`（缺省视为 1）。P1 事件模式版本为 `2`：必须能记录 Session/Turn/Step 标识与时间、模型与安全模式变化、Context 投影版本/预算/估算量/裁剪原因摘要、工具请求、策略 rule ID、审批、执行终态、命令耗时/退出码/截断，以及 Turn 终态与可引用验证结果。`session.resumed`、`model.changed` 和 `safety.changed` 属于版本 2。P1.5 事件模式版本为 `3`：新 Session 写入版本 3，增加聚合 `model.text`、聚合 `model.reasoning` 与停止原因 `output_limit`。版本 3 Writer 不写 `model.text_delta`；Reader 接受并验证两个聚合事件，同时兼容旧版本及修订前本地 v3 的正文增量。版本 2 Session 继续可读和恢复，但不补造历史推理字段。恢复时遇到未知事件类型、未知未来版本、损坏聚合 payload 或同一 Step 混用两种正文表示必须失败，不得丢弃后继续。现有 payload 的新增字段在版本 2 中可选，P0 写入方可省略。CLI `EventRenderer` 对 `model.reasoning` 保持无输出，对新旧正文表示产生相同聚合显示，不得改变 stdout/stderr 契约。
 

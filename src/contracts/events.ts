@@ -94,10 +94,17 @@ export interface EchoEventPayloads {
     approvalKey: string;
     scope: 'once' | 'session';
   }>;
-  readonly 'approval.denied': Readonly<{ toolCallId: ToolCallId; reason: string }>;
+  readonly 'approval.denied': Readonly<{
+    toolCallId: ToolCallId;
+    reason: string;
+    policyRuleId?: string;
+    outcome?: 'denied' | 'failed';
+  }>;
   readonly 'tool.authorized': Readonly<{
     toolCallId: ToolCallId;
     source: 'policy' | 'approval';
+    policyRuleId?: string;
+    reason?: string;
   }>;
   readonly 'tool.started': Readonly<{ toolCallId: ToolCallId; toolName: string }>;
   readonly 'tool.completed': Readonly<{

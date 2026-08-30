@@ -1,8 +1,8 @@
 # P2 本地 WebUI 与可解释性工作台计划
 
-> 状态：Accepted plan（A0 基线已实现，其余尚未实现）
+> 状态：Accepted plan（A0/A1 已实现，其余尚未实现）
 >
-> 版本：1.2
+> 版本：1.3
 >
 > 最后更新：2026-08-30
 
@@ -265,9 +265,11 @@ echo-harness web
    Node 下限已收紧为 `>=22.12.0 <23`；[AGENTS.md](../../AGENTS.md) 已同步；`src/web/server`、
    `src/web/client`、分层测试目录、`pnpm test:web` 与写入 `dist/web/` 的 `pnpm build:web` 已建立。
    A0 只交付可验证的最小壳层，不声称 Fastify API、产品页面或浏览器流程已经实现。
-2. **A1：Web 契约与 Policy Explain 事实**。冻结 DTO（含 `SessionViewDto`、能力状态表、写操作响应、
-   完整 SSE 判别联合与扩展后的 `toolSummaries`）、错误码、幂等冲突语义和 Schema；为所有
-   `PolicyDecision` 增加稳定 `ruleId`，旧 Session 可读。
+2. **A1：Web 契约与 Policy Explain 事实（已实现）**。已冻结全部跨 HTTP/SSE 边界 DTO 的运行时 JSON Schema
+   （Page/ApiResponse 由统一工厂生成，长度与数组上限集中定义）、错误码、幂等终态语义和三层
+   Policy Explain 事实。`PolicyDecision` 携带稳定 `ruleId`，新 Writer 写入授权/审批/拒绝事件，旧 Session
+   缺少字段时按可选兼容读取，不提升 Session schema。DTO 脱敏约束已冻结，真实投影器尚未实现，
+   P2-1-05 不得标为 Accepted。本任务不实现 HTTP 路由或页面。
 3. **A2：共享 Provider 配置服务**。抽出 CLI 背后的读取、校验、发现和原子写入；API Key 仍只来自
    环境变量。
 4. **A3：Fastify 服务骨架**。固定工作区生命周期、bootstrap 认证、Host/Origin 防护、静态资源和

@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：1.4
+> 版本：1.5
 >
 > 最后更新：2026-08-30
 
@@ -318,10 +318,12 @@ P1-2A 已使 `run` 读取 `<artifact-root>/config/echo.config.json`。P1-2B 已�
 ## 15. P2 Web 扩展边界
 
 P2 按 [ADR-0007](./decisions/0007-local-web-console.md) 增加 Fastify loopback adapter 和 React/Vite
-页面。实现落点为 `src/web/server` 与 `src/web/client`，静态资源写入 `dist/web/`。WebUI 只依赖公开
-应用服务、共享配置服务和有界 DTO；UI 状态不得反向侵入 Agent Loop。工作区在启动时固定，Provider
-API Key 不进入浏览器，进程同时只允许一个活动 Turn。远程展示页、多用户、跨工作区控制台、第二种
-Session 存储和导出会话仍不属于当前承诺。
+页面。实现落点为 `src/web/server` 与 `src/web/client`，静态资源写入 `dist/web/`。A1 已冻结共享 Web
+DTO、JSON Schema、错误码、能力状态表、写操作响应、SSE 判别联合与进程内 `requestId` 幂等冲突语义
+（`src/contracts/web.ts`、`src/contracts/web-schema.ts`），并补齐 `PolicyDecision.ruleId` 与旧 Session
+可读的 Policy Explain 事实。WebUI 只依赖公开应用服务、共享配置服务和这些有界 DTO；UI 状态不得反向
+侵入 Agent Loop。工作区在启动时固定，Provider API Key 不进入浏览器，进程同时只允许一个活动 Turn。
+远程展示页、多用户、跨工作区控制台、第二种 Session 存储和导出会话仍不属于当前承诺。
 
 ## 16. 独立实现与原创边界
 
@@ -355,5 +357,6 @@ CLI 显示时机和 stdout/stderr 契约。空响应、推理预算耗尽、部�
 `chat` 恢复、Slash 与粘贴适配器接到同一应用服务。固定失败测试故事已在一个受控 OpenAI-compatible
 服务上连续完成 3 次；真实 Provider 兼容性验证保持为显式本地验收，不进入 CI。
 
-P2 已完成计划、ADR、API 与 UI 契约冻结，但 `echo-harness web`、Fastify adapter、React 页面和浏览器
-测试尚未实现。实现状态只能在对应自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后更新。
+P2 已完成计划、ADR、API 与 UI 契约冻结，A1 已把 Web DTO/Schema 与 Policy Explain 事实落到类型和
+聚焦测试。`echo-harness web`、Fastify adapter、React 页面和浏览器测试尚未实现。实现状态只能在对应
+自动化、Windows 产物 smoke 和受控真实 Provider 验收完成后把 API 文档从设计契约改为已交付。

@@ -89,6 +89,11 @@ export function TraceView({
           {list.unseenCount > 0 ? `新事件 ${String(list.unseenCount)}` : '回到最新'}
         </button>
       )}
+      <div aria-hidden="true" className={styles.traceColumns}>
+        <span>时间</span>
+        <span>事件</span>
+        <span>状态</span>
+      </div>
       <div
         className={styles.scroll}
         onScroll={(event) => {
@@ -184,17 +189,21 @@ function TraceRow({
         }}
         type="button"
       >
-        <strong>
-          {record.time.slice(11, 19)} · {record.type} · {record.label}
-        </strong>
-        <span className={styles.sessionMeta}>
+        <span className={styles.traceTime}>{record.time.slice(11, 19)}</span>
+        <span className={styles.traceLabel}>
+          <span className={styles.traceKind}>{record.type}</span>
+          {record.label}
+        </span>
+        <span className={styles.traceStatus}>
           {record.status}
           {record.durationMs === undefined ? '' : ` · ${String(record.durationMs)} ms`}
-          {record.parameterSummary === undefined ? '' : ` · ${record.parameterSummary}`}
         </span>
-        {record.resultSummary === undefined ? null : (
-          <span className={styles.traceResult}>{record.resultSummary}</span>
-        )}
+        <span className={styles.traceResult}>
+          {record.parameterSummary ?? ''}
+          {record.resultSummary === undefined
+            ? ''
+            : `${record.parameterSummary === undefined ? '' : ' · '}${record.resultSummary}`}
+        </span>
       </button>
     </div>
   );

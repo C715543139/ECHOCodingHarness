@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { TraceRecordDetailDto } from '../../../contracts/web.js';
+import { Glyph } from './glyph.js';
 import styles from './shell.module.css';
 
 const COLLAPSE_AFTER = 400;
@@ -24,8 +25,14 @@ export function InspectorPane({
         <h2 id="inspector-title" ref={headingRef} tabIndex={-1}>
           Inspector
         </h2>
-        <button className={styles.secondaryButton} onClick={onClose} type="button">
-          关闭
+        <button
+          aria-label="关闭"
+          className={styles.iconButton}
+          onClick={onClose}
+          title="关闭"
+          type="button"
+        >
+          <Glyph name="close" />
         </button>
       </div>
       <p className={styles.inspectorIdentity}>
@@ -35,9 +42,9 @@ export function InspectorPane({
         <section className={styles.inspectorSection} key={`${detail.id}:${section.key}`}>
           <h3>{section.title}</h3>
           {(section.fields ?? []).map((field) => (
-            <p key={field.label}>
-              <span className={styles.muted}>{field.label}：</span>
-              {field.value}
+            <p className={styles.inspectorField} key={field.label}>
+              <span className={styles.inspectorLabel}>{field.label}：</span>
+              <span className={styles.inspectorFieldValue}>{field.value}</span>
             </p>
           ))}
           {section.code === undefined ? null : (
@@ -49,9 +56,9 @@ export function InspectorPane({
           )}
           {section.diff === undefined ? null : (
             <div>
-              <p>
-                <span className={styles.muted}>路径：</span>
-                {section.diff.path}
+              <p className={styles.inspectorField}>
+                <span className={styles.inspectorLabel}>路径：</span>
+                <span className={styles.inspectorFieldValue}>{section.diff.path}</span>
               </p>
               <BoundedBlock
                 label={`${section.title} diff`}

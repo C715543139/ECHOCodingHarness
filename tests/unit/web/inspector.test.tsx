@@ -234,4 +234,39 @@ describe('Trace Inspector selection', () => {
     expect(selected?.getAttribute('aria-label')).toBe('代理 agent completed');
     expect(selected?.textContent).toContain('long-summary-');
   });
+
+  it('renders decorative trace columns and keeps every row cell text-first', () => {
+    render(
+      <TraceView
+        onSelectRecord={() => undefined}
+        pageSize={100}
+        records={[
+          {
+            id: 'rec_1',
+            seq: 1,
+            turnId: 'turn-1',
+            time: '2026-08-30T09:12:34.000Z',
+            type: 'tool',
+            label: 'run_command',
+            status: 'completed',
+            hasDetails: true,
+            durationMs: 120,
+            parameterSummary: 'pnpm test',
+            resultSummary: 'exit 0',
+          },
+        ]}
+        selectedRecordId={undefined}
+      />,
+    );
+
+    const columns = screen.getByText('时间').parentElement;
+    expect(columns?.getAttribute('aria-hidden')).toBe('true');
+    expect(columns?.textContent).toBe('时间事件状态');
+
+    const row = screen.getByRole('button', { name: 'run_command tool completed' });
+    expect(row.textContent).toContain('09:12:34');
+    expect(row.textContent).toContain('completed · 120 ms');
+    expect(row.textContent).toContain('pnpm test · exit 0');
+    expect(screen.queryByRole('img')).toBeNull();
+  });
 });

@@ -80,6 +80,27 @@ describe('Session rail', () => {
     expect(screen.getByRole('button', { name: '新会话' })).toHaveProperty('disabled', true);
     expect(screen.getByText('Provider 不可用或本地 API 不可达')).toBeTruthy();
   });
+
+  it('collapses and expands the rail through a named toggle', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+    });
+    render(<App transport={transport} />);
+
+    const collapse = screen.getByRole('button', { name: '收起会话栏' });
+    expect(collapse.getAttribute('aria-expanded')).toBe('true');
+
+    await user.click(collapse);
+    expect(screen.queryByRole('button', { name: '新会话' })).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Session' })).toBeTruthy();
+
+    const expand = screen.getByRole('button', { name: '展开会话栏' });
+    expect(expand.getAttribute('aria-expanded')).toBe('false');
+    await user.click(expand);
+    expect(screen.getByRole('button', { name: '新会话' })).toBeTruthy();
+  });
 });
 
 describe('Session rail paging through Fake transport', () => {

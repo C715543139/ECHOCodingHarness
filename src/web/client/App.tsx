@@ -19,9 +19,12 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
     ownedTransport.getSnapshot,
   );
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const selected = snapshot.sessions.find((session) => session.id === snapshot.selectedSessionId);
   const inspectorOpen = snapshot.inspectorDetail !== undefined;
-  const shellClass = inspectorOpen ? `${styles.shell} ${styles.shellWithInspector}` : styles.shell;
+  const shellClass = `${styles.shell}${inspectorOpen ? ` ${styles.shellWithInspector}` : ''}${
+    railCollapsed ? ` ${styles.shellRailCollapsed}` : ''
+  }`;
   const controllerView = {
     catalogModels: catalogModels(snapshot.providerDraft),
     loadingHistory: snapshot.loadingHistory,
@@ -58,7 +61,11 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
       </a>
       <SessionRail
         canCreateSession={snapshot.bootstrap.capabilities.canCreateSession}
+        collapsed={railCollapsed}
         createBlockedReason={snapshot.bootstrap.capabilities.createSessionBlockedReason}
+        onToggleCollapsed={() => {
+          setRailCollapsed((current) => !current);
+        }}
         onCreateSession={() => {
           ownedTransport.createSession();
         }}

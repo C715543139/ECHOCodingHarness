@@ -17,7 +17,15 @@ body {
   background: var(--echo-color-bg);
   color: var(--echo-color-text);
   font-family: var(--echo-font-ui);
-  line-height: 1.45;
+  font-size: var(--echo-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--echo-color-heading);
 }
 
 button,

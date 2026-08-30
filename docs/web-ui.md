@@ -69,6 +69,30 @@ Session rail | Chat or Trace | Inspector
 - 使用 CSS Modules 与全局语义 token，不在功能组件写入散落颜色常量；
 - 动画只用于抽屉、状态过渡和流式提示，并遵循 `prefers-reduced-motion`。
 
+### 3.1 视觉基线（P2.5）
+
+控制台使用单一浅色主题，不提供深浅切换，也不维护第二套主题状态。权威 token 定义在
+`src/web/client/styles/tokens.css`，功能组件只能引用这些语义名：
+
+| 用途 | Token | 值 |
+| --- | --- | --- |
+| 画布底色 | `--echo-color-bg` | `#f7f8fa` |
+| Session rail 底色 | `--echo-color-rail` | `#f4f6f8` |
+| 卡面 | `--echo-color-surface` | `#ffffff` |
+| 次级填充（用户气泡、代码块） | `--echo-color-surface-subtle` | `#f1f3f7` |
+| 分隔线 | `--echo-color-border` | `#e3e6eb` |
+| 正文 | `--echo-color-text` | `#1f2430` |
+| 次要文本 | `--echo-color-muted` | `#5a6472` |
+| 主色 | `--echo-color-accent` | `#2563eb` |
+| 选中态填充 | `--echo-color-accent-soft` | `#e8eefb` |
+| 成功 / 警告 / 危险 | `--echo-color-success` / `-warning` / `-danger` | `#15803d` / `#b45309` / `#b91c1c` |
+| 运行提示条 | `--echo-color-info-soft` | `#eff4fe` |
+
+所有语义前景色与其所在背景的对比度不低于 WCAG 2.2 AA 正文要求；语义色只作为文字标签的补充，
+不得成为状态的唯一线索。圆角使用 `--echo-radius-sm|--echo-radius|--echo-radius-lg`，阴影使用
+`--echo-shadow-card|-raised|-dialog`，布局宽度使用 `--echo-rail-width`（15rem）与
+`--echo-inspector-width`（19rem）。
+
 公开产品只作为布局与渐进披露参考。ECHO 不复刻其品牌、颜色、图标、文案、组件代码或插件结构。
 
 最终实现见 [ECHO local Web console 截图](./assets/echo-web-console.png)。截图来自自动化浏览器中的已实现

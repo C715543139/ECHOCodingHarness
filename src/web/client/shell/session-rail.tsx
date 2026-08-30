@@ -11,6 +11,7 @@ import {
   type WebConsoleActions,
   type WebConsoleView,
 } from '../view-model/console-controller.js';
+import { Glyph } from './glyph.js';
 import { SESSION_PHASE_LABELS } from './labels.js';
 import styles from './shell.module.css';
 
@@ -31,6 +32,8 @@ export function SessionRail({
   settingsButtonRef,
   canCreateSession,
   createBlockedReason,
+  collapsed = false,
+  onToggleCollapsed,
   onCreateSession,
   onSelectSession,
   onOpenSettings,
@@ -43,6 +46,8 @@ export function SessionRail({
   readonly settingsButtonRef?: Ref<HTMLButtonElement>;
   readonly canCreateSession: boolean;
   readonly createBlockedReason: RuntimeBlockReason | undefined;
+  readonly collapsed?: boolean;
+  readonly onToggleCollapsed?: () => void;
   readonly onCreateSession: () => void;
   readonly onSelectSession: (id: string) => void;
   readonly onOpenSettings: () => void;
@@ -52,26 +57,57 @@ export function SessionRail({
   const blockedMessage = createBlockedMessage(createBlockedReason);
   const wired = hasWebConsoleActions(actions);
   const hasMoreSessions = view.hasMoreSessions;
+  const collapseToggle =
+    onToggleCollapsed === undefined ? null : (
+      <button
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? '展开会话栏' : '收起会话栏'}
+        className={styles.iconButton}
+        onClick={onToggleCollapsed}
+        type="button"
+      >
+        <Glyph name={collapsed ? 'chevronRight' : 'chevronLeft'} />
+      </button>
+    );
+
+  if (collapsed) {
+    return (
+      <nav aria-label="Session" className={`${styles.rail} ${styles.railCollapsed}`}>
+        {collapseToggle}
+      </nav>
+    );
+  }
 
   return (
     <nav aria-label="Session" className={styles.rail}>
-      <p className={styles.brand} id="echo-title">
-        ECHO
-      </p>
-      <p className={styles.workspaceName} data-testid="workspace-name">
-        {workspace.name}
-      </p>
+      <div className={styles.railHeader}>
+        <div className={styles.brandBlock}>
+          <p className={styles.brand} id="echo-title">
+            ECHO
+          </p>
+          <p className={styles.brandSub}>Coding Harness</p>
+        </div>
+        {collapseToggle}
+      </div>
       <button
         className={styles.newSession}
         disabled={!canCreateSession}
         onClick={onCreateSession}
         type="button"
       >
+        <Glyph name="plus" />
         新会话
       </button>
       {blockedMessage === undefined || canCreateSession ? null : (
         <p className={styles.blockReason}>{blockedMessage}</p>
       )}
+      <div className={styles.workspaceRow}>
+        <Glyph name="folder" />
+        <p className={styles.workspaceName} data-testid="workspace-name" title={workspace.name}>
+          {workspace.name}
+        </p>
+      </div>
+      <p className={styles.railSectionLabel}>会话</p>
       {sessions.length === 0 ? (
         <p className={styles.emptyHint}>尚无 Session。新建会话后开始对话。</p>
       ) : (
@@ -127,6 +163,7 @@ export function SessionRail({
           ref={settingsButtonRef}
           type="button"
         >
+          <Glyph name="gear" />
           设置
         </button>
       </div>

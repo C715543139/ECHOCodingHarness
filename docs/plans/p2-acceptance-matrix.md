@@ -28,7 +28,7 @@
 | P2-1-07 | 自动发现显式执行、不自动保存、错误脱敏 | integration | `tests/integration/web/provider-discovery.test.ts` | Accepted |
 | P2-1-08 | 整个进程最多一个活动 Turn | application / API | `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/turns.test.ts`, `tests/integration/web/security-fixture.test.ts` | Accepted |
 | P2-1-09 | 相同 requestId 重放同一响应且不重复副作用；不同请求指纹返回幂等冲突 | contract / integration | `tests/unit/web/idempotency.test.ts`, `tests/integration/web/idempotency.test.ts`, `tests/integration/web/production-assembly.test.ts` | Accepted |
-| P2-1-10 | SSE 判别联合、backlog 与 live 无缝衔接并按 seq 去重 | contract / integration | `tests/unit/web/sse-contract.test.ts`, `tests/unit/web/sse-hub.test.ts`, `tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts` | Accepted |
+| P2-1-10 | SSE 判别联合、backlog 与 live 无缝衔接并按 seq 去重；终态即时清除全局活动能力 | contract / integration | `tests/unit/web/sse-contract.test.ts`, `tests/unit/web/sse-hub.test.ts`, `tests/unit/web/http-transport.test.ts`, `tests/integration/web/sse.test.ts`, `tests/integration/web/sse-race.test.ts` | Accepted |
 | P2-1-11 | 无法连续补齐时显式 resync，不重放 POST | integration / browser | `tests/integration/web/sse-resync.test.ts`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-1-12 | 关闭时取消活动 Turn，10 秒内清理或非零退出 | integration / artifact | `tests/integration/web/shutdown.test.ts`, `scripts/smoke-web-artifact.mjs`, `scripts/smoke-web-isolated-artifact.mjs` | Accepted |
 | P2-1-13 | 每种 Policy 结论持久化稳定 rule ID 与原因，旧 Session 可读 | contract / session | `tests/unit/security/policy-explain.test.ts` | Accepted |
@@ -40,7 +40,7 @@
 | ID | 强制行为 | 主要测试层 | 计划证据 | 状态 |
 | --- | --- | --- | --- | --- |
 | P2-2-01 | Session 分页、新建、恢复和状态显示 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/integration/web/session-view.test.ts`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/session-flow.spec.ts` | Accepted |
-| P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`, `tests/unit/web/http-transport.test.ts` | Accepted |
+| P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交；当前/其他 Session 使用准确且不重复的运行提示 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-03 | Chat 历史只从聚合 `model.text` 恢复 | projection / browser | `tests/unit/web/chat-projection.test.ts`, `tests/unit/web/http-transport.test.ts`, `scripts/accept-web-provider.mjs` | Accepted |
 | P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-05 | 上滚暂停尾随并提供底部“回到最新”浮层恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/inspector.test.tsx` | Accepted |
@@ -111,8 +111,8 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 
 - 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
   时补录；
-- `pnpm check`：117 个测试文件、643 项测试通过；
-- 覆盖率：statements 85.00%、branches 76.92%、functions 89.23%、lines 86.81%；
+- `pnpm check`：117 个测试文件、644 项测试通过；
+- 覆盖率：statements 85.03%、branches 77.07%、functions 89.32%、lines 86.84%；
 - Web E2E：Playwright Chromium 10/10 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
   断线恢复、审批、Provider 秘密与 200 条 Trace；
 - Windows 非仓库 cwd 隔离产物 smoke：通过；

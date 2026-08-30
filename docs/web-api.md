@@ -564,6 +564,11 @@ heartbeat
 进行中的 Agent 或工具记录通过稳定 record/Turn ID 原位更新，不生成 chunk 行。heartbeat 不携带
 业务数据、不设置 SSE `id`，也不推进 Session `seq`。客户端按数值 `seq` 去重，只应用更大的值。
 
+`turn.terminal` 是活动 Turn 已结束的权威边界：其 `delta.view.session.phase` 必须为对应终态，
+`delta.view.capabilities` 不得继续携带该 Turn 的 `activeSessionId`、`activeTurnId` 或 `turn_active`
+阻断原因。客户端即使正在浏览另一 Session，也必须应用这份全局能力收敛，同时保持所浏览 Session 的
+内容不变。
+
 断线恢复顺序：
 
 1. 客户端使用最后确认的 Session seq 重连；

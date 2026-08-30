@@ -204,7 +204,10 @@ export function createHttpTransport(): WebConsoleTransport {
       sessions: upsertSession(snapshot.sessions, session),
       bootstrap: {
         ...snapshot.bootstrap,
-        capabilities: selected ? event.delta.view.capabilities : snapshot.bootstrap.capabilities,
+        capabilities:
+          selected || event.type === 'turn.terminal'
+            ? event.delta.view.capabilities
+            : snapshot.bootstrap.capabilities,
       },
       ...(selected
         ? {

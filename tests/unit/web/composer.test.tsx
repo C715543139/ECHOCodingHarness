@@ -90,6 +90,8 @@ describe('Composer shell', () => {
 
     expect(screen.getByRole('button', { name: '停止' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '发送' })).toHaveProperty('disabled', true);
+    expect(screen.queryByText('另一会话正在运行')).toBeNull();
+    expect(screen.getByText('当前 Session 正在运行。')).toBeTruthy();
   });
 
   it('changes model and safety mode only when no Turn is running', async () => {

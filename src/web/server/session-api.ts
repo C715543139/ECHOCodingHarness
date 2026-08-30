@@ -812,6 +812,34 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
     let lastSentSeq = after;
     let known = [...view.events];
 
+    const liveContext = (event: EchoEvent): SessionProjectionContext => {
+      const active = deps.coordinator.snapshot();
+      const terminalForActive =
+        (event.type === 'turn.completed' ||
+          event.type === 'turn.failed' ||
+          event.type === 'turn.cancelled') &&
+        active.sessionId === event.sessionId &&
+        active.turnId === event.turnId;
+      const activeSessionId = terminalForActive ? undefined : active.sessionId;
+      const activeTurnId = terminalForActive ? undefined : active.turnId;
+      return {
+        redaction: context.redaction,
+        capabilities: {
+          serviceState: context.capabilities.serviceState,
+          providerAvailable: context.capabilities.providerAvailable,
+          selectedSessionAvailable: context.capabilities.selectedSessionAvailable,
+          awaitingApproval: context.capabilities.awaitingApproval,
+          ...(context.capabilities.selectedSessionId === undefined
+            ? {}
+            : { selectedSessionId: context.capabilities.selectedSessionId }),
+          ...(activeSessionId === undefined ? {} : { activeSessionId }),
+          ...(activeTurnId === undefined ? {} : { activeTurnId }),
+        },
+        ...(activeSessionId === undefined ? {} : { activeSessionId }),
+        ...(activeTurnId === undefined ? {} : { activeTurnId }),
+      };
+    };
+
     const release = (): void => {
       lease.release();
     };
@@ -885,7 +913,7 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
       sendBusiness(
         projectStreamEvent(
           event,
-          projectSessionView(prefixView, context),
+          projectSessionView(prefixView, liveContext(event)),
           currentChatTurn(prefixView, context.redaction),
           projectTrace(prefix, redaction).records.filter((record) => record.seq === event.sequence),
         ),

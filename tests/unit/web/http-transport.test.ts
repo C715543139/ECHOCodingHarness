@@ -266,4 +266,93 @@ describe('HTTP Web console transport', () => {
       traceRecords: [trace],
     });
   });
+
+  it('clears global active-turn capabilities when another Session reaches its terminal event', async () => {
+    window.history.replaceState(null, '', '/');
+    const activeSummary: SessionSummaryDto = {
+      ...summary,
+      id: 'session-active',
+      shortId: 'active1',
+      title: 'Active Session',
+      phase: 'running',
+    };
+    const selectedSummary: SessionSummaryDto = {
+      ...summary,
+      id: 'session-selected',
+      shortId: 'select1',
+      title: 'Selected Session',
+    };
+    const activeCapabilities: RuntimeCapabilitiesDto = {
+      canCreateSession: true,
+      canSubmitTurn: false,
+      canChangeRuntime: false,
+      canCancelTurn: false,
+      canRespondToApproval: false,
+      submitTurnBlockedReason: 'turn_active',
+      changeRuntimeBlockedReason: 'turn_active',
+      activeSessionId: activeSummary.id,
+      activeTurnId: 'turn-active',
+    };
+    const selectedRuntime: SessionRuntimeDto = {
+      ...selectedSummary,
+      context: { usedApproxTokens: 0, limitApproxTokens: 256_000 },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === '/api/v1/bootstrap') {
+          return json({
+            data: {
+              ...bootstrap,
+              capabilities: activeCapabilities,
+              suggestedSessionId: selectedSummary.id,
+            },
+            requestId: 'request-bootstrap-terminal',
+          });
+        }
+        if (url === '/api/v1/sessions?limit=30') {
+          return json({
+            data: { items: [activeSummary, selectedSummary] },
+            requestId: 'request-sessions-terminal',
+          });
+        }
+        if (url === `/api/v1/sessions/${selectedSummary.id}`) {
+          return json({
+            data: { session: selectedRuntime, capabilities: activeCapabilities },
+            requestId: 'request-selected-terminal',
+          });
+        }
+        if (url.includes('/chat?') || url.includes('/trace?')) {
+          return json({ data: { items: [] }, requestId: 'request-page-terminal' });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+
+    const transport = createHttpTransport();
+    await transport.start();
+    const stream = FakeEventSource.instances.at(-1);
+    expect(stream?.url).toContain(`/sessions/${activeSummary.id}/events`);
+    expect(transport.getSnapshot().selectedSessionId).toBe(selectedSummary.id);
+    expect(transport.getSnapshot().bootstrap.capabilities.activeSessionId).toBe(activeSummary.id);
+
+    stream?.emit('turn.terminal', {
+      type: 'turn.terminal',
+      sessionId: activeSummary.id,
+      seq: 9,
+      turnId: 'turn-active',
+      status: 'completed',
+      delta: {
+        view: {
+          session: { ...activeSummary, phase: 'completed', context: selectedRuntime.context },
+          capabilities,
+        },
+      },
+    });
+
+    expect(transport.getSnapshot().selectedRuntime?.id).toBe(selectedSummary.id);
+    expect(transport.getSnapshot().bootstrap.capabilities).toEqual(capabilities);
+    transport.dispose();
+  });
 });

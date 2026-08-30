@@ -101,7 +101,11 @@ export function ChatView({
 
   const contextLabel = `${String(session.context.usedApproxTokens)} / ${String(session.context.limitApproxTokens)}`;
   const blocked = capabilities.submitTurnBlockedReason;
-  const blockedMessage = blockedMessageFor(blocked);
+  const blockedMessage =
+    blocked === 'turn_active' &&
+    (capabilities.activeSessionId === session.id || session.phase === 'running')
+      ? undefined
+      : blockedMessageFor(blocked);
   const pending = session.pendingApproval;
   const models = view.catalogModels.length === 0 ? [session.model] : view.catalogModels;
   const modelOptions = models.includes(session.model) ? models : [session.model, ...models];

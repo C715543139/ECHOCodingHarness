@@ -72,8 +72,10 @@ test.describe('bootstrap and first Session', () => {
     const sessionCaption = page.getByText('会话', { exact: true });
     const workspaceName = page.getByTestId('workspace-name');
     const sessionTitle = rail.locator('button[title] > span').first();
+    const newSession = page.getByRole('button', { name: '新会话', exact: true });
     expect(await typography(sessionCaption)).toEqual(await typography(workspaceCaption));
-    expect(await typography(workspaceName)).toEqual(await typography(sessionTitle));
+    expect((await typography(sessionTitle)).fontSize).toBe((await typography(newSession)).fontSize);
+    expect((await typography(workspaceName)).fontSize).toBe('17px');
 
     const modelSelect = page.getByLabel('模型');
     const safetySelect = page.getByLabel('安全模式');

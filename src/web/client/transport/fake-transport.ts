@@ -200,7 +200,7 @@ function deriveCapabilities(
     submitTurnBlockedReason = 'provider_unavailable';
   } else if (selected === undefined) {
     submitTurnBlockedReason = 'session_unavailable';
-  } else if (turnActive && !selectedIsRunning) {
+  } else if (turnActive) {
     submitTurnBlockedReason = 'turn_active';
   }
 

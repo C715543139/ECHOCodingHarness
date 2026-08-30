@@ -130,7 +130,19 @@ describe('Session SSE backlog and live handoff', () => {
       const payloads = [...stream.text().matchAll(/^data: (\{.*\})$/gmu)]
         .map((match) => match[1] ?? '')
         .filter((line) => line !== '{}')
-        .map((line) => JSON.parse(line) as { type: string; seq?: number });
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              type: string;
+              seq?: number;
+              delta?: {
+                view: {
+                  session: { phase: string };
+                  capabilities: Record<string, unknown>;
+                };
+              };
+            },
+        );
       for (const payload of payloads) {
         expect(isWebStreamEvent(payload)).toBe(true);
       }
@@ -139,6 +151,16 @@ describe('Session SSE backlog and live handoff', () => {
         .filter((seq): seq is number => typeof seq === 'number');
       expect(seqs).toEqual([...seqs].toSorted((left, right) => left - right));
       expect(new Set(seqs).size).toBe(seqs.length);
+      const terminal = payloads.find((payload) => payload.type === 'turn.terminal');
+      expect(terminal?.delta?.view.session.phase).toBe('completed');
+      expect(terminal?.delta?.view.capabilities).toMatchObject({
+        canSubmitTurn: true,
+        canChangeRuntime: true,
+        canCancelTurn: false,
+      });
+      expect(terminal?.delta?.view.capabilities).not.toHaveProperty('activeSessionId');
+      expect(terminal?.delta?.view.capabilities).not.toHaveProperty('activeTurnId');
+      expect(terminal?.delta?.view.capabilities).not.toHaveProperty('submitTurnBlockedReason');
       stream.request.destroy();
     } finally {
       await harness.close();

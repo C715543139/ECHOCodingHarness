@@ -41,6 +41,10 @@ function recordingActions(label: string, log: string[]): WebConsoleActions {
     discoverModels: () => {
       log.push(`${label}:discover`);
     },
+    refreshExtensions: () => undefined,
+    enableExtension: () => undefined,
+    disableExtension: () => undefined,
+    uninstallExtension: () => undefined,
   };
 }
 
@@ -49,6 +53,9 @@ const moreView: WebConsoleView = {
   loadingHistory: false,
   resyncRequired: false,
   hasMoreSessions: true,
+  extensions: [],
+  extensionsAvailable: false,
+  extensionsLoading: false,
 };
 
 const idleCapabilities = {
@@ -166,12 +173,19 @@ describe('Web console isolation', () => {
       discoverModels: () => {
         discovered = true;
       },
+      refreshExtensions: () => undefined,
+      enableExtension: () => undefined,
+      disableExtension: () => undefined,
+      uninstallExtension: () => undefined,
     };
     const httpView: WebConsoleView = {
       catalogModels: ['remote-model'],
       loadingHistory: false,
       resyncRequired: false,
       hasMoreSessions: false,
+      extensions: [],
+      extensionsAvailable: false,
+      extensionsLoading: false,
       lastDiscoveredAt: undefined,
     };
     render(

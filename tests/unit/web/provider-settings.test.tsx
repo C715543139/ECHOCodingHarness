@@ -80,6 +80,10 @@ describe('Provider settings modal', () => {
     expect(screen.getByRole('button', { name: '新会话' })).not.toBe(document.activeElement);
 
     await user.tab();
+    expect(screen.getByRole('button', { name: 'Provider' })).toBe(document.activeElement);
+    await user.tab();
+    expect(screen.getByRole('button', { name: '扩展' })).toBe(document.activeElement);
+    await user.tab();
     expect(screen.getByLabelText('Base URL')).toBe(document.activeElement);
     expect(
       screen.getByRole('navigation', { name: 'Session' }).contains(document.activeElement),

@@ -15,6 +15,11 @@ export const WEB_ERROR_CODES = [
   'CONFIG_INVALID',
   'PROVIDER_UNAVAILABLE',
   'RESYNC_REQUIRED',
+  'EXTENSION_NOT_FOUND',
+  'EXTENSION_BUSY',
+  'EXTENSION_INVALID',
+  'EXTENSION_QUARANTINED',
+  'EXTENSION_CLEANUP_PENDING',
   'INTERNAL_ERROR',
 ] as const;
 
@@ -58,6 +63,12 @@ export const WEB_BOUNDS = {
   sessionPageMax: 100,
   chatPageMax: 100,
   tracePageMax: 200,
+  extensionIdMax: 64,
+  extensionVersionMax: 64,
+  extensionToolNameMax: 64,
+  extensionToolsMax: 32,
+  extensionEntriesMax: 256,
+  extensionQuarantineReasonMax: 2_048,
 } as const;
 
 // Reject C0 controls in basename display names; the class is intentional.
@@ -241,6 +252,27 @@ export interface AcceptedCancellationDto {
 export interface DeletedSessionDto {
   readonly sessionId: string;
   readonly stoppedActiveTurn: boolean;
+}
+
+export interface ExtensionSummaryDto {
+  readonly id: string;
+  readonly version: string;
+  readonly contentHash: string;
+  readonly state: 'enabled' | 'disabled' | 'quarantined';
+  readonly tools: readonly string[];
+  readonly loaded: boolean;
+  readonly quarantineReason?: string;
+  readonly cleanupPending: boolean;
+}
+
+export interface ExtensionMutationDto {
+  readonly id: string;
+  readonly state: 'enabled' | 'disabled' | 'quarantined' | 'absent';
+  readonly loaded: boolean;
+  readonly changed: boolean;
+  readonly cleanupPending: boolean;
+  readonly contentHash?: string;
+  readonly deactivated?: boolean;
 }
 
 export interface ApprovalDecisionRequest {

@@ -115,6 +115,54 @@ describe('Composer shell', () => {
     expect(transport.getSnapshot().selectedRuntime?.safetyMode).toBe('safe');
   });
 
+  it('requires explicit risk confirmation before entering Full Access', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+    });
+    render(<App transport={transport} />);
+
+    await user.selectOptions(screen.getByLabelText('安全模式'), 'full-access');
+    expect(screen.getByRole('dialog', { name: '确认启用 Full Access' })).toBeTruthy();
+    expect(screen.getByText(/访问网络、安装依赖、执行 Git 写操作、删除文件/u)).toBeTruthy();
+    expect(screen.getByText(/访问工作区外位置/u)).toBeTruthy();
+    expect(transport.getSnapshot().selectedRuntime?.safetyMode).toBe('balanced');
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { name: '确认启用 Full Access' }),
+    );
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: '确认启用 Full Access' }),
+    );
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '取消' }));
+
+    await user.click(screen.getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog', { name: '确认启用 Full Access' })).toBeNull();
+    expect(transport.getSnapshot().selectedRuntime?.safetyMode).toBe('balanced');
+
+    await user.selectOptions(screen.getByLabelText('安全模式'), 'full-access');
+    await user.click(screen.getByRole('button', { name: '确认启用 Full Access' }));
+    expect(transport.getSnapshot().selectedRuntime?.safetyMode).toBe('full-access');
+    expect(screen.getByText('FULL ACCESS')).toBeTruthy();
+
+    await user.selectOptions(screen.getByLabelText('安全模式'), 'safe');
+    expect(screen.queryByText('FULL ACCESS')).toBeNull();
+  });
+
+  it('restores the persistent Full Access warning from Session facts without reconfirming', () => {
+    const session = createIdleSession({ safetyMode: 'full-access' });
+    const transport = createFakeTransport({
+      sessions: [session],
+      selectedSessionId: session.id,
+    });
+    render(<App transport={transport} />);
+
+    expect(screen.getByText('FULL ACCESS')).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: '确认启用 Full Access' })).toBeNull();
+  });
+
   it('requires a second confirmation before stopping the selected Session', async () => {
     const user = userEvent.setup();
     const transport = createFakeTransport({

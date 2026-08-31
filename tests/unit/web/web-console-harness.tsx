@@ -27,6 +27,18 @@ export function fakeWebConsoleActions(transport: FakeTransport): WebConsoleActio
     discoverModels: () => {
       transport.discoverModels();
     },
+    refreshExtensions: () => {
+      transport.refreshExtensions();
+    },
+    enableExtension: (extensionId) => {
+      transport.enableExtension(extensionId);
+    },
+    disableExtension: (extensionId) => {
+      transport.disableExtension(extensionId);
+    },
+    uninstallExtension: (extensionId) => {
+      transport.uninstallExtension(extensionId);
+    },
   };
 }
 
@@ -46,6 +58,12 @@ export function fakeWebConsoleView(transport: FakeTransport): WebConsoleView {
     fieldErrors: snapshot.providerFieldErrors,
     errorSummary: snapshot.providerErrorSummary,
     approvalError,
+    extensions: snapshot.extensions,
+    extensionsAvailable: snapshot.extensionsAvailable,
+    extensionsLoading: snapshot.extensionsLoading,
+    extensionPendingId: snapshot.extensionPendingId,
+    extensionError: snapshot.extensionError,
+    extensionNotice: snapshot.extensionNotice,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   createWebServer,
   type StartedWebServer,
 } from '../../../src/web/server/index.js';
+import type { ExtensionAdministrationPort } from '../../../src/web/server/index.js';
 
 export interface TestInjectOptions {
   readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -39,6 +40,7 @@ export async function startTestWebServer(
     readonly heartbeatIntervalMs?: number;
     readonly withAssets?: boolean;
     readonly env?: Record<string, string | undefined>;
+    readonly extensionAdministration?: ExtensionAdministrationPort;
   } = {},
 ): Promise<TestWebServer> {
   const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'echo-web-ws-'));
@@ -62,6 +64,9 @@ export async function startTestWebServer(
     port: 0,
     env: overrides.env ?? { ECHO_API_KEY: 'test-key' },
     heartbeatIntervalMs: overrides.heartbeatIntervalMs ?? 20,
+    ...(overrides.extensionAdministration === undefined
+      ? {}
+      : { extensionAdministration: overrides.extensionAdministration }),
   });
   const origin = `http://${WEB_SERVER_HOST}:${String(server.port)}`;
   const host = `${WEB_SERVER_HOST}:${String(server.port)}`;

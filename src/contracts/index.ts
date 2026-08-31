@@ -138,6 +138,8 @@ export {
   type DiscoverModelsRequest,
   type DiscoveredModelsDto,
   type FullAccessConfirmationRequest,
+  type ExtensionMutationDto,
+  type ExtensionSummaryDto,
   type Page,
   type ProjectionDeltaDto,
   type ProviderConfigDto,

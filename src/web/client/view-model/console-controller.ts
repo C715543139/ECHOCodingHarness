@@ -1,15 +1,23 @@
-import type { ApprovalChoiceDto, SafetyModeDto } from '../../../contracts/web.js';
+import type {
+  ApprovalChoiceDto,
+  ExtensionSummaryDto,
+  UpdateSessionRuntimeRequest,
+} from '../../../contracts/web.js';
 
 /**
  * Narrow Chat/Session/settings actions. Implementations may be Fake or HTTP.
  * This type must not mention FakeTransport or expose a full console snapshot.
  */
 export interface WebConsoleActions {
-  changeRuntime(update: { readonly model?: string; readonly safetyMode?: SafetyModeDto }): void;
+  changeRuntime(update: UpdateSessionRuntimeRequest): void;
   respondToApproval(decision: ApprovalChoiceDto): void;
   resyncFromSnapshot(): void;
   loadMoreSessions(): void;
   discoverModels(): void;
+  refreshExtensions(): void;
+  enableExtension(extensionId: string): void;
+  disableExtension(extensionId: string): void;
+  uninstallExtension(extensionId: string): void;
 }
 
 /**
@@ -24,6 +32,12 @@ export interface WebConsoleView {
   readonly fieldErrors?: Readonly<Record<string, string>> | undefined;
   readonly errorSummary?: string | undefined;
   readonly approvalError?: string | undefined;
+  readonly extensions: readonly ExtensionSummaryDto[];
+  readonly extensionsAvailable: boolean;
+  readonly extensionsLoading: boolean;
+  readonly extensionPendingId?: string | undefined;
+  readonly extensionError?: string | undefined;
+  readonly extensionNotice?: string | undefined;
 }
 
 export const EMPTY_WEB_CONSOLE_VIEW: WebConsoleView = {
@@ -31,6 +45,9 @@ export const EMPTY_WEB_CONSOLE_VIEW: WebConsoleView = {
   loadingHistory: false,
   resyncRequired: false,
   hasMoreSessions: false,
+  extensions: [],
+  extensionsAvailable: false,
+  extensionsLoading: false,
 };
 
 /**

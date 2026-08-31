@@ -407,6 +407,25 @@
   white-space: nowrap;
 }
 
+.sessionIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--echo-space-3);
+}
+
+.fullAccessBadge {
+  flex: none;
+  padding: 0.1875rem var(--echo-space-2);
+  border: 0.0625rem solid var(--echo-color-danger);
+  border-radius: var(--echo-radius-pill);
+  background: var(--echo-color-danger);
+  color: var(--echo-color-accent-text);
+  font-size: var(--echo-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .viewSwitch {
   display: flex;
   justify-self: center;
@@ -1202,6 +1221,9 @@
 }
 
 .settingsNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--echo-space-1);
   padding: var(--echo-space-5) var(--echo-space-3);
   border-right: 0.0625rem solid var(--echo-color-border);
   background: var(--echo-color-rail);
@@ -1211,13 +1233,23 @@
   display: flex;
   align-items: center;
   gap: var(--echo-space-2);
+  width: 100%;
   margin: 0;
   padding: var(--echo-space-2) var(--echo-space-3);
+  border: 0;
   border-radius: var(--echo-radius-sm);
-  background: var(--echo-color-accent-soft);
-  color: var(--echo-color-accent);
+  background: transparent;
+  color: var(--echo-color-muted);
   font-size: var(--echo-text-sm);
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settingsNavItem:hover,
+.settingsNavItem[aria-current='page'] {
+  background: var(--echo-color-accent-soft);
+  color: var(--echo-color-accent);
 }
 
 .settingsBody {
@@ -1354,6 +1386,76 @@
   justify-content: flex-end;
   padding-top: var(--echo-space-2);
   border-top: 0.0625rem solid var(--echo-color-border);
+}
+
+.extensionList {
+  display: grid;
+  gap: var(--echo-space-3);
+}
+
+.extensionCard {
+  display: grid;
+  gap: var(--echo-space-3);
+  padding: var(--echo-space-3);
+  border: 0.0625rem solid var(--echo-color-border);
+  border-radius: var(--echo-radius);
+  background: var(--echo-color-surface);
+}
+
+.extensionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--echo-space-3);
+}
+
+.extensionHeader h3,
+.extensionHeader span {
+  margin: 0;
+}
+
+.extensionHeader h3,
+.extensionFacts dd {
+  overflow-wrap: anywhere;
+}
+
+.extensionHeader h3 {
+  font-size: var(--echo-text-base);
+}
+
+.extensionHeader span {
+  color: var(--echo-color-muted);
+  font-family: var(--echo-font-mono);
+  font-size: var(--echo-text-sm);
+}
+
+.extensionFacts {
+  display: grid;
+  gap: var(--echo-space-2);
+  margin: 0;
+}
+
+.extensionFacts > div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: var(--echo-space-2);
+}
+
+.extensionFacts dt {
+  color: var(--echo-color-muted);
+}
+
+.extensionFacts dd {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--echo-font-mono);
+}
+
+.extensionWarning,
+.extensionNotice {
+  margin: 0;
+  color: var(--echo-color-warning);
+  font-size: var(--echo-text-sm);
 }
 
 /* ---------- responsive ---------- */

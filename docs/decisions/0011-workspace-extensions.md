@@ -112,6 +112,11 @@ Worker 隔离用于超时、取消、崩溃恢复和可靠卸载，不构成 OS 
 安装或启用成功后，新增工具从下一次模型请求开始出现在定义列表中。模型不能在一条响应里安装并调用
 此前未知的工具。
 
+P3-B1 实现位于 `src/extensions/worker-host.ts` 与 `runtime-manager.ts`。Worker 只继承显式允许的系统、
+路径、临时目录和区域变量，配置有界 V8 内存，并丢弃 stdout/stderr；Host 对输入、消息 ID、响应类型、
+`ToolExecution` 与输出执行二次校验。动态工具按扩展所有权原子注册；故障先同步注销，再通过
+`onQuarantine` 交给 P3-B2 持久化 Catalog，避免 B1 创建第二套状态机。
+
 ### 生命周期
 
 ```text

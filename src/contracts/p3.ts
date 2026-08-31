@@ -143,7 +143,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Extension workers have bounded protocol, output, timeout, cancellation, credential inheritance, and shutdown behavior',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'pending:P3-B1',
+    runtimeEvidence: 'tests/unit/extensions/worker-host.test.ts',
     runtimeTask: 'P3-B1',
   },
   {
@@ -152,7 +152,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'New tools become model-visible only at the next model-request boundary and registry collisions fail closed',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'pending:P3-B1',
+    runtimeEvidence: 'tests/unit/tools/tool-registry.test.ts',
     runtimeTask: 'P3-B1',
   },
   {

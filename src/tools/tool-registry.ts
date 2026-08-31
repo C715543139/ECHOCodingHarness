@@ -77,6 +77,7 @@ export function toolCallSignature(toolName: string, normalizedInput: unknown): s
 
 export class ToolRegistry {
   private readonly entries = new Map<string, RegisteredTool>();
+  private readonly extensionTools = new Map<string, ReadonlySet<string>>();
 
   constructor(tools: readonly RegisteredTool[]) {
     for (const tool of tools) {
@@ -97,6 +98,44 @@ export class ToolRegistry {
 
   has(name: string): boolean {
     return this.entries.has(name);
+  }
+
+  ownerOf(name: string): string | undefined {
+    for (const [extensionId, names] of this.extensionTools) {
+      if (names.has(name)) return extensionId;
+    }
+    return undefined;
+  }
+
+  registerExtension(extensionId: string, tools: readonly RegisteredTool[]): void {
+    if (extensionId.length === 0) throw new Error('Extension id cannot be empty.');
+    if (this.extensionTools.has(extensionId)) {
+      throw new Error(`Extension "${extensionId}" is already registered.`);
+    }
+    const names = new Set<string>();
+    for (const tool of tools) {
+      if (names.has(tool.name)) {
+        throw new Error(`Tool "${tool.name}" is registered more than once by the extension.`);
+      }
+      if (this.entries.has(tool.name)) {
+        throw new Error(`Tool "${tool.name}" is already registered.`);
+      }
+      names.add(tool.name);
+    }
+    for (const tool of tools) this.entries.set(tool.name, tool);
+    this.extensionTools.set(extensionId, names);
+  }
+
+  unregisterExtension(extensionId: string): boolean {
+    const names = this.extensionTools.get(extensionId);
+    if (names === undefined) return false;
+    for (const name of names) this.entries.delete(name);
+    this.extensionTools.delete(extensionId);
+    return true;
+  }
+
+  extensionToolNames(extensionId: string): readonly string[] {
+    return [...(this.extensionTools.get(extensionId) ?? [])];
   }
 
   execute(

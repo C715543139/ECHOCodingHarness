@@ -27,6 +27,25 @@ export class ExtensionStorageError extends Error {
   }
 }
 
+export type ExtensionWorkerErrorCode =
+  | 'WORKER_INITIALIZATION_FAILED'
+  | 'WORKER_PROTOCOL_ERROR'
+  | 'WORKER_CRASHED'
+  | 'WORKER_TIMEOUT'
+  | 'WORKER_CLOSED'
+  | 'EXTENSION_BUSY'
+  | 'REGISTRY_CONFLICT';
+
+export class ExtensionWorkerError extends Error {
+  readonly code: ExtensionWorkerErrorCode;
+
+  constructor(code: ExtensionWorkerErrorCode, message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = 'ExtensionWorkerError';
+    this.code = code;
+  }
+}
+
 export function isFileSystemError(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }

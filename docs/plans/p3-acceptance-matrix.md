@@ -1,6 +1,6 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：In progress / P3-A1 与 P3-A2 runtime evidence recorded
+> 状态：In progress / P3-A1、P3-A2 与 P3-B1 runtime evidence recorded
 >
 > 最后更新：2026-08-31
 
@@ -19,8 +19,8 @@
 | FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Implemented：`tests/unit/security/command-policy.test.ts`；`tests/unit/application/full-access.test.ts`；`pnpm test` / `pnpm check` |
 | EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Implemented — `tests/unit/extensions/workspace-isolation.test.ts`, `tests/unit/extensions/content-hash.test.ts` |
 | EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Implemented — `tests/unit/extensions/manifest.test.ts`, `tests/unit/extensions/content-hash.test.ts`, `tests/unit/extensions/catalog.test.ts` |
-| WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Planned |
-| WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Planned |
+| WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Implemented — `tests/unit/extensions/worker-host.test.ts` |
+| WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Implemented — `tests/unit/tools/tool-registry.test.ts`, `tests/unit/extensions/worker-host.test.ts` |
 | LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Planned |
 | LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Planned |
 | WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Planned |

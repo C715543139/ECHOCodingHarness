@@ -365,7 +365,7 @@ response body.
   complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
   cleanup are complete.
 
-## P3 quality plan（A1 Full Access evidence）
+## P3 quality plan（A1/A2/B1 evidence）
 
 `P3_TEST_MATRIX` 位于 `src/contracts/p3.ts`，权威文档是
 [p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 使用 `pending:P3-*` 标记后续运行时所有权；
@@ -408,5 +408,14 @@ Schema、原子写与工作区隔离；Worker 超时、取消、崩溃、协议�
   忽略。
 
 P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七个 `extension_*` 生命周期工具或 Web
-接线。由于 A1/A2 并行期冻结 `src/contracts/p3.ts`，EXT-01/02 的上述真实证据先记录于文档，待集成
-任务统一替换其中的 `pending:P3-A2`。
+接线。A1/A2 合并后，集成分支已把 FULL-01/02/03 与 EXT-01/02 替换为真实证据路径。
+
+### P3-B1 Worker and Registry evidence
+
+- `tests/unit/extensions/worker-host.test.ts`：真实 Node Worker 初始化与 handler 对应、环境凭据隔离、
+  输入/输出上限、普通失败、clone/protocol 违规、崩溃、超时、协作取消、活动调用 busy、故障注销和
+  quarantine 回调；
+- `tests/unit/tools/tool-registry.test.ts`：定义快照边界、按扩展所有权注册/注销，以及整组名称冲突的
+  原子失败；
+- WRK-01/02 已在 `P3_TEST_MATRIX` 指向上述真实路径。B1 只提供 Runtime Manager 的隔离回调，不直接
+  修改 Catalog；P3-B2 负责将该回调持久化为 `quarantined` 并实现生命周期状态转换。

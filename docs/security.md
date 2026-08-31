@@ -362,8 +362,8 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A1 Full Access 授权与安全模式运行时、A2 工作区扩展存储边界均已实现；Worker、动态
-> Registry、生命周期与 WebUI 仍由后续任务交付。现有 `safe`、`balanced`、`auto` 规则保持不变。
+> P3 状态：A1 Full Access、A2 工作区扩展存储与 B1 Worker/Registry 均已实现；生命周期、生产接线与
+> WebUI 仍由后续任务交付。现有 `safe`、`balanced`、`auto` 规则保持不变。
 
 P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或
 hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git、删除文件并引用工作区外路径。进入
@@ -401,3 +401,15 @@ Catalog 操作前复验该绑定；原始 alias/junction 后续改指不会迁�
 
 名称冲突检查始终包含全部 `DEFAULT_TOOLS` 和 `extension_` 生命周期命名空间。依赖注入只能通过
 `reservedToolNames` 追加宿主保留名，不能用空集或不完整列表削弱默认冲突集合。
+
+B1 Worker 使用独立 V8 isolate 和有界内存配置，但这不是 OS 沙箱。Worker 不继承宿主 `execArgv`，
+避免调试器、loader 或模块模式参数改变扩展 bootstrap 语义；`env` 从空白允许列表
+重建，只保留平台启动所需的 PATH、临时目录、区域和系统变量，不继承 `ECHO_API_KEY`、Token 或任意
+其他宿主凭据；stdout/stderr 被持续排空而不进入 Session 或终端。输入先经过普通 JSON 正规化和 1 MiB
+消息上限，响应必须是严格 `ToolExecution`；非 cloneable、未知字段、未知响应或意外 ID 都视为协议
+违规。隔离原因在进入 Catalog 前限制到既有 `quarantineReason` 上限。
+
+取消和超时先向 Worker 的调用级 `AbortController` 发送信号。协作式 handler 结束后 Worker 可继续使用；
+超过短宽限期仍未结束则终止 Worker、原子注销该扩展的全部动态工具并通知上层持久化 `quarantined`。
+业务异常只形成有界 `EXTENSION_HANDLER_FAILED`，不会自动隔离。活动调用期间 Runtime Manager 拒绝
+卸载，避免 Registry 与仍在执行的 handler 所有权分离。

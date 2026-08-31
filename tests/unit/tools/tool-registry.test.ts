@@ -47,6 +47,31 @@ describe('ToolRegistry', () => {
     );
   });
 
+  it('publishes extension tools only in later definition snapshots and unregisters by owner', () => {
+    const registry = new ToolRegistry([definition('built_in')]);
+    const before = registry.definitions();
+
+    registry.registerExtension('pdf-reader', [definition('read_pdf')]);
+
+    expect(before.map((tool) => tool.name)).toEqual(['built_in']);
+    expect(registry.definitions().map((tool) => tool.name)).toEqual(['built_in', 'read_pdf']);
+    expect(registry.ownerOf('read_pdf')).toBe('pdf-reader');
+    expect(registry.extensionToolNames('pdf-reader')).toEqual(['read_pdf']);
+    expect(registry.unregisterExtension('pdf-reader')).toBe(true);
+    expect(registry.unregisterExtension('pdf-reader')).toBe(false);
+    expect(registry.definitions().map((tool) => tool.name)).toEqual(['built_in']);
+  });
+
+  it('rejects extension collisions atomically without partially publishing tools', () => {
+    const registry = new ToolRegistry([definition('built_in')]);
+
+    expect(() =>
+      registry.registerExtension('unsafe', [definition('new_tool'), definition('built_in')]),
+    ).toThrow('already registered');
+    expect(registry.has('new_tool')).toBe(false);
+    expect(registry.extensionToolNames('unsafe')).toEqual([]);
+  });
+
   it('normalizes JSON objects recursively with stable key order', () => {
     const normalized = normalizeToolInput({ z: [{ b: 2, a: 1 }], a: true });
 

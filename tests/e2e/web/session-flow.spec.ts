@@ -18,6 +18,7 @@ test.describe('bootstrap and first Session', () => {
   test('keeps the desktop shell fixed while rail and model catalog own their scrolling', async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 2048, height: 1000 });
     await page.goto('/?scenario=first-session');
 
     const rail = page.getByRole('navigation', { name: 'Session' });
@@ -61,6 +62,17 @@ test.describe('bootstrap and first Session', () => {
     });
     expect(Number.parseFloat(viewport.chatPaddingLeft ?? '0')).toBeGreaterThan(24);
     expect(viewport.chatPaddingRight).toBe(viewport.chatPaddingLeft);
+
+    const chatContent = await page.getByTestId('chat-content').boundingBox();
+    const composerCard = await page.getByTestId('composer-card').boundingBox();
+    expect(chatContent).not.toBeNull();
+    expect(composerCard).not.toBeNull();
+    if (chatContent === null || composerCard === null) return;
+    expect(chatContent.width).toBeCloseTo(896, 0);
+    expect(Math.abs(chatContent.width - composerCard.width)).toBeLessThan(1);
+    const chatCenter = chatContent.x + chatContent.width / 2;
+    const composerCenter = composerCard.x + composerCard.width / 2;
+    expect(Math.abs(chatCenter - composerCenter)).toBeLessThan(1);
 
     const typography = async (locator: Locator) =>
       locator.evaluate((element) => {

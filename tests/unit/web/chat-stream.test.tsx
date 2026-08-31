@@ -83,6 +83,8 @@ describe('Chat streaming projection', () => {
     const input = screen.getByLabelText('输入');
     const send = screen.getByRole('button', { name: '发送' });
     const card = input.closest('form')?.firstElementChild;
+    expect(screen.getByTestId('chat-content').contains(bubble)).toBe(true);
+    expect(screen.getByTestId('composer-card')).toBe(card);
     expect(card?.contains(input)).toBe(true);
     expect(card?.contains(send)).toBe(true);
     expect(card?.contains(screen.getByTestId('context-usage'))).toBe(true);

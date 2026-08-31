@@ -101,7 +101,9 @@ export function ChatView({
   if (session === undefined) {
     return (
       <div className={`${styles.scroll} ${styles.chatScroll}`}>
-        <p>选择或新建会话后开始对话。</p>
+        <div className={styles.chatContent}>
+          <p>选择或新建会话后开始对话。</p>
+        </div>
       </div>
     );
   }
@@ -134,94 +136,106 @@ export function ChatView({
         }}
         ref={scrollRef}
       >
-        {view.loadingHistory ? <p>正在加载历史…</p> : null}
-        {view.resyncRequired ? (
-          <p className={styles.blockReason} data-testid="resync-banner">
-            需要完整同步。已保留当前内容，不会重新提交 Turn。
-            <button
-              className={styles.secondaryButton}
-              disabled={!wired}
-              onClick={() => {
-                actions?.resyncFromSnapshot();
-              }}
-              type="button"
-            >
-              重新同步
-            </button>
-          </p>
-        ) : null}
-        {turns.length === 0 && !view.loadingHistory ? (
-          <p>开始对话。历史只投影聚合 Session 事实。</p>
-        ) : null}
-        {turns.map((turn) => (
-          <article className={styles.turn} data-turn-id={turn.turnId} key={turn.turnId}>
-            <h3 className={styles.srOnly}>用户</h3>
-            <div className={styles.userRow}>
-              <p className={styles.userBubble}>{turn.userText}</p>
-            </div>
-            {turn.responses.map((response) => (
-              <div
-                className={styles.agentText}
-                data-partial={String(response.partial)}
-                key={response.step}
+        <div className={styles.chatContent} data-testid="chat-content">
+          {view.loadingHistory ? <p>正在加载历史…</p> : null}
+          {view.resyncRequired ? (
+            <p className={styles.blockReason} data-testid="resync-banner">
+              需要完整同步。已保留当前内容，不会重新提交 Turn。
+              <button
+                className={styles.secondaryButton}
+                disabled={!wired}
+                onClick={() => {
+                  actions?.resyncFromSnapshot();
+                }}
+                type="button"
               >
-                <MarkdownMessage>{response.text}</MarkdownMessage>
+                重新同步
+              </button>
+            </p>
+          ) : null}
+          {turns.length === 0 && !view.loadingHistory ? (
+            <p>开始对话。历史只投影聚合 Session 事实。</p>
+          ) : null}
+          {turns.map((turn) => (
+            <article className={styles.turn} data-turn-id={turn.turnId} key={turn.turnId}>
+              <h3 className={styles.srOnly}>用户</h3>
+              <div className={styles.userRow}>
+                <p className={styles.userBubble}>{turn.userText}</p>
               </div>
-            ))}
-            {turn.toolSummaries.map((summary) => (
-              <p className={styles.toolCard} data-status={summary.status} key={summary.toolCallId}>
-                {summary.name} · {TOOL_SUMMARY_LABELS[summary.status]}
-                {summary.resultSummary === undefined ? '' : ` · ${summary.resultSummary}`}
-              </p>
-            ))}
-            <p className={styles.turnStatus}>{turnStatusLabel(turn)}</p>
-          </article>
-        ))}
+              {turn.responses.map((response) => (
+                <div
+                  className={styles.agentText}
+                  data-partial={String(response.partial)}
+                  key={response.step}
+                >
+                  <MarkdownMessage>{response.text}</MarkdownMessage>
+                </div>
+              ))}
+              {turn.toolSummaries.map((summary) => (
+                <p
+                  className={styles.toolCard}
+                  data-status={summary.status}
+                  key={summary.toolCallId}
+                >
+                  {summary.name} · {TOOL_SUMMARY_LABELS[summary.status]}
+                  {summary.resultSummary === undefined ? '' : ` · ${summary.resultSummary}`}
+                </p>
+              ))}
+              <p className={styles.turnStatus}>{turnStatusLabel(turn)}</p>
+            </article>
+          ))}
+        </div>
       </div>
       {pending === undefined ? (
         approvalError === undefined ? null : (
-          <p className={styles.blockReason}>{approvalError}</p>
+          <div className={styles.chatAuxiliary}>
+            <p className={styles.blockReason}>{approvalError}</p>
+          </div>
         )
       ) : (
-        <ApprovalCard
-          approval={pending}
-          disabled={!capabilities.canRespondToApproval || !wired}
-          errorMessage={approvalError}
-          onDecide={(decision) => {
-            actions?.respondToApproval(decision);
-          }}
-        />
+        <div className={styles.chatAuxiliary}>
+          <ApprovalCard
+            approval={pending}
+            disabled={!capabilities.canRespondToApproval || !wired}
+            errorMessage={approvalError}
+            onDecide={(decision) => {
+              actions?.respondToApproval(decision);
+            }}
+          />
+        </div>
       )}
       {session.phase === 'running' ? (
-        <div className={styles.runBanner} role="status">
-          <Glyph className={`${styles.glyph} ${styles.bannerIcon}`} name="info" />
-          <p>当前 Session 正在运行。</p>
-          {capabilities.canCancelTurn ? (
-            confirmStop ? (
-              <button
-                className={styles.stopButton}
-                onClick={() => {
-                  onCancel();
-                  setConfirmStop(false);
-                }}
-                type="button"
-              >
-                <Glyph name="stop" />
-                {`确认停止 ${session.shortId}`}
-              </button>
-            ) : (
-              <button
-                className={styles.stopButton}
-                onClick={() => {
-                  setConfirmStop(true);
-                }}
-                type="button"
-              >
-                <Glyph name="stop" />
-                停止
-              </button>
-            )
-          ) : null}
+        <div className={styles.chatAuxiliary}>
+          <div className={styles.runBanner} role="status">
+            <Glyph className={`${styles.glyph} ${styles.bannerIcon}`} name="info" />
+            <p>当前 Session 正在运行。</p>
+            {capabilities.canCancelTurn ? (
+              confirmStop ? (
+                <button
+                  className={styles.stopButton}
+                  onClick={() => {
+                    onCancel();
+                    setConfirmStop(false);
+                  }}
+                  type="button"
+                >
+                  <Glyph name="stop" />
+                  {`确认停止 ${session.shortId}`}
+                </button>
+              ) : (
+                <button
+                  className={styles.stopButton}
+                  onClick={() => {
+                    setConfirmStop(true);
+                  }}
+                  type="button"
+                >
+                  <Glyph name="stop" />
+                  停止
+                </button>
+              )
+            ) : null}
+          </div>
         </div>
       ) : null}
       <div className={styles.toastLayer}>
@@ -252,7 +266,7 @@ export function ChatView({
           onSubmit();
         }}
       >
-        <div className={styles.composerCard}>
+        <div className={styles.composerCard} data-testid="composer-card">
           <label className={styles.field}>
             <span className={styles.srOnly}>输入</span>
             <textarea

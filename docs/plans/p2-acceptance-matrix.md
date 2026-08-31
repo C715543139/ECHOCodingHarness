@@ -53,7 +53,7 @@
 | P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
-| P2-2-15 | 侧栏可有界调宽；文档根节点不滚动；Chat/Trace 只纵向滚动；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts`, `tests/e2e/web/responsive.spec.ts` | Accepted |
+| P2-2-15 | 侧栏可有界调宽；文档根节点不滚动；Chat/Trace 只纵向滚动；Chat 内容与输入卡使用有界居中列；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts`, `tests/e2e/web/responsive.spec.ts` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
 

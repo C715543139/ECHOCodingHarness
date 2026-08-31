@@ -47,6 +47,7 @@
   --echo-radius-pill: 62.5rem;
   --echo-rail-width: 17.5rem;
   --echo-inspector-width: 19rem;
+  --echo-chat-column-width: 56rem;
   --echo-target-min: 1.75rem;
   --echo-target-primary: 2.25rem;
 }

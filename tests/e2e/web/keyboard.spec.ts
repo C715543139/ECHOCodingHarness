@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('keyboard-only critical flow', () => {
-  test('reaches skip link, creates a session, and restores focus from settings', async ({
-    page,
-  }) => {
+  test('creates a session and restores focus from settings', async ({ page }) => {
     await page.goto('/?scenario=keyboard');
-    await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: '跳到主内容' })).toBeFocused();
+    await expect(page.getByRole('link', { name: '跳到主内容' })).toHaveCount(0);
 
     await page.getByRole('button', { name: '新会话', exact: true }).click();
     await page.getByLabel('输入').fill('列出工作区文件');

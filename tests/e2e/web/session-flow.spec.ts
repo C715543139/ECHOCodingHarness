@@ -101,12 +101,21 @@ test.describe('bootstrap and first Session', () => {
     for (const select of [modelSelect, safetySelect]) {
       expect(
         await select.evaluate((element) => ({
+          appearance: getComputedStyle(element).appearance,
+          backgroundImage: getComputedStyle(element).backgroundImage,
           height: getComputedStyle(element).height,
           lineHeight: getComputedStyle(element).lineHeight,
           paddingBottom: getComputedStyle(element).paddingBottom,
           paddingTop: getComputedStyle(element).paddingTop,
         })),
-      ).toEqual({ height: '32px', lineHeight: 'normal', paddingBottom: '0px', paddingTop: '0px' });
+      ).toEqual({
+        appearance: 'none',
+        backgroundImage: expect.stringContaining('svg'),
+        height: '32px',
+        lineHeight: '20px',
+        paddingBottom: '5px',
+        paddingTop: '5px',
+      });
     }
 
     await page.getByRole('button', { name: '设置' }).click();

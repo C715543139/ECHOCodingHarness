@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { TraceRecordDto } from '../../../contracts/web.js';
 import {
@@ -58,11 +58,25 @@ export function TraceView({
     ? Math.min(visible.length, clampedStart + Math.ceil(480 / ROW_HEIGHT) + OVERSCAN * 2)
     : visible.length;
   const rendered = virtualized ? visible.slice(clampedStart, windowCount) : visible;
+  const tailWindowStart = virtualized
+    ? Math.max(0, visible.length - Math.ceil(480 / ROW_HEIGHT) - OVERSCAN * 2)
+    : 0;
+  const lastVisibleSeq = visible.at(-1)?.seq;
 
   useEffect(() => {
     if (windowStart === clampedStart) return;
     setWindowStart(clampedStart);
   }, [clampedStart, windowStart]);
+
+  useLayoutEffect(() => {
+    if (!list.followTail) return;
+    if (windowStart !== tailWindowStart) {
+      setWindowStart(tailWindowStart);
+      return;
+    }
+    const viewport = viewportRef.current;
+    if (viewport !== null) viewport.scrollTop = viewport.scrollHeight;
+  }, [lastVisibleSeq, list.followTail, tailWindowStart, windowStart]);
 
   if (records.length === 0) {
     return (

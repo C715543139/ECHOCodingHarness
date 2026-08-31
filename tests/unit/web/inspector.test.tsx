@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -114,11 +114,16 @@ describe('Trace Inspector selection', () => {
     render(<LargeList />);
     const initialButtons = screen.getAllByRole('button', { name: /用户 user completed/u });
     expect(initialButtons.length).toBeLessThan(120);
-    const firstLabel = initialButtons[0]?.textContent;
 
     const viewport = screen.getByRole('list');
-    viewport.scrollTop = 8;
-    viewport.dispatchEvent(new Event('scroll', { bubbles: true }));
+    Object.defineProperties(viewport, {
+      clientHeight: { configurable: true, value: 480 },
+      scrollHeight: { configurable: true, value: 7200 },
+    });
+    viewport.scrollTop = 5760;
+    fireEvent.scroll(viewport);
+    const firstLabel = screen.getAllByRole('button', { name: /用户 user completed/u })[0]
+      ?.textContent;
 
     await user.click(screen.getByRole('button', { name: 'append-tail' }));
     const toast = screen.getByRole('button', { name: '回到最新' });
@@ -220,7 +225,7 @@ describe('Trace Inspector selection', () => {
         onSelectRecord={() => undefined}
         pageSize={100}
         records={records}
-        selectedRecordId="long_2"
+        selectedRecordId="long_49"
       />,
     );
     const rows = screen.getAllByRole('listitem');

@@ -6,14 +6,13 @@ test.describe('large Trace list', () => {
     const list = page.getByRole('main').getByRole('list');
     const rows = list.getByRole('listitem');
     await expect(rows.first()).toHaveAttribute('aria-setsize', '100');
-    await expect(rows.first().getByRole('button')).toHaveAttribute('data-seq', '101');
     expect(await rows.count()).toBeLessThan(40);
     await expect(page.getByRole('main').getByText('chunk', { exact: true })).toHaveCount(0);
-
-    await list.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
-      element.dispatchEvent(new Event('scroll', { bubbles: true }));
-    });
+    await expect
+      .poll(() =>
+        list.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight),
+      )
+      .toBeLessThanOrEqual(1);
     const last = list.locator('[role="listitem"][aria-posinset="100"]');
     await expect(last).toBeVisible();
     await expect(last.getByRole('button')).toHaveAttribute('data-seq', '200');

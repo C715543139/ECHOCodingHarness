@@ -15,16 +15,12 @@ describe('Keyboard and focus shell', () => {
     cleanup();
   });
 
-  it('exposes a skip link targeting main content', async () => {
-    const user = userEvent.setup();
+  it('does not inject the removed skip-navigation target', () => {
     render(<App />);
 
-    await user.tab();
-    expect(screen.getByRole('link', { name: '跳到主内容' })).toBe(document.activeElement);
-    expect(screen.getByRole('link', { name: '跳到主内容' })).toHaveProperty(
-      'hash',
-      '#workspace-main',
-    );
+    expect(screen.queryByRole('link', { name: '跳到主内容' })).toBeNull();
+    expect(screen.getByRole('main').getAttribute('id')).toBeNull();
+    expect(screen.getByRole('main').getAttribute('tabindex')).toBeNull();
   });
 
   it('switches Chat and Trace from the header tabs', async () => {

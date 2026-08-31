@@ -1,4 +1,5 @@
 import type {
+  AcceptedTurnDto,
   ApiErrorResponse,
   ApiResponse,
   ApprovalChoiceDto,
@@ -145,7 +146,7 @@ export function createHttpTransport(): WebConsoleTransport {
     const parsed = apiError(error);
     const message = parsed?.error.message ?? '本地 Web API 请求失败。';
     emit({
-      connection: 'disconnected',
+      ...(parsed === undefined ? { connection: 'disconnected' as const } : {}),
       ...(approval
         ? { approvalError: message }
         : {
@@ -376,12 +377,14 @@ export function createHttpTransport(): WebConsoleTransport {
       const text = snapshot.composerText.trim();
       if (sessionId === undefined || text.length === 0) return;
       run(async () => {
-        await request(`/api/v1/sessions/${encodeURIComponent(sessionId)}/turns`, {
-          method: 'POST',
-          body: { text },
-        });
+        await request<ApiResponse<AcceptedTurnDto>>(
+          `/api/v1/sessions/${encodeURIComponent(sessionId)}/turns`,
+          {
+            method: 'POST',
+            body: { text },
+          },
+        );
         emit({ composerText: '' });
-        await loadSelected(sessionId);
       });
     },
     cancelTurn() {

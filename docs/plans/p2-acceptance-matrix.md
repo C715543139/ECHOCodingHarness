@@ -51,7 +51,7 @@
 | P2-2-10 | API Key 只显示 configured 布尔值且不进入 DOM | API / browser / scan | `tests/unit/web/provider-settings.test.tsx`, `tests/integration/web/production-assembly.test.ts`, `tests/e2e/web/provider-secret.spec.ts`, `scripts/scan-web-artifacts.mjs` | Accepted |
 | P2-2-11 | Session 行使用文字状态、不加图标；创建/恢复返回 `SessionViewDto` | component / API | `tests/unit/web/session-rail.test.tsx`, `tests/integration/web/session-view.test.ts`, `tests/integration/web/security-fixture.test.ts` | Accepted |
 | P2-2-12 | 输入区含模型、`safe/balanced/auto`、只读上下文用量；运行时发送禁用、停止在提示条 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
-| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，并正确反映 API、所选 Session SSE 与重连状态 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
+| P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，正确反映 API、所选 Session SSE 与重连状态；提交 Turn 不替换健康 SSE，结构化业务错误不冒充断线 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
 | P2-2-15 | 侧栏可有界调宽；文档根节点不滚动；Chat/Trace 只纵向滚动；Chat 内容与输入卡使用有界居中列；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts`, `tests/e2e/web/responsive.spec.ts` | Accepted |
 
@@ -67,7 +67,7 @@
 | P2-3-06 | Policy Explain 只消费结构化 decision/rule | projection | `tests/unit/web/policy-detail.test.ts` | Accepted |
 | P2-3-07 | 文件变化只显示相对路径和 bounded diff | projection / browser | `tests/unit/web/diff-detail.test.ts` | Accepted |
 | P2-3-08 | Verified 只来源于真实命令终态且不夸大退出码含义 | projection / browser | `tests/unit/web/verification-detail.test.ts` | Accepted |
-| P2-3-09 | 大型 Trace 分页、虚拟化且上滚不跳动 | component / performance | `tests/unit/web/inspector.test.tsx`, `tests/unit/web/trace-upsert.test.ts`, `tests/e2e/web/trace-large-session.spec.ts` | Accepted |
+| P2-3-09 | 大型 Trace 分页、虚拟化、首次进入默认定位最新事件且主动上滚不跳动 | component / performance | `tests/unit/web/inspector.test.tsx`, `tests/unit/web/trace-upsert.test.ts`, `tests/e2e/web/trace-large-session.spec.ts` | Accepted |
 | P2-3-10 | 不注册 Session 导出路由或页面入口 | API / component | `tests/integration/web/routes.test.ts`（A5 已证明无导出路由）；`tests/unit/web/session-actions.test.tsx`（B2 已证明无页面入口） | Accepted |
 
 ## 5. P2-4：体验、产物与回归
@@ -112,7 +112,7 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 - 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
   时补录；
 - `pnpm check`：117 个测试文件、645 项测试通过；
-- 覆盖率：statements 85.05%、branches 77.08%、functions 89.36%、lines 86.86%；
+- 覆盖率：statements 85.19%、branches 77.32%、functions 89.61%、lines 87.01%；
 - Web E2E：Playwright Chromium 11/11 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
   安全 Markdown、断线恢复、审批、Provider 秘密与 200 条 Trace；
 - Windows 非仓库 cwd 隔离产物 smoke：通过；

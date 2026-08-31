@@ -70,9 +70,6 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
         }
       }}
     >
-      <a className={styles.skipLink} href="#workspace-main">
-        跳到主内容
-      </a>
       <SessionRail
         canCreateSession={snapshot.bootstrap.capabilities.canCreateSession}
         collapsed={railCollapsed}
@@ -124,7 +121,7 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
           </div>
           <ConnectionStatus state={snapshot.connection} />
         </header>
-        <main className={styles.main} id="workspace-main" tabIndex={-1}>
+        <main className={styles.main}>
           {snapshot.view === 'chat' ? (
             <ChatView
               capabilities={snapshot.bootstrap.capabilities}

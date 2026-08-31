@@ -16,7 +16,7 @@ describe('Web application shell', () => {
     render(<App />);
 
     expect(screen.getByText('ECHO')).toBeTruthy();
-    expect(screen.getByRole('link', { name: '跳到主内容' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '跳到主内容' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Session' })).toBeTruthy();
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('status')).toBeTruthy();

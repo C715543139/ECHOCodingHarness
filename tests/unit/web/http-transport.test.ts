@@ -145,6 +145,19 @@ describe('HTTP Web console transport', () => {
             requestId: 'request-trace-detail-1',
           });
         }
+        if (url === '/api/v1/sessions/session-1/trace/missing') {
+          return json(
+            {
+              error: {
+                code: 'NOT_FOUND',
+                message: 'The trace record was not found.',
+                retryable: false,
+              },
+              requestId: 'request-trace-missing',
+            },
+            404,
+          );
+        }
         if (url === '/api/v1/provider' && method === 'GET') {
           return json({ data: provider, requestId: 'request-provider-1' });
         }
@@ -160,7 +173,20 @@ describe('HTTP Web console transport', () => {
         if (url === '/api/v1/sessions' && method === 'POST') {
           return json({ data: sessionView, requestId: 'request-create-1' }, 201);
         }
-        if (url.endsWith('/turns') || url.endsWith('/runtime')) {
+        if (url.endsWith('/turns')) {
+          return json(
+            {
+              data: {
+                sessionId: summary.id,
+                turnId: 'turn-accepted',
+                acceptedAt: '2026-08-30T10:01:00.000Z',
+              },
+              requestId: 'request-turn-1',
+            },
+            202,
+          );
+        }
+        if (url.endsWith('/runtime')) {
           return json({ data: sessionView, requestId: 'request-command-1' }, 202);
         }
         throw new Error(`Unexpected request: ${method} ${url}`);
@@ -213,10 +239,21 @@ describe('HTTP Web console transport', () => {
       expect(transport.getSnapshot().hasMoreSessions).toBe(false);
     });
     transport.setComposerText('hello');
+    const streamCountBeforeSubmit = FakeEventSource.instances.length;
     transport.submitTurn();
     await vi.waitFor(() => {
       expect(calls.some((call) => call === 'POST /api/v1/sessions/session-1/turns')).toBe(true);
+      expect(transport.getSnapshot().composerText).toBe('');
     });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(FakeEventSource.instances).toHaveLength(streamCountBeforeSubmit);
+    expect(stream?.closed).toBe(false);
+    expect(transport.getSnapshot().connection).toBe('connected');
+    transport.selectTraceRecord('missing');
+    await vi.waitFor(() => {
+      expect(transport.getSnapshot().lastCommandError).toMatchObject({ code: 'NOT_FOUND' });
+    });
+    expect(transport.getSnapshot().connection).toBe('connected');
     transport.changeRuntime({ safetyMode: 'safe' });
     await vi.waitFor(() => {
       expect(calls.some((call) => call === 'PATCH /api/v1/sessions/session-1/runtime')).toBe(true);

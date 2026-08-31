@@ -107,7 +107,7 @@ describe('Extension Manifest v1', () => {
   });
 
   it('rejects built-in, lifecycle namespace, and other-extension tool conflicts', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace(), {
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace(), {
       reservedToolNames: ['host_tool'],
     });
     const catalog = {

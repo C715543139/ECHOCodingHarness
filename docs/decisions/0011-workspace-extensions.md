@@ -82,8 +82,11 @@ interface ExtensionCatalog {
 Catalog 使用同目录临时文件、flush、原子替换并递增 revision；无法解析、未知版本、哈希/目录不一致
 或恢复不确定时失败关闭，不扫描目录猜测状态。
 
-P3-A2 的存储实现位于 `src/extensions/`。`WorkspaceExtensionStore` 只从构造时绑定的工作区规范根派生
-`.echo/extension-staging`、`.echo/extensions`、`catalog.json` 和 `.trash`，不接受共享扩展根。Manifest
+P3-A2 的存储实现位于 `src/extensions/`。`WorkspaceExtensionStore.open()` 在异步打开时只解析一次调用方
+给出的工作区入口，固定其 canonical 根以及 `.echo`、`extension-staging`、`extensions` 和 `.trash` 的
+目录身份；后续操作不再解析原始入口。入口 junction 改指不会迁移 Store，同路径目录被替换、重建或
+改链则失败关闭为 `WORKSPACE_CHANGED`/`LINK_DENIED`。Store 由固定根派生 `catalog.json`，不接受共享
+扩展根。Manifest
 与 Catalog 均拒绝未知字段并实施大小/数量/深度上限；工具输入 Schema 首版验证 JSON Schema
 2020-12 的有界子集，根必须为严格 object Schema。扩展相对路径会统一为 `/`，绝对路径、`..`、Windows
 歧义路径、链接、junction 及解析后逃逸均拒绝。

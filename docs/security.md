@@ -386,5 +386,9 @@ A2 存储读取只信任绑定工作区中的严格 Catalog，不枚举其他工
 owned root 参数，底层目录快照/路径派生函数也不作为扩展模块公共 API 暴露，避免调用方用另一工作区
 的合法路径绕过实例边界。
 
+Store 必须经异步 `open()` 固定 canonical workspace 与扩展基础目录的设备/inode/创建身份。每次文件或
+Catalog 操作前复验该绑定；原始 alias/junction 后续改指不会迁移实例，绑定目录被替换、重建、删除或
+改链分别以 `WORKSPACE_CHANGED` 或 `LINK_DENIED` 失败。公开返回的路径是副本，不能修改实例内部绑定。
+
 名称冲突检查始终包含全部 `DEFAULT_TOOLS` 和 `extension_` 生命周期命名空间。依赖注入只能通过
 `reservedToolNames` 追加宿主保留名，不能用空集或不完整列表削弱默认冲突集合。

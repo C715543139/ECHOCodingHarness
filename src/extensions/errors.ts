@@ -1,5 +1,6 @@
 export type ExtensionStorageErrorCode =
   | 'WORKSPACE_INVALID'
+  | 'WORKSPACE_CHANGED'
   | 'LINK_DENIED'
   | 'PATH_OUTSIDE_EXTENSION_ROOT'
   | 'MANIFEST_READ_FAILED'

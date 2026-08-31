@@ -19,7 +19,7 @@ afterEach(cleanupWorkspaces);
 
 describe('Catalog v1', () => {
   it('round-trips enabled, disabled, and quarantined entries with monotonic revisions', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const enabled = await installStagedExtension(store);
     const baseTool = sampleManifest().tools.at(0);
     if (baseTool === undefined) throw new Error('Fixture tool is missing.');
@@ -59,7 +59,7 @@ describe('Catalog v1', () => {
 
   it('rejects corrupt, unknown-version, unknown-field, and invalid-state catalogs without rebuilding', async () => {
     const workspace = await makeWorkspace();
-    const store = new WorkspaceExtensionStore(workspace);
+    const store = await WorkspaceExtensionStore.open(workspace);
     const paths = await store.ensureWorkspace();
     const cases: readonly (readonly [string, unknown, string])[] = [
       ['corrupt', '{bad', 'CATALOG_CORRUPT'],
@@ -98,7 +98,7 @@ describe('Catalog v1', () => {
   });
 
   it('fails closed when the installed directory hash changes', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const entry = await installStagedExtension(store);
     await store.replaceCatalog(0, [entry]);
     await fs.writeFile(
@@ -112,7 +112,7 @@ describe('Catalog v1', () => {
   });
 
   it('rejects a catalog symbolic link instead of reading another file', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const paths = await store.ensureWorkspace();
     const external = path.join(paths.workspaceRoot, 'external-catalog.json');
     await fs.writeFile(external, JSON.stringify({ schemaVersion: 1, revision: 0, extensions: [] }));
@@ -123,7 +123,7 @@ describe('Catalog v1', () => {
 
   it('keeps the previous catalog when its atomic replacement fails', async () => {
     const workspace = await makeWorkspace();
-    const initialStore = new WorkspaceExtensionStore(workspace);
+    const initialStore = await WorkspaceExtensionStore.open(workspace);
     const entry = await installStagedExtension(initialStore);
     await initialStore.replaceCatalog(0, [entry]);
     const paths = await initialStore.ensureWorkspace();
@@ -140,7 +140,7 @@ describe('Catalog v1', () => {
         await fs.rm(filePath, { force: true });
       },
     };
-    const failingStore = new WorkspaceExtensionStore(workspace, { catalogWriter: writer });
+    const failingStore = await WorkspaceExtensionStore.open(workspace, { catalogWriter: writer });
 
     await expect(
       failingStore.replaceCatalog(1, [{ ...entry, state: 'disabled' }]),
@@ -152,7 +152,7 @@ describe('Catalog v1', () => {
   });
 
   it('rejects stale revisions and an uncertain missing catalog without guessing from directories', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const entry = await installStagedExtension(store);
     await store.replaceCatalog(0, [entry]);
     await expect(store.replaceCatalog(0, [entry])).rejects.toMatchObject({

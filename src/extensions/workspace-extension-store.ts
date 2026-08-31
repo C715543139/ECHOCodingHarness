@@ -18,9 +18,11 @@ import { snapshotExtensionContent, type ExtensionContentSnapshot } from './conte
 import { ExtensionStorageError, isFileSystemError } from './errors.js';
 import { parseExtensionManifest } from './manifest.js';
 import {
-  ensureExtensionWorkspacePaths,
+  assertExtensionWorkspaceBinding,
+  bindExtensionWorkspace,
   installedExtensionPath,
   stagingExtensionPath,
+  type BoundExtensionWorkspace,
   type ExtensionWorkspacePaths,
 } from './workspace-paths.js';
 
@@ -55,8 +57,8 @@ export class WorkspaceExtensionStore {
   private readonly builtInToolNames: ReadonlySet<string>;
   private readonly catalogWriter: AtomicCatalogWriter;
 
-  constructor(
-    private readonly workspaceRoot: string,
+  private constructor(
+    private readonly binding: BoundExtensionWorkspace,
     options: WorkspaceExtensionStoreOptions = {},
   ) {
     this.builtInToolNames = new Set(
@@ -65,8 +67,16 @@ export class WorkspaceExtensionStore {
     this.catalogWriter = options.catalogWriter ?? defaultCatalogWriter;
   }
 
-  ensureWorkspace(): Promise<ExtensionWorkspacePaths> {
-    return ensureExtensionWorkspacePaths(this.workspaceRoot);
+  static async open(
+    workspaceRoot: string,
+    options: WorkspaceExtensionStoreOptions = {},
+  ): Promise<WorkspaceExtensionStore> {
+    return new WorkspaceExtensionStore(await bindExtensionWorkspace(workspaceRoot), options);
+  }
+
+  async ensureWorkspace(): Promise<ExtensionWorkspacePaths> {
+    await assertExtensionWorkspaceBinding(this.binding);
+    return { ...this.binding.paths };
   }
 
   async stagingExtensionPath(extensionId: string): Promise<string> {

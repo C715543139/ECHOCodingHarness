@@ -18,7 +18,7 @@ describe('workspace extension paths and content hashes', () => {
   it('creates only the current workspace staging, install, and trash roots', async () => {
     const first = await makeWorkspace('echo-extension-first-');
     const second = await makeWorkspace('echo-extension-second-');
-    const store = new WorkspaceExtensionStore(first);
+    const store = await WorkspaceExtensionStore.open(first);
     const paths = await store.ensureWorkspace();
 
     expect(path.relative(paths.workspaceRoot, paths.stagingRoot)).toBe(
@@ -34,7 +34,7 @@ describe('workspace extension paths and content hashes', () => {
   });
 
   it('hashes a normalized sorted file collection and detects any content change', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const { root } = await createStagedExtension(store, sampleManifest(), {
       'lib/helper.mjs': 'export const value = 1;\n',
     });
@@ -49,7 +49,7 @@ describe('workspace extension paths and content hashes', () => {
   });
 
   it('rejects an extension path that escapes its owned root', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const paths = await store.ensureWorkspace();
     await fs.symlink(paths.workspaceRoot, path.join(paths.stagingRoot, 'escape-root'), 'junction');
 
@@ -59,7 +59,7 @@ describe('workspace extension paths and content hashes', () => {
   });
 
   it('rejects junctions or symbolic links even when their target remains in the workspace', async () => {
-    const store = new WorkspaceExtensionStore(await makeWorkspace());
+    const store = await WorkspaceExtensionStore.open(await makeWorkspace());
     const { paths, root } = await createStagedExtension(store);
     const linkedTarget = path.join(paths.workspaceRoot, 'linked-source');
     await fs.mkdir(linkedTarget);
@@ -76,7 +76,7 @@ describe('workspace extension paths and content hashes', () => {
     const external = await makeWorkspace('echo-extension-external-');
     await fs.symlink(external, path.join(workspace, '.echo'), 'junction');
 
-    await expect(new WorkspaceExtensionStore(workspace).ensureWorkspace()).rejects.toMatchObject({
+    await expect(WorkspaceExtensionStore.open(workspace)).rejects.toMatchObject({
       code: 'LINK_DENIED',
     });
   });

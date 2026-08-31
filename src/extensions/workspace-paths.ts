@@ -13,6 +13,18 @@ export interface ExtensionWorkspacePaths {
   readonly trashRoot: string;
 }
 
+interface BoundDirectoryIdentity {
+  readonly path: string;
+  readonly device: number;
+  readonly inode: number;
+  readonly birthtimeMs: number;
+}
+
+export interface BoundExtensionWorkspace {
+  readonly paths: ExtensionWorkspacePaths;
+  readonly directories: readonly BoundDirectoryIdentity[];
+}
+
 function ensureContained(
   root: string,
   candidate: string,
@@ -86,6 +98,89 @@ export async function ensureExtensionWorkspacePaths(
     catalogPath: path.join(extensionsRoot, 'catalog.json'),
     trashRoot,
   };
+}
+
+function pathsEqual(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === 'win32'
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+async function captureDirectoryIdentity(directory: string): Promise<BoundDirectoryIdentity> {
+  const stats = await fs.lstat(directory);
+  if (stats.isSymbolicLink()) {
+    throw new ExtensionStorageError(
+      'LINK_DENIED',
+      'A bound extension workspace directory cannot be a symbolic link or junction.',
+    );
+  }
+  if (!stats.isDirectory()) {
+    throw new ExtensionStorageError(
+      'WORKSPACE_INVALID',
+      'A bound extension workspace path is not a directory.',
+    );
+  }
+  const canonical = await fs.realpath(directory);
+  if (!pathsEqual(directory, canonical)) {
+    throw new ExtensionStorageError(
+      'LINK_DENIED',
+      'A bound extension workspace directory resolves through a link or junction.',
+    );
+  }
+  return Object.freeze({
+    path: canonical,
+    device: stats.dev,
+    inode: stats.ino,
+    birthtimeMs: stats.birthtimeMs,
+  });
+}
+
+export async function bindExtensionWorkspace(
+  workspaceRoot: string,
+): Promise<BoundExtensionWorkspace> {
+  const created = await ensureExtensionWorkspacePaths(workspaceRoot);
+  const paths = Object.freeze({ ...created });
+  const directories = await Promise.all(
+    [
+      paths.workspaceRoot,
+      paths.echoRoot,
+      paths.stagingRoot,
+      paths.extensionsRoot,
+      paths.trashRoot,
+    ].map(captureDirectoryIdentity),
+  );
+  return Object.freeze({ paths, directories: Object.freeze(directories) });
+}
+
+export async function assertExtensionWorkspaceBinding(
+  binding: BoundExtensionWorkspace,
+): Promise<void> {
+  for (const expected of binding.directories) {
+    let actual: BoundDirectoryIdentity;
+    try {
+      actual = await captureDirectoryIdentity(expected.path);
+    } catch (error) {
+      if (error instanceof ExtensionStorageError && error.code === 'LINK_DENIED') throw error;
+      throw new ExtensionStorageError(
+        'WORKSPACE_CHANGED',
+        'A bound extension workspace directory is missing or no longer valid.',
+        error,
+      );
+    }
+    if (
+      !pathsEqual(actual.path, expected.path) ||
+      actual.device !== expected.device ||
+      actual.inode !== expected.inode ||
+      actual.birthtimeMs !== expected.birthtimeMs
+    ) {
+      throw new ExtensionStorageError(
+        'WORKSPACE_CHANGED',
+        'A bound extension workspace directory was replaced after the store opened.',
+      );
+    }
+  }
 }
 
 export async function assertOwnedExtensionDirectory(

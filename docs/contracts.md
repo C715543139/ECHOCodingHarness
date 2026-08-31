@@ -698,8 +698,10 @@ P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继�
 工具/Policy/终态事件。Catalog 是扩展状态事实源，Session JSONL 不复制 Catalog 内容。A0 验收矩阵
 允许 `pending:P3-*`；负责实现的任务必须改为真实测试路径，P3-C3 清零全部 pending 后才能宣称完成。
 
-P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。它绑定
-一个规范化工作区，只管理该工作区的 staging、安装根和 Catalog；Manifest/Catalog、工具 JSON Schema、
+P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。调用方
+必须通过异步 `WorkspaceExtensionStore.open(workspaceRoot)` 创建实例；open 一次性固定 canonical 根和
+扩展基础目录身份，后续不重新解析原始 workspaceRoot。实例只管理该工作区的 staging、安装根和
+Catalog；Manifest/Catalog、工具 JSON Schema、
 路径、链接、名称冲突、完整 SHA-256 和原子写均在此边界验证。Store 的路径派生与内容快照 API 只接收
 扩展 ID、内容哈希或 Catalog 条目，不接受调用方提供的工作区路径、扩展根或 owned root；可绕过绑定
 工作区的底层文件系统函数不从 `src/extensions/index.ts` 导出。A1/A2 并行期不改冻结

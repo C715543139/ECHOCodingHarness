@@ -204,8 +204,10 @@ fail-closed scan step succeeds.
 - shared Provider config service tests in `tests/unit/config/config-service.test.ts` prove Web
   `saveProviderSettings` is a restricted Provider merge, CLI `replacePersistentConfig` is a full
   validated replace, artifact-root locking is case-normalized on win32, discovery does not
-  auto-save, and merge refuses to overwrite an unreadable or schema-invalid file; HTTP provider
-  routes remain a later integration task;
+  auto-save, and merge refuses to overwrite an unreadable or schema-invalid file. Production
+  Provider HTTP route assembly and persisted settings are covered by
+  `tests/integration/web/production-assembly.test.ts`; discovery request mapping is covered by
+  `tests/unit/web/http-transport.test.ts` and the config-service tests;
 - Fastify injection tests cover the Phase A assembled routes without opening a product TCP client;
   `tests/integration/web/routes.test.ts` proves the packaged shell is served and no export route
   is registered. P2-B1 independently assembles Session API routes in
@@ -252,8 +254,8 @@ Vitest, Testing Library, `user-event`, and a DOM environment cover:
 - safe model Markdown semantics, plain-text user messages, skipped raw HTML, isolated links, and
   non-loading image placeholders (`tests/unit/web/chat-stream.test.tsx`);
 - Web Chat/settings extras are injected as a Fake-agnostic `WebConsoleActions` /
-  `WebConsoleView` pair. There is no module-level controller; A4 `App.tsx` omits these
-  props and controller-owned buttons stay disabled until C1 wires the root;
+  `WebConsoleView` pair. There is no module-level controller; the production `App.tsx` owns one
+  transport instance and passes its actions to the Session rail, Chat view, and Provider settings;
 - model/safety controls and Provider settings validation
   (`tests/unit/web/composer.test.tsx`, `tests/unit/web/provider-settings.test.tsx`);
 - no Session export entry (`tests/unit/web/session-actions.test.tsx`);
@@ -264,17 +266,20 @@ Vitest, Testing Library, `user-event`, and a DOM environment cover:
 
 ### Browser and artifact layer
 
-Playwright Chromium runs a deliberately small set of critical flows against a built local server:
+Playwright Chromium runs 11 deliberately small spec files (13 test cases) against a built local
+server. The current P2.5 browser baseline covers:
 
-1. bootstrap and first Session;
-2. Fake Provider Chat with an approval and a completed Turn;
-3. refresh/reconnect without duplicate execution;
-4. browsing another Session while a Turn is active;
-5. Trace selection and matching Inspector details;
-6. Provider config save without an API Key entering the DOM;
-7. keyboard-only critical flow and 200% zoom smoke;
-8. graceful shutdown with and without an active Turn.
-9. confirmed idle deletion and active Turn stop-before-delete behavior.
+1. bootstrap without a paid Provider;
+2. first Fake Provider Session plus fixed-shell and owned-scroll behavior;
+3. approval projection and matching Trace;
+4. disconnect, reconnect, and resync without replaying a POST;
+5. Provider state without an API Key entering the DOM;
+6. keyboard-only operation and focus restoration;
+7. 200% zoom, narrow viewport, and reduced motion;
+8. safe model Markdown without interpreting user text or loading remote images;
+9. confirmed idle deletion and active Turn stop-before-delete behavior;
+10. bounded, virtualized rendering of 200 Trace records;
+11. landmarks, text status, and polite live-region accessibility.
 
 `echo-harness web` defaults to opening the server-issued, verified loopback bootstrap URL through an
 injectable argument-array opener; tests never launch a real browser. `--no-open` prints that same
@@ -321,11 +326,16 @@ artifact-root config, starts the packaged `dist/cli.js web`, authenticates throu
 bootstrap flow, verifies SSE terminal delivery plus restored Chat and Trace DTOs, and restores the
 previous config and temporary workspace in `finally`.
 
-The 2026-08-31 C2 baseline passed `pnpm check` with 117 test files / 637 tests and coverage of
-85.01% statements, 76.94% branches, 89.04% functions, and 86.80% lines. Playwright Chromium was
-9/9; offline evals were 11/11 and demo smoke was 1/1. Controlled Provider acceptance used
-`deepseek/deepseek-v4-flash` and completed packaged Web Chat, SSE terminal delivery, Session
-recovery, and Trace in 4003 ms without recording the key or response body.
+The 2026-08-31 C2 historical checkpoint passed `pnpm check` with 117 test files / 637 tests and
+coverage of 85.01% statements, 76.94% branches, 89.04% functions, and 86.80% lines. Playwright
+Chromium was 9/9 at that checkpoint.
+
+The current P2.5 acceptance baseline passes `pnpm check` with 118 test files / 658 tests and
+coverage of 85.09% statements, 76.94% branches, 90.08% functions, and 86.91% lines. Playwright
+Chromium is 13/13 across 11 spec files; offline evals remain 11/11 and demo smoke remains 1/1.
+Controlled Provider acceptance used `deepseek/deepseek-v4-flash` and completed packaged Web Chat,
+SSE terminal delivery, Session recovery, and Trace in 4003 ms without recording the key or
+response body.
 
 ## Known gaps
 

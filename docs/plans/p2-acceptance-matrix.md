@@ -111,8 +111,9 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 
 ## 7. 最终签收记录
 
-- 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
-  时补录；
+- 本地与远端签收：2026-08-31，Windows 10；P2.5 实现已快进合并至 `main`，签收 HEAD
+  `4607d12`；[GitHub Actions CI 33359573204](https://github.com/C715543139/ECHOCodingHarness/actions/runs/33359573204)
+  通过；
 - `pnpm check`：118 个测试文件、658 项测试通过；
 - 覆盖率：statements 85.09%、branches 76.94%、functions 90.08%、lines 86.91%；
 - Web E2E：Playwright Chromium 13/13 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、

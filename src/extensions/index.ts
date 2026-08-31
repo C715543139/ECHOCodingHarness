@@ -48,3 +48,7 @@ export {
   type ExtensionWorkerHostOptions,
   type ExtensionWorkerSpec,
 } from './worker-host.js';
+export {
+  WorkspaceExtensionSystem,
+  type WorkspaceExtensionSystemOptions,
+} from './workspace-extension-system.js';

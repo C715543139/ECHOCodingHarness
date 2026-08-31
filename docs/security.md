@@ -362,8 +362,8 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A1 Full Access、A2 工作区扩展存储与 B1 Worker/Registry 均已实现；生命周期、生产接线与
-> WebUI 仍由后续任务交付。现有 `safe`、`balanced`、`auto` 规则保持不变。
+> P3 状态：A1–B3 与 C1 生产接线均已实现；PDF 演示和最终验收仍由 C2/C3 完成。
+> 现有 `safe`、`balanced`、`auto` 规则保持不变。
 
 P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或
 hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git、删除文件并引用工作区外路径。进入

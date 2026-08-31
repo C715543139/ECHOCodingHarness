@@ -61,6 +61,11 @@ export interface EchoApplicationServiceOptions {
   readonly approvalHandler?: ApprovalHandler;
   readonly unattendedApproval?: UnattendedApproval;
   readonly onEvent?: (event: EchoEvent) => void | Promise<void>;
+  readonly prepareToolsForTurn?: (
+    runtime: SessionRuntimeState,
+    signal: AbortSignal,
+  ) => Promise<void>;
+  readonly closeTools?: () => Promise<void>;
   readonly secrets?: readonly string[];
   readonly homeDirectory?: string;
   readonly idFactory?: (kind: 'session' | 'turn' | 'step' | 'event') => string;
@@ -139,6 +144,7 @@ export class EchoApplicationService implements ApplicationService {
   private readonly expired = new Set<string>();
   private readonly now: () => string;
   private readonly idFactory: NonNullable<EchoApplicationServiceOptions['idFactory']>;
+  private closePromise: Promise<void> | undefined;
 
   constructor(options: EchoApplicationServiceOptions) {
     this.options = options;
@@ -274,8 +280,9 @@ export class EchoApplicationService implements ApplicationService {
     };
     input.signal?.addEventListener('abort', onAbort, { once: true });
 
-    const loop = this.createLoop(runtime);
     try {
+      await this.options.prepareToolsForTurn?.(runtime, controller.signal);
+      const loop = this.createLoop(runtime);
       const result = await loop.continueSession(input.sessionId, input.goal, controller.signal);
       const active = this.activeTurns.get(input.sessionId);
       if (active !== undefined) {
@@ -296,6 +303,14 @@ export class EchoApplicationService implements ApplicationService {
       return;
     }
     active.controller.abort();
+  }
+
+  async close(): Promise<void> {
+    this.closePromise ??= (async () => {
+      for (const active of this.activeTurns.values()) active.controller.abort();
+      await this.options.closeTools?.();
+    })();
+    return this.closePromise;
   }
 
   async respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult> {

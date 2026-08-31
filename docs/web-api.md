@@ -683,6 +683,6 @@ interface ExtensionMutationDto {
 人类 Web 管理不要求当前 Session 为 Full Access；活动扩展调用返回 `409 EXTENSION_BUSY`。稳定增量
 错误码包括 `EXTENSION_NOT_FOUND`、`EXTENSION_BUSY`、`EXTENSION_INVALID`、
 `EXTENSION_QUARANTINED` 与 `EXTENSION_CLEANUP_PENDING`。B3 服务端只依赖可注入的
-`ExtensionAdministrationPort`；未装配时 GET 和变更端点稳定返回 `503 EXTENSION_INVALID`，客户端隐藏
-扩展导航，真实 Catalog/Store 生命周期接线由 C1 完成。Web 不读取扩展目录推断状态，也不提供 staging
+`ExtensionAdministrationPort`。生产装配已由 C1 接入当前工作区 Catalog/Store；测试或裁剪装配未提供
+端口时，GET 和变更端点仍稳定返回 `503 EXTENSION_INVALID`，客户端隐藏扩展导航。Web 不读取扩展目录推断状态，也不提供 staging
 编写、检查或安装端点；这些由 Full Access 下的 Agent 生命周期工具完成。

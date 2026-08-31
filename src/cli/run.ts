@@ -141,7 +141,7 @@ export async function runGoal(
     workspaceRoot: loaded.workspaceRoot,
     secrets: [...loaded.secrets],
   });
-  const service = createHarnessService({
+  const service = await createHarnessService({
     runtime: loaded,
     unattendedApproval: options.interactive ? 'wait' : 'deny',
     ...(options.interactive
@@ -153,21 +153,25 @@ export async function runGoal(
       : {}),
     onEvent: (event) => writeChunks(renderer.renderEvent(event, loaded.capabilities), io),
   });
-  const settings = newSessionSettings(options, loaded.config);
-  const session = await service.createSession({
-    workspaceRoot: loaded.workspaceRoot,
-    provider: loaded.providerIdentity,
-    model: settings.model,
-    safetyMode: settings.safetyMode,
-    ...(authorization.confirmation === undefined
-      ? {}
-      : { fullAccessConfirmation: authorization.confirmation }),
-  });
-  const result = await service.runTurn({
-    sessionId: session.sessionId,
-    goal,
-    ...(options.signal === undefined ? {} : { signal: options.signal }),
-  });
-  writeChunks(renderer.renderResult(result, loaded.capabilities), io);
-  return { exitCode: toExitCode(result), result };
+  try {
+    const settings = newSessionSettings(options, loaded.config);
+    const session = await service.createSession({
+      workspaceRoot: loaded.workspaceRoot,
+      provider: loaded.providerIdentity,
+      model: settings.model,
+      safetyMode: settings.safetyMode,
+      ...(authorization.confirmation === undefined
+        ? {}
+        : { fullAccessConfirmation: authorization.confirmation }),
+    });
+    const result = await service.runTurn({
+      sessionId: session.sessionId,
+      goal,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
+    writeChunks(renderer.renderResult(result, loaded.capabilities), io);
+    return { exitCode: toExitCode(result), result };
+  } finally {
+    await service.close();
+  }
 }

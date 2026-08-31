@@ -83,6 +83,8 @@ interface MaterializedExtension {
 export interface ExtensionLifecycleManagerOptions {
   readonly workspaceRoot: string;
   readonly registry: ToolRegistry;
+  /** Controls process-local loading without changing the persisted enabled state. */
+  readonly runtimeAllowed?: () => boolean;
   readonly now?: () => Date;
   readonly removeTree?: (target: string) => Promise<void>;
   readonly storeOptions?: WorkspaceExtensionStoreOptions;
@@ -237,6 +239,7 @@ export class ExtensionLifecycleManager {
   readonly runtime: ExtensionRuntimeManager;
   private readonly now: () => Date;
   private readonly removeTree: (target: string) => Promise<void>;
+  private readonly runtimeAllowed: () => boolean;
   private readonly loading = new Set<string>();
   private serialTail: Promise<void> = Promise.resolve();
 
@@ -249,6 +252,7 @@ export class ExtensionLifecycleManager {
     this.store = store;
     this.runtime = runtime;
     this.now = options.now ?? (() => new Date());
+    this.runtimeAllowed = options.runtimeAllowed ?? (() => true);
     this.removeTree =
       options.removeTree ?? (async (target) => fs.rm(target, { recursive: true, force: true }));
   }
@@ -368,7 +372,7 @@ export class ExtensionLifecycleManager {
       if (
         existing?.contentHash === snapshot.contentHash &&
         existing.state === 'enabled' &&
-        this.runtime.isLoaded(extensionId)
+        (this.runtime.isLoaded(extensionId) || !this.runtimeAllowed())
       ) {
         return this.mutation(existing, false);
       }
@@ -387,16 +391,18 @@ export class ExtensionLifecycleManager {
       }
       const wasLoaded = this.runtime.isLoaded(extensionId);
       if (wasLoaded) await this.runtime.unload(extensionId);
-      try {
-        await this.loadRuntime(installed.root, snapshot.manifest);
-      } catch (error) {
-        await this.discardMaterialized(installed);
-        await this.restoreRuntime(existing).catch(() => undefined);
-        throw new ExtensionLifecycleError(
-          'EXTENSION_INSTALL_FAILED',
-          `Extension "${extensionId}" could not be loaded.`,
-          error,
-        );
+      if (this.runtimeAllowed()) {
+        try {
+          await this.loadRuntime(installed.root, snapshot.manifest);
+        } catch (error) {
+          await this.discardMaterialized(installed);
+          await this.restoreRuntime(existing).catch(() => undefined);
+          throw new ExtensionLifecycleError(
+            'EXTENSION_INSTALL_FAILED',
+            `Extension "${extensionId}" could not be loaded.`,
+            error,
+          );
+        }
       }
 
       const entry: ExtensionCatalogEntry = {
@@ -418,7 +424,7 @@ export class ExtensionLifecycleManager {
         await this.restoreRuntime(existing).catch(() => undefined);
         throw error;
       }
-      if (!this.runtime.isLoaded(extensionId)) {
+      if (this.runtimeAllowed() && !this.runtime.isLoaded(extensionId)) {
         await this.persistQuarantine(extensionId, 'Worker closed during installation.');
         throw new ExtensionLifecycleError(
           'EXTENSION_INSTALL_FAILED',
@@ -454,7 +460,10 @@ export class ExtensionLifecycleManager {
       assertValidExtensionId(extensionId, 'extensionId');
       const catalog = await this.store.readCatalog();
       const entry = this.requireEntry(catalog, extensionId);
-      if (entry.state === 'enabled' && this.runtime.isLoaded(extensionId)) {
+      if (
+        entry.state === 'enabled' &&
+        (this.runtime.isLoaded(extensionId) || !this.runtimeAllowed())
+      ) {
         return this.mutation(entry, false);
       }
       if (this.runtime.activeCallCount(extensionId) > 0) this.busy(extensionId);
@@ -466,10 +475,12 @@ export class ExtensionLifecycleManager {
           await this.store.installedExtensionPath(entry.id, entry.contentHash),
           snapshot.manifest,
         );
-        await this.loadRuntime(
-          await this.store.installedExtensionPath(entry.id, entry.contentHash),
-          snapshot.manifest,
-        );
+        if (this.runtimeAllowed()) {
+          await this.loadRuntime(
+            await this.store.installedExtensionPath(entry.id, entry.contentHash),
+            snapshot.manifest,
+          );
+        }
       } catch (error) {
         await this.persistQuarantine(
           extensionId,
@@ -544,6 +555,31 @@ export class ExtensionLifecycleManager {
   }
 
   async close(): Promise<void> {
+    await this.runtime.shutdownAll();
+  }
+
+  /**
+   * Reconciles persisted enabled entries with the process-local registry.
+   * A broken entry is quarantined by enable() without preventing healthy peers from loading.
+   */
+  async activateEnabled(signal?: AbortSignal): Promise<void> {
+    if (!this.runtimeAllowed()) return;
+    const entries = await this.list(signal);
+    for (const entry of entries) {
+      if (entry.state !== 'enabled' || entry.loaded) continue;
+      try {
+        await this.enable(entry.id, signal);
+      } catch (error) {
+        if (error instanceof ExtensionLifecycleError && error.code === 'EXTENSION_INSTALL_FAILED') {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  /** Unloads Workers and tools while preserving Catalog state and installed files. */
+  async deactivateRuntime(): Promise<void> {
     await this.runtime.shutdownAll();
   }
 
@@ -730,7 +766,13 @@ export class ExtensionLifecycleManager {
   }
 
   private async restoreRuntime(entry: ExtensionCatalogEntry | undefined): Promise<void> {
-    if (entry === undefined || entry.state !== 'enabled' || this.runtime.isLoaded(entry.id)) return;
+    if (
+      !this.runtimeAllowed() ||
+      entry === undefined ||
+      entry.state !== 'enabled' ||
+      this.runtime.isLoaded(entry.id)
+    )
+      return;
     const snapshot = await this.store.snapshotInstalledExtension(entry);
     await this.loadRuntime(
       await this.store.installedExtensionPath(entry.id, entry.contentHash),

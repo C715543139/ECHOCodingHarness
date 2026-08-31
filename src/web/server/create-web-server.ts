@@ -189,9 +189,7 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
     assetRoot: options.assetRoot,
     state,
     sessionApi: runtime.sessionApi,
-    ...(options.extensionAdministration === undefined
-      ? {}
-      : { extensionAdministration: options.extensionAdministration }),
+    extensionAdministration: options.extensionAdministration ?? runtime.extensionAdministration,
   });
 
   await app.listen({ host: WEB_SERVER_HOST, port });
@@ -210,6 +208,7 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
     state.serviceState = 'stopping';
     runtime.sessionApi.hub.closeStream();
     await runtime.sessionApi.coordinator.shutdown(timeoutMs);
+    await runtime.close();
     app.server.closeIdleConnections?.();
     app.server.closeAllConnections?.();
     let timer: ReturnType<typeof setTimeout> | undefined;

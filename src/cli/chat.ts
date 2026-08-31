@@ -168,7 +168,7 @@ export async function runChat(
     createInteractiveFullAccessConfirmer(stdin, stderr, options.signal);
 
   let turnRunning = false;
-  const service = createHarnessService({
+  const service = await createHarnessService({
     runtime: loaded,
     unattendedApproval: options.interactive ? 'wait' : 'deny',
     ...(approvalHandler === undefined ? {} : { approvalHandler }),
@@ -187,6 +187,7 @@ export async function runChat(
     runtime = await openSession(service, loaded, options, fullAccessConfirmer);
   } catch (error) {
     input.close();
+    await service.close();
     if (isConfigurationError(error)) {
       return failConfiguration(io, `configuration · ${error.message}`);
     }
@@ -316,6 +317,7 @@ export async function runChat(
   } finally {
     detachInterrupt();
     input.close();
+    await service.close();
   }
 
   return { exitCode: idleInterrupt ? 130 : exitCode };

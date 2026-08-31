@@ -426,5 +426,14 @@ P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七�
   Worker/自测失败、首次安装、同哈希幂等、不同哈希替换、enable/disable/list、两个工作区隔离、活动
   调用 busy、Worker fault 持久 quarantine、卸载删除故障的 deactivated/cleanupPending 与重试；
 - 同文件验证七个 `extension_*` 工具的固定集合、严格输入与稳定 `ToolExecution` 错误映射；
-- LIFE-01/02 已在 `P3_TEST_MATRIX` 指向上述真实路径。C1 仍负责只在已确认 Full Access 的模型请求边界
-  暴露这些定义，并负责进程重启加载和跨 Session 复用的集成证据。
+- LIFE-01/02 已在 `P3_TEST_MATRIX` 指向上述真实路径；C1 已负责只在确认 Full Access 的模型请求边界
+  暴露这些定义，并完成进程重启加载和跨 Session 复用证据。
+
+### P3-C1 production integration evidence
+
+- `tests/unit/extensions/workspace-extension-system.test.ts`：验证生命周期工具和动态工具只在 Full Access
+  请求边界可见，安全模式 Web 启用不加载 Worker，退出模式仅卸载运行时，并覆盖重启恢复与跨工作区隔离；
+- `tests/integration/p3-extension-integration.test.ts`：使用 Fake Provider 证明安装完成后的下一模型请求即可
+  调用新工具、新 Session 可复用，以及切回 balanced 后下一模型请求不再获得扩展工具；
+- `tests/integration/web/extensions.test.ts`：验证生产 Web 装配读取真实当前工作区 Catalog，同时保留稳定错误
+  映射、请求守卫和可注入测试端口。

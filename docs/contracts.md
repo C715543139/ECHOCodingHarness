@@ -681,13 +681,13 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
 
-## 15. P3 增量契约（A1/A2/B1 已实现）
+## 15. P3 增量契约（A1–C1 已实现）
 
 P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。P3-A1 已把运行时
 `SafetyMode` 迁移为 `safe | balanced | auto | full-access`，并复用 A0 冻结的
-`FullAccessConfirmation`。P3-A2 已实现 Manifest、Catalog 与工作区存储；P3-B1 已实现 Worker Host
-与动态 Registry；生命周期和生产接线仍由后续任务实现。
+`FullAccessConfirmation`。P3-A2 至 B3 已实现 Manifest/Catalog、Worker、动态 Registry、生命周期和
+Web 管理；P3-C1 已将同一个工作区扩展系统接入 CLI 与 Web 生产运行时。
 
 Full Access 只有在人类确认后才成为 Session 的有效并持久模式。新 Session 不能仅因配置、CLI 候选
 或继承值而静默获得；非交互 CLI 必须使用 `--allow-full-access`，Web 必须提交

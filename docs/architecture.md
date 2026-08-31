@@ -63,7 +63,7 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
-### 2.5 P3 增量（A1/A2/B1 已实现）
+### 2.5 P3 增量（A1–C1 已实现）
 
 P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与
@@ -72,8 +72,9 @@ P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 插件的历史范围。
 
 其中 P3-A1 已交付 Full Access 的人类确认门、Session 恢复/撤销、CLI 双旗标、Web DTO/路由校验和
-Central Safety Policy 直通；P3-A2 已交付工作区 Manifest、Catalog 与存储；P3-B1 已交付独立 Worker
-Host、故障注销和动态 Tool Registry。生命周期工具、生产接线与 WebUI 仍按任务依赖逐步实现。
+Central Safety Policy 直通；A2–B3 已交付工作区存储、Worker、生命周期与 Web 管理。P3-C1 通过
+`WorkspaceExtensionSystem` 完成 CLI/Web 生产接线：模型请求边界按 Session 模式协调 Registry，进程关闭
+时终止 Worker，Catalog 仍是跨 Session 与重启的持久事实源。
 
 ## 3. 架构原则
 
@@ -405,12 +406,12 @@ P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提�
 工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
 Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。
 
-## 18. P3 增量架构（A1/A2/B1/B2 已实现）
+## 18. P3 增量架构（A1–C1 已实现）
 
 P3 在现有 ApplicationService、Agent Loop 和 ToolRegistry 之间增加 `ExtensionManager`。它以固定
 `workspaceRoot` 解析 `.echo/extensions/catalog.json`，在已确认 Full Access 时启动 enabled 扩展的
-Worker，并把动态定义注入现有 Registry。P3-B1 的 `ExtensionRuntimeManager` 已实现这一 Worker/Registry
-边界；P3-C1 再把它接入 ApplicationService。Agent Loop 仍在每次模型请求前读取 Registry，因此安装
+Worker，并把动态定义注入现有 Registry。`WorkspaceExtensionSystem` 已把该边界接入 CLI/Web 与
+ApplicationService 的 Turn 前置钩子。Agent Loop 仍在每次模型请求前读取 Registry，因此安装
 或启用成功后的下一次请求自然获得新工具，不建立第二套循环。
 
 ```text
@@ -432,7 +433,9 @@ Full Access 只放开 Central Safety Policy 的授权结论；输入校验、工
 工作区 Catalog 持有，不复制进每个 Session JSONL。
 
 P3-B2 的 `ExtensionLifecycleManager` 串行化同一工作区的状态转换，以 Catalog revision 作为持久事实，
-以 `ExtensionRuntimeManager` 作为进程内加载事实。`extension_check` 只读取 staging、启动一次性 Worker
+以 `ExtensionRuntimeManager` 作为进程内加载事实。安全模式下 Web 启用只更新 Catalog，不加载 Worker；
+下一次 Full Access Turn 才恢复 enabled 项，下一次非 Full Access Turn 则卸载进程内工具但保留文件。
+`extension_check` 只读取 staging、启动一次性 Worker
 并运行凭据隔离的有界自测；`extension_install` 再次取快照，经临时目录、哈希复验和 Worker 握手后才
-替换 Catalog 与 Registry。七个定义由 `createExtensionLifecycleTools()` 单独提供，P3-C1 仅在已确认
+替换 Catalog 与 Registry。七个定义由 `createExtensionLifecycleTools()` 单独提供，生产接线仅在已确认
 Full Access 的模型请求边界注册，不把生命周期逻辑复制进 CLI、Web 或 ApplicationService。

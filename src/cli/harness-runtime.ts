@@ -17,6 +17,7 @@ import type {
   SafetyMode,
 } from '../contracts/index.js';
 import { EventContextBuilder } from '../context/index.js';
+import { WorkspaceExtensionSystem } from '../extensions/index.js';
 import { createOpenAIClient, OpenAICompatibleProvider } from '../provider/index.js';
 import { CentralSafetyPolicy } from '../security/index.js';
 import { createProviderIdentity, JsonlSessionRepository, redactText } from '../session/index.js';
@@ -193,12 +194,17 @@ export async function loadHarnessRuntime(input: {
   };
 }
 
-export function createHarnessService(input: {
+export async function createHarnessService(input: {
   readonly runtime: LoadedHarnessRuntime;
   readonly unattendedApproval: 'deny' | 'wait';
   readonly approvalHandler?: ApprovalHandler;
   readonly onEvent?: (event: EchoEvent) => void | Promise<void>;
-}): EchoApplicationService {
+}): Promise<EchoApplicationService> {
+  const tools = new ToolRegistry(DEFAULT_TOOLS);
+  const extensions = await WorkspaceExtensionSystem.open({
+    workspaceRoot: input.runtime.workspaceRoot,
+    registry: tools,
+  });
   return new EchoApplicationService({
     repository: new JsonlSessionRepository({
       workspaceRoot: input.runtime.workspaceRoot,
@@ -206,7 +212,7 @@ export function createHarnessService(input: {
     }),
     provider: input.runtime.provider,
     providerIdentity: input.runtime.providerIdentity,
-    tools: new ToolRegistry(DEFAULT_TOOLS),
+    tools,
     policy: new CentralSafetyPolicy(),
     contextBuilder: new EventContextBuilder({
       systemPrompt: SYSTEM_PROMPT,
@@ -223,6 +229,9 @@ export function createHarnessService(input: {
     unattendedApproval: input.unattendedApproval,
     ...(input.approvalHandler === undefined ? {} : { approvalHandler: input.approvalHandler }),
     ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
+    prepareToolsForTurn: (runtime, signal) =>
+      extensions.prepareForTurn(runtime.safetyMode.value, signal),
+    closeTools: () => extensions.close(),
     secrets: input.runtime.secrets,
   });
 }

@@ -194,7 +194,7 @@ describe('Extension administration API', () => {
     }
   });
 
-  it('maps stable failures, rejects invalid inputs, and preserves unavailable production assembly', async () => {
+  it('maps stable failures, rejects invalid inputs, and exposes the production workspace Catalog', async () => {
     const fixture = administration({
       disable: async () => {
         throw new ExtensionAdministrationError('EXTENSION_BUSY');
@@ -227,18 +227,18 @@ describe('Extension administration API', () => {
       await harness.server.close();
     }
 
-    const unavailable = await startTestWebServer();
+    const production = await startTestWebServer();
     try {
-      const cookie = await unavailable.bootstrap();
-      const response = await unavailable.inject({
+      const cookie = await production.bootstrap();
+      const response = await production.inject({
         method: 'GET',
         url: '/api/v1/extensions',
         cookies: cookie,
       });
-      expect(response.statusCode).toBe(503);
-      expect(response.json()).toMatchObject({ error: { code: 'EXTENSION_INVALID' } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ data: [] });
     } finally {
-      await unavailable.server.close();
+      await production.server.close();
     }
   });
 });

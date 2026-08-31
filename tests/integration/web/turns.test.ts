@@ -141,6 +141,23 @@ describe('Turn, cancel, and approval API', () => {
         },
       });
 
+      const terminal = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          unsubscribe();
+          reject(new Error('timed out waiting for the cancelled turn to reach a terminal state'));
+        }, 8_000);
+        const unsubscribe = harness.hub.subscribe(sessionId, (event) => {
+          if (
+            event.turnId !== turnId ||
+            !['turn.completed', 'turn.failed', 'turn.cancelled'].includes(event.type)
+          ) {
+            return;
+          }
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve();
+        });
+      });
       const cancel = await harness.inject({
         method: 'POST',
         url: `/api/v1/sessions/${sessionId}/turns/${turnId}/cancel`,
@@ -156,9 +173,10 @@ describe('Turn, cancel, and approval API', () => {
         data: { sessionId, turnId, state: 'cancelling' },
       });
       release();
-      await new Promise((resolve) => {
-        setTimeout(resolve, 50);
-      });
+      await terminal;
+      await expect
+        .poll(() => harness.coordinator.snapshot().sessionId, { timeout: 8_000 })
+        .toBeUndefined();
       const cancelAgain = await harness.inject({
         method: 'POST',
         url: `/api/v1/sessions/${sessionId}/turns/${turnId}/cancel`,

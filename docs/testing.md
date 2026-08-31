@@ -288,11 +288,14 @@ non-repo cwd, redeems the Cookie, fetches `/` and `/api/v1/bootstrap`, and shuts
 pnpm and Web child processes receive an explicit Windows env allowlist (`PATH`, `SystemRoot`,
 `ComSpec`, `PATHEXT`, `TEMP`, `TMP`, and similar runtime variables). The Web process gets only a
 controlled `ECHO_API_KEY`; other `ECHO_*` and common CI/cloud/token/key variables are not inherited.
-Windows invokes `pnpm.cmd` with a fixed argument array and `shell: false`. Temp cleanup failures are
-reported without expanding the delete scope beyond that `os.tmpdir()` tree. It does not use source,
-repository `node_modules`, `.env.test`, or a user profile workspace. C1 requires the isolated
-`POST /api/v1/sessions` call to return `201 SessionViewDto` and wires the script into `pnpm check`
-/ CI. It does not rely on `.env.test`, a paid Provider, or a user profile path.
+Windows invokes `pnpm.cmd` with a fixed argument array and `shell: false`. The copied manifest keeps
+both dependency sections so it exactly matches the copied lockfile, while
+`--prod --offline --frozen-lockfile` installs production dependencies only and never performs a
+registry resolution. Temp cleanup failures are reported without expanding the delete scope beyond
+that `os.tmpdir()` tree. It does not use source, repository `node_modules`, `.env.test`, or a user
+profile workspace. C1 requires the isolated `POST /api/v1/sessions` call to return
+`201 SessionViewDto` and wires the script into `pnpm check` / CI. It does not rely on `.env.test`, a
+paid Provider, or a user profile path.
 
 CI installs the pinned Chromium version only in the Web E2E evidence step and caches it by the
 Playwright version. Browser failures save bounded screenshots/traces as CI artifacts only after

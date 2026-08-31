@@ -170,6 +170,8 @@ describe('smoke-web-isolated-artifact source contract', () => {
     expect(source).toContain('stdin.end');
     expect(source).toContain("'.env.test'");
     expect(source).toContain('install --prod');
+    expect(source).toContain('devDependencies: pkg.devDependencies');
+    expect(source).toContain("'--frozen-lockfile'");
     expect(source).toContain('--store-dir');
     expect(source).toContain('--cache-dir');
     expect(source).toContain('--config.node-linker=hoisted');

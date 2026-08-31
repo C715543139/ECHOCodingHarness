@@ -242,6 +242,9 @@ function copyPublishTree(packageDir) {
         bin: { 'echo-harness': './dist/cli.js' },
         engines: pkg.engines,
         dependencies: pkg.dependencies,
+        // Keep the copied manifest aligned with the full lockfile. --prod below still prevents
+        // development dependencies from being installed in the isolated artifact.
+        devDependencies: pkg.devDependencies,
       },
       null,
       2,
@@ -272,6 +275,7 @@ function installIsolatedProdDeps(packageDir, env, sourceEnv) {
     'install',
     '--prod',
     '--offline',
+    '--frozen-lockfile',
     '--ignore-scripts',
     '--config.node-linker=hoisted',
     '--store-dir',

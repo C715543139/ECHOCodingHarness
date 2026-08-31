@@ -1,6 +1,6 @@
 # P3：Full Access 与工作区扩展系统
 
-> 状态：Planned / contracts frozen by P3-A0
+> 状态：In progress / contracts frozen by P3-A0；P3-A2 storage implemented
 >
 > 版本：1.0
 >
@@ -88,7 +88,7 @@ Web 创建/切换 Full Access 必须确认，之后常驻红色 `FULL ACCESS` �
 | --- | --- | --- |
 | P3-A0 | ADR、计划、目标接口与验收矩阵 | 已验收 main 与远端 CI |
 | P3-A1 | Full Access 授权、策略、CLI/领域运行时 | A0 |
-| P3-A2 | Manifest、Catalog 与工作区存储 | A0，可与 A1 并行 |
+| P3-A2 | Manifest、Catalog 与工作区存储 | 已实现；A0 契约保持冻结，可供 B1/B2/B3 复用 |
 | P3-B1 | Worker Host 与动态 Registry | A2 |
 | P3-B2 | 创作规范与七个生命周期工具 | A1、B1 |
 | P3-B3 | Full Access 与扩展 WebUI | A0、A1、A2，可与 B1 并行 |

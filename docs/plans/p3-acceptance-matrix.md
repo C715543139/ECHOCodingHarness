@@ -1,25 +1,25 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：Planned / contracts frozen by P3-A0
+> 状态：In progress / contracts frozen by P3-A0；EXT-01/02 have runtime evidence
 >
 > 最后更新：2026-08-31
 
 ## 1. 使用规则
 
 可机读的权威行位于 `src/contracts/p3.ts` 的 `P3_TEST_MATRIX`。A0 阶段的运行时证据使用
-`pending:P3-*`，只表示所有权，不表示已经实现。每个后续任务必须在同一提交中把自己负责的 pending
-替换为真实测试路径；P3-C3 只有在不存在 pending、所有路径存在且完整门禁通过后才能把本文改为
-Accepted。
+`pending:P3-*`，只表示所有权，不表示已经实现。P3-A2 与 P3-A1 并行期间继续冻结该共享文件，因此本页
+先记录 EXT-01/02 的真实测试路径；集成任务在合并并行分支后统一同步 `P3_TEST_MATRIX`。P3-C3 只有在
+不存在 pending、所有路径存在且完整门禁通过后才能把本文改为 Accepted。
 
 ## 2. 冻结矩阵
 
-| ID | 领域 | 要求摘要 | 实现任务 | A0 状态 |
+| ID | 领域 | 要求摘要 | 实现任务 | 状态 / 运行时证据 |
 | --- | --- | --- | --- | --- |
 | FULL-01 | Full Access | 明确人类确认并绑定 Session | P3-A1 | Planned |
 | FULL-02 | Full Access | 免逐项审批但保留可靠性边界 | P3-A1 | Planned |
 | FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Planned |
-| EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Planned |
-| EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Planned |
+| EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Implemented — `tests/unit/extensions/workspace-isolation.test.ts`, `tests/unit/extensions/content-hash.test.ts` |
+| EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Implemented — `tests/unit/extensions/manifest.test.ts`, `tests/unit/extensions/content-hash.test.ts`, `tests/unit/extensions/catalog.test.ts` |
 | WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Planned |
 | WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Planned |
 | LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Planned |

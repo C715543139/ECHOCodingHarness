@@ -379,3 +379,17 @@ Schema、原子写与工作区隔离；Worker 超时、取消、崩溃、协议�
 
 真实 Provider/PDF 验收显式本地运行，不进入 CI，不打印模型正文或凭据。普通命令 `exitCode=0` 仍只
 表示该命令成功；只有哈希未变且独立复验通过，UI/文档才可以写“可信验收通过”。
+
+### P3-A2 storage evidence
+
+- `tests/unit/extensions/manifest.test.ts`：Manifest v1 往返、未知字段、名称/版本/数量上限、严格工具
+  JSON Schema、路径正规化和内置/生命周期/扩展间工具冲突；
+- `tests/unit/extensions/content-hash.test.ts`：当前工作区固定目录、规范文件集合 SHA-256、内容变化、
+  根逃逸以及 symlink/junction 拒绝；
+- `tests/unit/extensions/catalog.test.ts`：三种冻结状态、revision、损坏与未知版本、哈希篡改、Catalog
+  链接、原子替换故障、陈旧 revision 和不确定恢复失败关闭；
+- `tests/unit/extensions/workspace-isolation.test.ts`：两个临时工作区互不可见并验证 `.echo/` Git 忽略。
+
+P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七个 `extension_*` 生命周期工具或 Web
+接线。由于 A1/A2 并行期冻结 `src/contracts/p3.ts`，EXT-01/02 的上述真实证据先记录于文档，待集成
+任务统一替换其中的 `pending:P3-A2`。

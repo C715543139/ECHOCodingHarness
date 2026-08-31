@@ -1,0 +1,18 @@
+export const EXTENSION_LIMITS = {
+  extensionIdLength: 64,
+  versionLength: 64,
+  relativePathLength: 256,
+  toolNameLength: 64,
+  toolDescriptionLength: 1_024,
+  toolCount: 32,
+  manifestBytes: 128 * 1_024,
+  toolSchemaBytes: 32 * 1_024,
+  schemaDepth: 16,
+  schemaNodes: 512,
+  extensionFiles: 512,
+  extensionDepth: 32,
+  extensionBytes: 32 * 1_024 * 1_024,
+  catalogBytes: 1024 * 1_024,
+  catalogEntries: 256,
+  quarantineReasonLength: 2_048,
+} as const;

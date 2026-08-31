@@ -82,6 +82,19 @@ interface ExtensionCatalog {
 Catalog 使用同目录临时文件、flush、原子替换并递增 revision；无法解析、未知版本、哈希/目录不一致
 或恢复不确定时失败关闭，不扫描目录猜测状态。
 
+P3-A2 的存储实现位于 `src/extensions/`。`WorkspaceExtensionStore` 只从构造时绑定的工作区规范根派生
+`.echo/extension-staging`、`.echo/extensions`、`catalog.json` 和 `.trash`，不接受共享扩展根。Manifest
+与 Catalog 均拒绝未知字段并实施大小/数量/深度上限；工具输入 Schema 首版验证 JSON Schema
+2020-12 的有界子集，根必须为严格 object Schema。扩展相对路径会统一为 `/`，绝对路径、`..`、Windows
+歧义路径、链接、junction 及解析后逃逸均拒绝。
+
+内容哈希覆盖按规范相对路径排序的完整普通文件集合，并以带长度边界的路径和文件字节计算
+`sha256:<hex>`；读前后文件身份或目录集合变化会失败。Catalog 读取会复验 Manifest、版本、工具顺序、
+安装目录和完整内容哈希。Catalog 不存在且目录为空时只返回内存中的 revision 0 空视图，不创建文件；
+若目录已有不确定状态、Catalog 损坏/版本不兼容、Catalog 是链接、完整性不符或原子替换失败，则返回稳定
+错误且不扫描重建。写入使用同目录独占临时文件、文件 flush 与原子 rename；更新以 expected revision
+拒绝陈旧写入。
+
 ### Worker 协议
 
 每个已加载扩展运行在独立 Node Worker。Host 请求只有 `initialize`、`execute`、`cancel`、`shutdown`，

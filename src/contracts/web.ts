@@ -67,7 +67,11 @@ export const WEB_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/u;
 
 export type SessionPhase = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled' | 'limited';
 
-export type SafetyModeDto = 'safe' | 'balanced' | 'auto';
+export type SafetyModeDto = 'safe' | 'balanced' | 'auto' | 'full-access';
+
+export interface FullAccessConfirmationRequest {
+  readonly acceptedRisk: true;
+}
 
 export type RuntimeBlockReason =
   'turn_active' | 'provider_unavailable' | 'session_unavailable' | 'service_stopping';
@@ -190,6 +194,7 @@ export interface DiscoveredModelsDto {
 export interface CreateSessionRequest {
   readonly model?: string;
   readonly safetyMode?: SafetyModeDto;
+  readonly fullAccessConfirmation?: FullAccessConfirmationRequest;
 }
 
 export interface ChatTurnDto {
@@ -214,6 +219,7 @@ export interface ChatTurnDto {
 export interface UpdateSessionRuntimeRequest {
   readonly model?: string;
   readonly safetyMode?: SafetyModeDto;
+  readonly fullAccessConfirmation?: FullAccessConfirmationRequest;
 }
 
 export interface SubmitTurnRequest {

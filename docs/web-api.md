@@ -181,7 +181,7 @@ interface SessionSummaryDto {
   readonly turnCount: number;
   readonly phase: SessionPhase;
   readonly model: string;
-  readonly safetyMode: 'safe' | 'balanced' | 'auto';
+  readonly safetyMode: 'safe' | 'balanced' | 'auto' | 'full-access';
 }
 
 interface ApprovalRequestDto {
@@ -308,7 +308,8 @@ interface DiscoveredModelsDto {
 ```ts
 interface CreateSessionRequest {
   readonly model?: string;
-  readonly safetyMode?: 'safe' | 'balanced' | 'auto';
+  readonly safetyMode?: 'safe' | 'balanced' | 'auto' | 'full-access';
+  readonly fullAccessConfirmation?: { readonly acceptedRisk: true };
 }
 ```
 
@@ -361,7 +362,8 @@ interface ChatTurnDto {
 ```ts
 interface UpdateSessionRuntimeRequest {
   readonly model?: string;
-  readonly safetyMode?: 'safe' | 'balanced' | 'auto';
+  readonly safetyMode?: 'safe' | 'balanced' | 'auto' | 'full-access';
+  readonly fullAccessConfirmation?: { readonly acceptedRisk: true };
 }
 ```
 
@@ -617,9 +619,9 @@ Chat/Trace DOM 生成导出文件。复盘继续使用 CLI 与 Session JSONL。
 - DTO 快照不得包含绝对路径、秘密或隐藏推理；
 - API 契约变化必须同步本文、类型、测试与 [web-ui.md](./web-ui.md)。
 
-## 13. P3 API 增量（A0 冻结，尚未实现）
+## 13. P3 API 增量（A1 Full Access 边界已实现）
 
-P3 把 `SafetyModeDto` 的目标联合扩展为 `safe | balanced | auto | full-access`。当创建 Session 或
+P3-A1 已把 `SafetyModeDto` 联合扩展为 `safe | balanced | auto | full-access`。当创建 Session 或
 PATCH runtime 的目标为 Full Access 时，请求必须额外包含：
 
 ```ts

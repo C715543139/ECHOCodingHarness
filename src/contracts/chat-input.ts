@@ -1,3 +1,5 @@
+import type { SafetyMode } from './safety.js';
+
 export const BRACKETED_PASTE_START = '\u001b[200~';
 export const BRACKETED_PASTE_END = '\u001b[201~';
 
@@ -12,5 +14,5 @@ export type ChatIdleInput =
   | Readonly<{ kind: 'message'; text: string; source: ChatInputSource }>
   | Readonly<{ kind: 'slash'; name: 'help' | 'status' | 'quit' }>
   | Readonly<{ kind: 'slash'; name: 'model'; argument?: string }>
-  | Readonly<{ kind: 'slash'; name: 'safety'; argument?: 'safe' | 'balanced' | 'auto' }>
+  | Readonly<{ kind: 'slash'; name: 'safety'; argument?: SafetyMode }>
   | Readonly<{ kind: 'error'; code: 'UNKNOWN_SLASH' | 'INVALID_SLASH_ARGUMENT'; message: string }>;

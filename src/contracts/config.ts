@@ -24,6 +24,7 @@ export const CONFIG_ERROR_CODES = {
   sessionCorrupt: 'CONFIG_SESSION_CORRUPT',
   sessionNotFound: 'CONFIG_SESSION_NOT_FOUND',
   sessionWorkspaceMismatch: 'CONFIG_SESSION_WORKSPACE_MISMATCH',
+  fullAccessConfirmationRequired: 'FULL_ACCESS_CONFIRMATION_REQUIRED',
 } as const;
 
 export type ConfigErrorCode = (typeof CONFIG_ERROR_CODES)[keyof typeof CONFIG_ERROR_CODES];

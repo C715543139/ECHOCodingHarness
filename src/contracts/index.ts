@@ -106,6 +106,7 @@ export {
   P3_TEST_MATRIX,
 } from './p3.js';
 export type { EventRenderer, OutputChannel, RenderCapabilities, RenderChunk } from './rendering.js';
+export { SAFETY_MODES } from './safety.js';
 export type { PolicyDecision, PolicyRequest, SafetyMode, SafetyPolicy } from './safety.js';
 export {
   REQUEST_ID_MAX_LENGTH,
@@ -136,6 +137,7 @@ export {
   type DeletedSessionDto,
   type DiscoverModelsRequest,
   type DiscoveredModelsDto,
+  type FullAccessConfirmationRequest,
   type Page,
   type ProjectionDeltaDto,
   type ProviderConfigDto,

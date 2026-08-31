@@ -5,9 +5,9 @@ import {
   type EchoPersistentConfig,
   type ModelCatalogConfig,
 } from '../contracts/config.js';
-import type { SafetyMode } from '../contracts/safety.js';
+import { SAFETY_MODES, type SafetyMode } from '../contracts/safety.js';
 
-export const SAFETY_MODES: readonly SafetyMode[] = ['safe', 'balanced', 'auto'];
+export { SAFETY_MODES };
 
 export const PERSISTENT_CONFIG_KEYS = [
   'baseUrl',

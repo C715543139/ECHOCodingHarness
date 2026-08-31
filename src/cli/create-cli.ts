@@ -58,8 +58,14 @@ export function createCli(options: CreateCliOptions = {}): Command {
     )
     .option('--base-url <url>', 'Override the OpenAI-compatible API base URL.')
     .addOption(
-      new Option('--safety-mode <mode>', 'Safety mode.').choices(['safe', 'balanced', 'auto']),
+      new Option('--safety-mode <mode>', 'Safety mode.').choices([
+        'safe',
+        'balanced',
+        'auto',
+        'full-access',
+      ]),
     )
+    .option('--allow-full-access', 'Acknowledge Full Access risk for a non-interactive run.', false)
     .option('--max-steps <count>', 'Maximum model steps.', (value: string) => {
       const parsed = Number(value);
       if (!Number.isSafeInteger(parsed) || parsed < 1) {
@@ -78,6 +84,7 @@ export function createCli(options: CreateCliOptions = {}): Command {
           model?: string;
           baseUrl?: string;
           safetyMode?: SafetyMode;
+          allowFullAccess: boolean;
           maxSteps?: number;
           verbose: boolean;
           nonInteractive: boolean;
@@ -106,6 +113,7 @@ export function createCli(options: CreateCliOptions = {}): Command {
             ...(commandOptions.safetyMode === undefined
               ? {}
               : { safetyMode: commandOptions.safetyMode }),
+            allowFullAccess: commandOptions.allowFullAccess,
             ...(commandOptions.maxSteps === undefined ? {} : { maxSteps: commandOptions.maxSteps }),
             verbose: commandOptions.verbose,
             color,
@@ -132,7 +140,12 @@ export function createCli(options: CreateCliOptions = {}): Command {
     .option('--model <name>', 'Override the configured model name.')
     .option('--base-url <url>', 'Override the OpenAI-compatible API base URL.')
     .addOption(
-      new Option('--safety-mode <mode>', 'Safety mode.').choices(['safe', 'balanced', 'auto']),
+      new Option('--safety-mode <mode>', 'Safety mode.').choices([
+        'safe',
+        'balanced',
+        'auto',
+        'full-access',
+      ]),
     )
     .option('--max-steps <count>', 'Maximum model steps.', (value: string) => {
       const parsed = Number(value);

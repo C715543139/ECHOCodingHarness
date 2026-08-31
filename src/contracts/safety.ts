@@ -1,4 +1,5 @@
-export type SafetyMode = 'safe' | 'balanced' | 'auto';
+export const SAFETY_MODES = ['safe', 'balanced', 'auto', 'full-access'] as const;
+export type SafetyMode = (typeof SAFETY_MODES)[number];
 
 export type PolicyDecision =
   | Readonly<{ action: 'allow'; reason: string; ruleId: string }>

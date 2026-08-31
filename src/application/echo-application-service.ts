@@ -15,6 +15,7 @@ import type {
   EchoEvent,
   EchoEventPayloads,
   EchoEventType,
+  FullAccessConfirmation,
   ModelProvider,
   P1ConfigSource,
   ProviderIdentity,
@@ -31,7 +32,11 @@ import type {
   ToolLimits,
   TurnId,
 } from '../contracts/index.js';
-import { CONFIG_ERROR_CODES, EVENT_SCHEMA_VERSION } from '../contracts/index.js';
+import {
+  CONFIG_ERROR_CODES,
+  EVENT_SCHEMA_VERSION,
+  FULL_ACCESS_CONFIRMATION_SOURCES,
+} from '../contracts/index.js';
 import type { ToolRegistry } from '../tools/index.js';
 
 import { configurationError, isStorageError } from '../session/errors.js';
@@ -105,6 +110,26 @@ function approvalKeyOf(
   return `${sessionId}\0${turnId}\0${toolCallId}\0${approvalKey}`;
 }
 
+function isHumanFullAccessConfirmation(
+  confirmation: FullAccessConfirmation | undefined,
+): confirmation is FullAccessConfirmation {
+  if (confirmation === undefined || confirmation.acceptedRisk !== true) return false;
+  return (FULL_ACCESS_CONFIRMATION_SOURCES as readonly string[]).includes(confirmation.source);
+}
+
+function requireFullAccessConfirmation(
+  currentMode: SafetyMode | undefined,
+  targetMode: SafetyMode,
+  confirmation: FullAccessConfirmation | undefined,
+): void {
+  if (targetMode !== 'full-access' || currentMode === 'full-access') return;
+  if (isHumanFullAccessConfirmation(confirmation)) return;
+  throw configurationError(
+    CONFIG_ERROR_CODES.fullAccessConfirmationRequired,
+    'Full Access requires explicit human confirmation for this session.',
+  );
+}
+
 export class EchoApplicationService implements ApplicationService {
   private readonly options: EchoApplicationServiceOptions;
   private readonly memory = new Map<SessionId, SessionMemory>();
@@ -129,6 +154,7 @@ export class EchoApplicationService implements ApplicationService {
         'The session Provider does not match the current process Provider.',
       );
     }
+    requireFullAccessConfirmation(undefined, input.safetyMode.value, input.fullAccessConfirmation);
 
     const summary = await this.options.repository.create({
       workspaceRoot: input.workspaceRoot,
@@ -164,6 +190,16 @@ export class EchoApplicationService implements ApplicationService {
 
     const model = view.runtime.model.value;
     const safetyMode = view.runtime.safetyMode.value;
+    requireFullAccessConfirmation(
+      safetyMode,
+      input.cliSafetyMode ?? safetyMode,
+      input.fullAccessConfirmation,
+    );
+    this.assertNoActiveTurnForSafetyModeChange(
+      input.sessionId,
+      safetyMode,
+      input.cliSafetyMode ?? safetyMode,
+    );
     this.memory.set(input.sessionId, {
       model: { value: model, source: 'session' },
       safetyMode: { value: safetyMode, source: 'session' },
@@ -181,7 +217,12 @@ export class EchoApplicationService implements ApplicationService {
       await this.writeSessionModel(input.sessionId, input.cliModel, 'cli');
     }
     if (input.cliSafetyMode !== undefined && input.cliSafetyMode !== safetyMode) {
-      await this.writeSessionSafetyMode(input.sessionId, input.cliSafetyMode, 'cli');
+      await this.writeSessionSafetyMode(
+        input.sessionId,
+        input.cliSafetyMode,
+        'cli',
+        input.fullAccessConfirmation,
+      );
     }
 
     return this.getRuntimeState(input.sessionId);
@@ -286,9 +327,10 @@ export class EchoApplicationService implements ApplicationService {
   async setSessionSafetyMode(
     sessionId: SessionId,
     mode: SafetyMode,
+    fullAccessConfirmation?: FullAccessConfirmation,
     source: P1ConfigSource | 'slash' = 'session',
   ): Promise<SessionRuntimeState> {
-    return this.writeSessionSafetyMode(sessionId, mode, source);
+    return this.writeSessionSafetyMode(sessionId, mode, source, fullAccessConfirmation);
   }
 
   async getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState> {
@@ -348,8 +390,11 @@ export class EchoApplicationService implements ApplicationService {
     sessionId: SessionId,
     mode: SafetyMode,
     source: P1ConfigSource | 'slash',
+    fullAccessConfirmation?: FullAccessConfirmation,
   ): Promise<SessionRuntimeState> {
     const current = await this.getRuntimeState(sessionId);
+    requireFullAccessConfirmation(current.safetyMode.value, mode, fullAccessConfirmation);
+    this.assertNoActiveTurnForSafetyModeChange(sessionId, current.safetyMode.value, mode);
     const runtimeSource = this.runtimeSource(source);
     if (current.safetyMode.value === mode && current.safetyMode.source === runtimeSource) {
       return current;
@@ -589,5 +634,17 @@ export class EchoApplicationService implements ApplicationService {
         'The session belongs to a different workspace.',
       );
     }
+  }
+
+  private assertNoActiveTurnForSafetyModeChange(
+    sessionId: SessionId,
+    currentMode: SafetyMode,
+    targetMode: SafetyMode,
+  ): void {
+    if (currentMode === targetMode || !this.activeTurns.has(sessionId)) return;
+    throw configurationError(
+      CONFIG_ERROR_CODES.sessionIncompatible,
+      'An active turn must settle before changing its safety mode.',
+    );
   }
 }

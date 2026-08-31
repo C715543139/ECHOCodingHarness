@@ -85,6 +85,27 @@ describe('CentralSafetyPolicy', () => {
     }
   });
 
+  it('allows every registered-tool request in Full Access without per-operation approval', async () => {
+    await expect(evaluateCommand('pnpm install', 'full-access')).resolves.toMatchObject({
+      action: 'allow',
+      ruleId: 'policy.tool.full_access',
+    });
+    await expect(
+      evaluateCommand('[Console]::Write($env:ECHO_API_KEY)', 'full-access'),
+    ).resolves.toMatchObject({ action: 'allow', ruleId: 'policy.tool.full_access' });
+
+    const policy = new CentralSafetyPolicy();
+    await expect(
+      policy.evaluate({
+        mode: 'full-access',
+        toolName: 'workspace_extension_tool',
+        normalizedInput: { path: '..\\outside.txt' },
+        workspaceRoot,
+        sessionApprovals: new Set(),
+      }),
+    ).resolves.toMatchObject({ action: 'allow', ruleId: 'policy.tool.full_access' });
+  });
+
   it('uses a stable, exact approval key without weakening hard-deny rules', async () => {
     const command = 'pnpm install';
     const first = await evaluateCommand(command);

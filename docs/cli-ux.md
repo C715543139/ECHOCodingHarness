@@ -102,7 +102,9 @@ stderr 承载执行过程和诊断：
 
 - `--workspace <path>`：固定工作区，默认当前目录；
 - `--model <name>`、`--base-url <url>`：覆盖 Provider 配置；`--model` 只作用于本次 `run`，不查询 `/models`；
-- `--safety-mode <safe|balanced|auto>`：覆盖安全模式；
+- `--safety-mode <safe|balanced|auto|full-access>`：覆盖安全模式；
+- `--allow-full-access`：只用于非交互 `run`，且必须与显式
+  `--safety-mode full-access` 同时出现；单独使用或仅从配置继承 Full Access 都以配置错误退出；
 - `--max-steps <count>`：覆盖 Step 上限；
 - `--verbose`：增加脱敏且有界的诊断；
 - `--non-interactive`：禁止审批提示，遇到 `ask` 立即拒绝；
@@ -111,6 +113,11 @@ stderr 承载执行过程和诊断：
 非 TTY、CI、`NO_COLOR` 或 `--no-color` 会关闭颜色；只有 stdin 与 stderr 均为 TTY 且未
 指定 `--non-interactive` 时才启用审批交互。Ctrl+C 通过同一个 `AbortSignal` 传播到
 Provider 与在途工具，并映射为退出码 130。
+
+交互式 `run`、Chat 新建/覆盖以及 `/safety full-access` 在进入前显示完整风险：可能修改或删除文件、
+安装软件、访问网络、操作 Git、执行模型生成的任意命令，且不是 OS 沙箱。用户必须键入
+`FULL ACCESS`；拒绝不会创建或改变 Session。已在 Full Access 的同一 Session resume 不重复询问；
+离开后再次执行 `/safety full-access` 必须重新确认。
 
 ## 6. 终端能力检测
 

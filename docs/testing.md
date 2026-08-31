@@ -365,11 +365,26 @@ response body.
   complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
   cleanup are complete.
 
-## P3 quality plan（A0 contract freeze）
+## P3 quality plan（A1 Full Access evidence）
 
 `P3_TEST_MATRIX` 位于 `src/contracts/p3.ts`，权威文档是
 [p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 使用 `pending:P3-*` 标记后续运行时所有权；
-A1–C3 必须逐项替换为存在的测试路径，最终不得保留 pending。
+A1–C3 必须逐项补齐存在的测试路径，最终不得保留 pending。P3-A1 专用分支按冻结要求不修改
+`src/contracts/p3.ts`；FULL-01/02/03 的真实路径先记录在验收矩阵文档，待共享合同解除冻结后由集成
+任务同步可机读矩阵。
+
+P3-A1 自动证据包括：
+
+- `tests/unit/application/full-access.test.ts`：确认门、非法模型来源、同 Session 恢复、撤销与重确认、
+  resume 覆盖以及活动 Turn 转换门；
+- `tests/unit/cli/full-access-confirmation.test.ts`、`tests/integration/cli-run.test.ts` 与
+  `tests/integration/cli-chat.test.ts`：完整风险提示、非交互双旗标、交互拒绝和 Slash 重确认；
+- `tests/unit/contracts/web-schema.test.ts` 与 `tests/integration/web/session-view.test.ts`：有界 Web DTO、
+  `web-dialog` 来源映射和非 Full Access 携带确认的拒绝；
+- `tests/unit/security/command-policy.test.ts` 与 `tests/integration/cli-run.test.ts`：危险命令无逐项审批，
+  同时保留命令超时、凭据隔离和内置文件工具工作区边界；
+- `tests/integration/tools/run-command.test.ts`、`tests/integration/execution/powershell.test.ts` 与既有
+  Agent Loop 测试继续覆盖取消、输出上限和进程树清理，证明 Full Access 未改动这些执行层路径。
 
 P3 继续以 `pnpm check` 为最小门禁，并增加：Full Access 的确认与三旧模式回归；Manifest/Catalog
 Schema、原子写与工作区隔离；Worker 超时、取消、崩溃、协议和凭据继承；动态 Registry 的下一模型

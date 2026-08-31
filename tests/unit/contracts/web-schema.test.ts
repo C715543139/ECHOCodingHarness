@@ -360,6 +360,38 @@ describe('Web JSON Schema freeze', () => {
     ).not.toEqual([]);
   });
 
+  it('requires the exact bounded Full Access confirmation DTO', () => {
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.createSessionRequest, {
+        safetyMode: 'full-access',
+        fullAccessConfirmation: { acceptedRisk: true },
+      }),
+    ).toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.updateSessionRuntimeRequest, {
+        safetyMode: 'full-access',
+        fullAccessConfirmation: { acceptedRisk: true },
+      }),
+    ).toEqual([]);
+    for (const confirmation of [
+      undefined,
+      { acceptedRisk: false },
+      { acceptedRisk: true, source: 'model' },
+      { acceptedRisk: true, extra: true },
+    ]) {
+      const payload = {
+        safetyMode: 'full-access',
+        ...(confirmation === undefined ? {} : { fullAccessConfirmation: confirmation }),
+      };
+      const schemaErrors = validateWebJsonSchema(WEB_JSON_SCHEMAS.createSessionRequest, payload);
+      if (confirmation === undefined) {
+        expect(schemaErrors).toEqual([]);
+      } else {
+        expect(schemaErrors).not.toEqual([]);
+      }
+    }
+  });
+
   it('rejects API key, reasoning, and stack fields on DTOs', () => {
     expect(
       validateWebJsonSchema(WEB_JSON_SCHEMAS.providerConfig, {

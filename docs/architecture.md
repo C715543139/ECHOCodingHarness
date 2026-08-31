@@ -63,13 +63,17 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
-### 2.5 P3 目标（Planned）
+### 2.5 P3 增量（A1 Full Access 已实现）
 
 P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与
 [p3-extensions.md](./plans/p3-extensions.md) 增加显式确认的 `full-access` 和工作区级扩展。它只覆盖
 创建、检查、安装、热加载、跨 Session 复用、禁用、隔离和卸载这一条闭环；不改变 P2 当时明确排除
 插件的历史范围。
+
+其中 P3-A1 已交付 Full Access 的人类确认门、Session 恢复/撤销、CLI 双旗标、Web DTO/路由校验和
+Central Safety Policy 直通。工作区扩展的存储、Worker、Registry、生命周期与 WebUI 仍按任务依赖
+逐步实现。
 
 ## 3. 架构原则
 
@@ -401,7 +405,7 @@ P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提�
 工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
 Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。
 
-## 18. P3 目标架构（A0 契约冻结，尚未实现）
+## 18. P3 增量架构（A1 已实现，扩展运行时待后续任务）
 
 P3 在现有 ApplicationService、Agent Loop 和 ToolRegistry 之间增加 `ExtensionManager`。它以固定
 `workspaceRoot` 解析 `.echo/extensions/catalog.json`，在已确认 Full Access 时启动 enabled 扩展的

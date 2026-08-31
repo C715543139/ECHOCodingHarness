@@ -10,7 +10,7 @@ const HELP_LINES = [
   '/model <model-id>',
   '/model refresh',
   '/safety',
-  '/safety safe|balanced|auto',
+  '/safety safe|balanced|auto|full-access',
   '/quit',
 ] as const;
 
@@ -82,7 +82,7 @@ function parseTypedSlash(line: string): ChatIdleInput {
       return { kind: 'slash', name: 'safety', argument: mode as SafetyMode };
     }
   }
-  return invalidSlash('Usage: /safety or /safety safe|balanced|auto.');
+  return invalidSlash('Usage: /safety or /safety safe|balanced|auto|full-access.');
 }
 
 /**

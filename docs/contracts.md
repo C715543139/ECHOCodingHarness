@@ -221,7 +221,7 @@ interface ToolResultMessage {
 ## 5. 安全策略契约
 
 ```ts
-type SafetyMode = "safe" | "balanced" | "auto";
+type SafetyMode = "safe" | "balanced" | "auto" | "full-access";
 
 type PolicyDecision =
   | { action: "allow"; reason: string; ruleId: string }
@@ -469,7 +469,11 @@ interface ApplicationService {
   cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void>;
   respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult>;
   setSessionModel(sessionId: SessionId, modelId: string): Promise<SessionRuntimeState>;
-  setSessionSafetyMode(sessionId: SessionId, mode: SafetyMode): Promise<SessionRuntimeState>;
+  setSessionSafetyMode(
+    sessionId: SessionId,
+    mode: SafetyMode,
+    fullAccessConfirmation?: FullAccessConfirmation,
+  ): Promise<SessionRuntimeState>;
   getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState>;
 }
 ```
@@ -677,17 +681,22 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
 
-## 15. P3 目标契约（A0 冻结，尚未实现）
+## 15. P3 增量契约（A1 Full Access 已实现）
 
 P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
-[ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。A1 完成后运行时
-`SafetyMode` 才从当前 `safe | balanced | auto` 迁移为
-`safe | balanced | auto | full-access`；A0 的 `P3SafetyMode` 是目标冻结，不代表现在已经可以运行。
+[ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。P3-A1 已把运行时
+`SafetyMode` 迁移为 `safe | balanced | auto | full-access`，并复用 A0 冻结的
+`FullAccessConfirmation`；Manifest、Catalog、Worker、动态 Registry 与生命周期仍由后续任务实现。
 
 Full Access 只有在人类确认后才成为 Session 的有效并持久模式。新 Session 不能仅因配置、CLI 候选
 或继承值而静默获得；非交互 CLI 必须使用 `--allow-full-access`，Web 必须提交
 `fullAccessConfirmation.acceptedRisk=true`。模型不能调用任何接口改变模式。离开后再次进入必须重新
 确认；恢复仍处于 Full Access 的同一 Session 不重复确认。
+
+ApplicationService 在创建、resume 覆盖与运行时切换三处验证确认来源。已有 Session 存在活动
+Turn 时拒绝任何安全模式切换，必须在写入 `session.resumed` 或 `safety.changed` 前拒绝；离开后
+Session 只保留新的非 Full Access 事实，再次进入必须提供新的确认。已持久化的
+`safetyMode=full-access` 是恢复同一 Session 的授权事实，不额外保存可重放确认对象。
 
 工作区扩展使用 Manifest/Catalog v1 与 `enabled | disabled | quarantined`。七个模型工具固定为
 `extension_init`、`extension_check`、`extension_install`、`extension_list`、`extension_enable`、

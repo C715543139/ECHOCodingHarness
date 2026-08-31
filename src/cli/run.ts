@@ -5,6 +5,11 @@ import type { ApprovalHandler } from '../agent/index.js';
 import type { AgentResult, ModelProvider, RenderCapabilities } from '../contracts/index.js';
 
 import {
+  createInteractiveFullAccessConfirmer,
+  resolveCliFullAccessConfirmation,
+  type FullAccessConfirmer,
+} from './full-access-confirmation.js';
+import {
   APPROVAL_CHOICES,
   DefaultEventRenderer,
   formatApprovalQuestion,
@@ -12,6 +17,7 @@ import {
 import {
   createHarnessService,
   defaultIo,
+  failConfiguration,
   loadHarnessRuntime,
   newSessionSettings,
   writeChunks,
@@ -31,6 +37,7 @@ export interface RunGoalDependencies {
   readonly providerFactory?: (options: ProviderFactoryOptions) => ModelProvider;
   readonly approvalHandler?: ApprovalHandler;
   readonly artifactRoot?: string;
+  readonly fullAccessConfirmer?: FullAccessConfirmer;
 }
 
 export interface RunGoalOutcome {
@@ -88,6 +95,16 @@ export async function runGoal(
 ): Promise<RunGoalOutcome> {
   const env = dependencies.env ?? process.env;
   const io = dependencies.io ?? defaultIo();
+  if (
+    !options.interactive &&
+    ((options.safetyMode === 'full-access' && options.allowFullAccess !== true) ||
+      (options.allowFullAccess === true && options.safetyMode !== 'full-access'))
+  ) {
+    return failConfiguration(
+      io,
+      'configuration · Non-interactive Full Access requires both --safety-mode full-access and --allow-full-access.',
+    );
+  }
   const artifactRoot = options.artifactRoot ?? dependencies.artifactRoot;
   const loaded = await loadHarnessRuntime({
     options,
@@ -101,6 +118,23 @@ export async function runGoal(
   });
   if ('exitCode' in loaded) {
     return loaded;
+  }
+
+  const authorization = await resolveCliFullAccessConfirmation({
+    targetMode: loaded.config.safetyMode,
+    explicitMode: options.safetyMode,
+    interactive: options.interactive,
+    allowFullAccess: options.allowFullAccess === true,
+    ...(options.interactive
+      ? {
+          confirm:
+            dependencies.fullAccessConfirmer ??
+            createInteractiveFullAccessConfirmer(process.stdin, process.stderr, options.signal),
+        }
+      : {}),
+  });
+  if (!authorization.ok) {
+    return failConfiguration(io, `configuration · ${authorization.message}`);
   }
 
   const renderer = new DefaultEventRenderer({
@@ -125,6 +159,9 @@ export async function runGoal(
     provider: loaded.providerIdentity,
     model: settings.model,
     safetyMode: settings.safetyMode,
+    ...(authorization.confirmation === undefined
+      ? {}
+      : { fullAccessConfirmation: authorization.confirmation }),
   });
   const result = await service.runTurn({
     sessionId: session.sessionId,

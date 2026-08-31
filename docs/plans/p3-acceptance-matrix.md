@@ -1,23 +1,24 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：Planned / contracts frozen by P3-A0
+> 状态：In progress / P3-A1 runtime evidence recorded
 >
 > 最后更新：2026-08-31
 
 ## 1. 使用规则
 
 可机读的权威行位于 `src/contracts/p3.ts` 的 `P3_TEST_MATRIX`。A0 阶段的运行时证据使用
-`pending:P3-*`，只表示所有权，不表示已经实现。每个后续任务必须在同一提交中把自己负责的 pending
-替换为真实测试路径；P3-C3 只有在不存在 pending、所有路径存在且完整门禁通过后才能把本文改为
+`pending:P3-*`，只表示所有权，不表示已经实现。P3-A1 专用分支不得修改冻结的
+`src/contracts/p3.ts`，因此本文件先记录 FULL-01/02/03 的真实测试路径；共享合同解除冻结后的集成任务
+必须同步可机读矩阵。P3-C3 只有在不存在 pending、所有路径存在且完整门禁通过后才能把本文改为
 Accepted。
 
 ## 2. 冻结矩阵
 
-| ID | 领域 | 要求摘要 | 实现任务 | A0 状态 |
+| ID | 领域 | 要求摘要 | 实现任务 | 当前状态 / 证据 |
 | --- | --- | --- | --- | --- |
-| FULL-01 | Full Access | 明确人类确认并绑定 Session | P3-A1 | Planned |
-| FULL-02 | Full Access | 免逐项审批但保留可靠性边界 | P3-A1 | Planned |
-| FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Planned |
+| FULL-01 | Full Access | 明确人类确认并绑定 Session | P3-A1 | Implemented：`tests/unit/application/full-access.test.ts`；`tests/unit/cli/full-access-confirmation.test.ts`；`tests/integration/cli-run.test.ts`；`tests/integration/cli-chat.test.ts`；`tests/integration/web/session-view.test.ts` |
+| FULL-02 | Full Access | 免逐项审批但保留可靠性边界 | P3-A1 | Implemented：`tests/unit/security/command-policy.test.ts`；`tests/integration/cli-run.test.ts`；`tests/integration/tools/run-command.test.ts`；`tests/integration/execution/powershell.test.ts` |
+| FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Implemented：`tests/unit/security/command-policy.test.ts`；`tests/unit/application/full-access.test.ts`；`pnpm test` / `pnpm check` |
 | EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Planned |
 | EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Planned |
 | WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Planned |

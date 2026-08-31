@@ -17,6 +17,7 @@ import {
   EVENT_SCHEMA_VERSION,
   EVENT_SCHEMA_VERSION_P0,
   EVENT_SCHEMA_VERSION_P1,
+  SAFETY_MODES,
   isToolTerminalEvent,
 } from '../contracts/index.js';
 
@@ -112,6 +113,10 @@ function isProviderIdentity(value: unknown): value is ProviderIdentity {
   );
 }
 
+function isSafetyMode(value: unknown): value is SafetyMode {
+  return typeof value === 'string' && (SAFETY_MODES as readonly string[]).includes(value);
+}
+
 export function schemaVersionOf(events: readonly EchoEvent[]): number {
   const started = events.find((event) => event.type === 'session.started');
   if (started?.type !== 'session.started') return EVENT_SCHEMA_VERSION_P0;
@@ -162,6 +167,17 @@ export function assertRecoverableEvents(events: readonly EchoEvent[]): void {
       throw storageError(
         'SESSION_LOG_INVALID',
         'The session event log contains a damaged aggregated text payload.',
+      );
+    }
+    if (
+      (event.type === 'session.started' ||
+        event.type === 'session.resumed' ||
+        event.type === 'safety.changed') &&
+      !isSafetyMode(event.payload.safetyMode)
+    ) {
+      throw storageError(
+        'SESSION_LOG_INVALID',
+        'The session event log contains an invalid safety mode.',
       );
     }
   }

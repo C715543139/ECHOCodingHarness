@@ -42,6 +42,7 @@ export interface HarnessCliOptions {
   readonly model?: string;
   readonly baseUrl?: string;
   readonly safetyMode?: SafetyMode;
+  readonly allowFullAccess?: boolean;
   readonly maxSteps?: number;
   readonly verbose: boolean;
   readonly color: boolean;

@@ -8,6 +8,7 @@ import {
   type ModelProvider,
   type SessionId,
   type SessionRuntimeState,
+  type SafetyMode,
 } from '../contracts/index.js';
 import { ProcessModelCatalog } from '../provider/index.js';
 import { configurationError, isConfigurationError } from '../session/index.js';
@@ -23,6 +24,11 @@ import {
 } from './chat-view.js';
 import { StreamChatInput, type ChatInputPort } from './chat-input-reader.js';
 import { DefaultEventRenderer } from './event-renderer.js';
+import {
+  createInteractiveFullAccessConfirmer,
+  resolveCliFullAccessConfirmation,
+  type FullAccessConfirmer,
+} from './full-access-confirmation.js';
 import {
   createHarnessService,
   defaultIo,
@@ -65,6 +71,7 @@ export interface ChatCommandDependencies {
   readonly stderr?: Writable;
   readonly modelCatalog?: ChatModelCatalog;
   readonly attachInterrupt?: (handler: () => void) => () => void;
+  readonly fullAccessConfirmer?: FullAccessConfirmer;
 }
 
 function streamIsTty(stream: Readable): boolean {
@@ -156,6 +163,9 @@ export async function runChat(
     (options.interactive
       ? new InteractiveApprovalHandler(stdin, stderr, loaded.capabilities)
       : undefined);
+  const fullAccessConfirmer =
+    dependencies.fullAccessConfirmer ??
+    createInteractiveFullAccessConfirmer(stdin, stderr, options.signal);
 
   let turnRunning = false;
   const service = createHarnessService({
@@ -174,7 +184,7 @@ export async function runChat(
   let idleInterrupt = false;
   let catalogAbort: AbortController | undefined;
   try {
-    runtime = await openSession(service, loaded, options);
+    runtime = await openSession(service, loaded, options, fullAccessConfirmer);
   } catch (error) {
     input.close();
     if (isConfigurationError(error)) {
@@ -249,17 +259,25 @@ export async function runChat(
         continue;
       }
       if (parsed.kind === 'slash') {
+        input.pause?.();
         catalogAbort = new AbortController();
-        const outcome = await handleSlash({
-          parsed,
-          service,
-          runtime,
-          loaded,
-          io,
-          catalog,
-          signal: catalogAbort.signal,
-        });
-        catalogAbort = undefined;
+        let outcome;
+        try {
+          outcome = await handleSlash({
+            parsed,
+            service,
+            runtime,
+            loaded,
+            io,
+            catalog,
+            signal: catalogAbort.signal,
+            interactive: options.interactive,
+            fullAccessConfirmer,
+          });
+        } finally {
+          catalogAbort = undefined;
+          input.resume?.();
+        }
         runtime = outcome.runtime;
         if (idleInterrupt) {
           exitCode = 130;
@@ -333,24 +351,64 @@ async function openSession(
   service: EchoApplicationService,
   loaded: LoadedHarnessRuntime,
   options: ChatCommandOptions,
+  fullAccessConfirmer: FullAccessConfirmer,
 ): Promise<SessionRuntimeState> {
   if (options.resume !== undefined) {
     const sessionId = await resolveResumeSessionId(service, loaded.workspaceRoot, options.resume);
+    const stored = await service.getSession(sessionId);
+    const targetMode = options.safetyMode ?? stored.runtime.safetyMode.value;
+    const confirmation = await confirmationForTransition({
+      currentMode: stored.runtime.safetyMode.value,
+      targetMode,
+      explicitMode: options.safetyMode,
+      interactive: options.interactive,
+      fullAccessConfirmer,
+    });
     return service.resumeSession({
       workspaceRoot: loaded.workspaceRoot,
       sessionId,
       provider: loaded.providerIdentity,
       ...(options.model === undefined ? {} : { cliModel: options.model }),
       ...(options.safetyMode === undefined ? {} : { cliSafetyMode: options.safetyMode }),
+      ...(confirmation === undefined ? {} : { fullAccessConfirmation: confirmation }),
     });
   }
   const settings = newSessionSettings(options, loaded.config);
+  const confirmation = await confirmationForTransition({
+    currentMode: undefined,
+    targetMode: settings.safetyMode.value,
+    explicitMode: options.safetyMode,
+    interactive: options.interactive,
+    fullAccessConfirmer,
+  });
   return service.createSession({
     workspaceRoot: loaded.workspaceRoot,
     provider: loaded.providerIdentity,
     model: settings.model,
     safetyMode: settings.safetyMode,
+    ...(confirmation === undefined ? {} : { fullAccessConfirmation: confirmation }),
   });
+}
+
+async function confirmationForTransition(input: {
+  readonly currentMode: SafetyMode | undefined;
+  readonly targetMode: SafetyMode;
+  readonly explicitMode: SafetyMode | undefined;
+  readonly interactive: boolean;
+  readonly fullAccessConfirmer: FullAccessConfirmer;
+}) {
+  if (input.currentMode === 'full-access' || input.targetMode !== 'full-access') return undefined;
+  const result = await resolveCliFullAccessConfirmation({
+    targetMode: input.targetMode,
+    explicitMode: input.explicitMode,
+    interactive: input.interactive,
+    allowFullAccess: false,
+    confirm: input.fullAccessConfirmer,
+  });
+  if (!result.ok) {
+    throw configurationError(CONFIG_ERROR_CODES.fullAccessConfirmationRequired, result.message);
+  }
+  return result.confirmation;
 }
 
 async function handleSlash(input: {
@@ -361,6 +419,8 @@ async function handleSlash(input: {
   readonly io: CliIo;
   readonly catalog: ChatModelCatalog;
   readonly signal: AbortSignal;
+  readonly interactive: boolean;
+  readonly fullAccessConfirmer: FullAccessConfirmer;
 }): Promise<{ runtime: SessionRuntimeState; quit: boolean }> {
   const { parsed, service, loaded, io } = input;
   let runtime = input.runtime;
@@ -408,7 +468,27 @@ async function handleSlash(input: {
       feedback(io, { kind: 'info', label: 'SAFETY', lines: [runtime.safetyMode.value] }, loaded);
       return { runtime, quit: false };
     }
-    runtime = await service.setSessionSafetyMode(runtime.sessionId, parsed.argument, 'slash');
+    let confirmation;
+    if (runtime.safetyMode.value !== 'full-access' && parsed.argument === 'full-access') {
+      const result = await resolveCliFullAccessConfirmation({
+        targetMode: parsed.argument,
+        explicitMode: parsed.argument,
+        interactive: input.interactive,
+        allowFullAccess: false,
+        confirm: input.fullAccessConfirmer,
+      });
+      if (!result.ok) {
+        feedback(io, { kind: 'error', label: 'SAFETY', message: result.message }, loaded);
+        return { runtime, quit: false };
+      }
+      confirmation = result.confirmation;
+    }
+    runtime = await service.setSessionSafetyMode(
+      runtime.sessionId,
+      parsed.argument,
+      confirmation,
+      'slash',
+    );
     feedback(io, { kind: 'safety', value: runtime.safetyMode.value }, loaded);
     return { runtime, quit: false };
   }

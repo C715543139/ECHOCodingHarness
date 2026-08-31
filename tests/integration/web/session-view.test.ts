@@ -139,4 +139,85 @@ describe('Session view API', () => {
       await harness.close();
     }
   });
+
+  it('requires explicit Web confirmation to enter Full Access on create and runtime update', async () => {
+    const harness = await startSessionApiHarness();
+    try {
+      const rejected = await harness.inject({
+        method: 'POST',
+        url: '/api/v1/sessions',
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': harness.requestId('fullcreate01'),
+        },
+        payload: { safetyMode: 'full-access' },
+      });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json()).toMatchObject({ error: { code: 'INVALID_REQUEST' } });
+
+      const created = await harness.inject({
+        method: 'POST',
+        url: '/api/v1/sessions',
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': harness.requestId('fullcreate02'),
+        },
+        payload: {
+          safetyMode: 'full-access',
+          fullAccessConfirmation: { acceptedRisk: true },
+        },
+      });
+      expect(created.statusCode).toBe(201);
+      expect(created.json()).toMatchObject({
+        data: { session: { safetyMode: 'full-access' } },
+      });
+      const sessionId = (created.json() as { data: { session: { id: string } } }).data.session.id;
+
+      const revoked = await harness.inject({
+        method: 'PATCH',
+        url: `/api/v1/sessions/${sessionId}/runtime`,
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': harness.requestId('fullruntime1'),
+        },
+        payload: { safetyMode: 'balanced' },
+      });
+      expect(revoked.statusCode).toBe(200);
+
+      const reentryRejected = await harness.inject({
+        method: 'PATCH',
+        url: `/api/v1/sessions/${sessionId}/runtime`,
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': harness.requestId('fullruntime2'),
+        },
+        payload: { safetyMode: 'full-access' },
+      });
+      expect(reentryRejected.statusCode).toBe(400);
+
+      const reentered = await harness.inject({
+        method: 'PATCH',
+        url: `/api/v1/sessions/${sessionId}/runtime`,
+        headers: {
+          origin: harness.origin,
+          'content-type': 'application/json',
+          'x-echo-request-id': harness.requestId('fullruntime3'),
+        },
+        payload: {
+          safetyMode: 'full-access',
+          fullAccessConfirmation: { acceptedRisk: true },
+        },
+      });
+      expect(reentered.statusCode).toBe(200);
+      expect(reentered.json()).toMatchObject({
+        data: { session: { safetyMode: 'full-access' } },
+      });
+    } finally {
+      await harness.close();
+    }
+  });
 });

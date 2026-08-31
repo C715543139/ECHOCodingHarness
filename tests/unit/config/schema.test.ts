@@ -23,6 +23,18 @@ describe('parsePersistentConfig', () => {
     });
   });
 
+  it('accepts Full Access as a persistent candidate without treating config as session authorization', () => {
+    const parsed = parsePersistentConfig({ ...validDiscover, safetyMode: 'full-access' });
+    expect(parsed).toEqual({
+      config: {
+        baseUrl: 'https://provider.example/v1',
+        model: 'example-model',
+        modelCatalog: { source: 'discover' },
+        safetyMode: 'full-access',
+      },
+    });
+  });
+
   it('requires unique non-empty manual catalog IDs and default membership', () => {
     const parsed = parsePersistentConfig({
       ...validDiscover,

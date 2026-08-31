@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ScriptedChatInput } from '../../src/cli/chat-input-reader.js';
 import { runChat } from '../../src/cli/chat.js';
@@ -230,6 +230,43 @@ describe('CLI chat integration', () => {
     expect(events.some((event) => event.type === 'model.changed')).toBe(true);
     expect(events.some((event) => event.type === 'safety.changed')).toBe(true);
     expect(events.filter((event) => event.type === 'turn.started')).toHaveLength(3);
+  });
+
+  it('confirms every Slash re-entry into Full Access and persists revocation', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root);
+    const fullAccessConfirmer = vi.fn().mockResolvedValue(true);
+
+    const outcome = await runChat(
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: true,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: output().io,
+        providerFactory: () => new FakeProvider([]),
+        fullAccessConfirmer,
+        input: new ScriptedChatInput([
+          { kind: 'batch', text: '/safety full-access', source: 'typed' },
+          { kind: 'batch', text: '/safety balanced', source: 'typed' },
+          { kind: 'batch', text: '/safety full-access', source: 'typed' },
+          { kind: 'batch', text: '/quit', source: 'typed' },
+        ]),
+      },
+    );
+
+    expect(outcome.exitCode).toBe(0);
+    expect(fullAccessConfirmer).toHaveBeenCalledTimes(2);
+    const events = await readEvents(root);
+    expect(
+      events
+        .filter((event) => event.type === 'safety.changed')
+        .map((event) => event.payload.safetyMode),
+    ).toEqual(['full-access', 'balanced', 'full-access']);
   });
 
   it('resumes the same session with CLI model override and reconstructs from events', async () => {

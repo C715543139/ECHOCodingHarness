@@ -362,7 +362,8 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A0 契约已冻结，运行时尚未实现。现有 `safe`、`balanced`、`auto` 规则仍是当前产品行为。
+> P3 状态：A1 Full Access 授权与安全模式运行时已实现；扩展存储、Worker、Registry、生命周期和
+> WebUI 仍由后续任务交付。
 
 P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或
 hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git、删除文件并引用工作区外路径。进入
@@ -372,6 +373,15 @@ hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git�
 即使在 Full Access，下列边界仍强制执行：输入 Schema 与正规化、超时、取消、输出上限、事件、脱敏、
 进程清理以及不向命令/扩展 Worker 传递 `ECHO_API_KEY`。内置文件工具仍限定工作区相对路径。它们是
 可靠性和隐私边界，不是 OS 隔离；用户授权的命令仍可能对主机产生不可恢复影响。
+
+实现中的确认事实只由 `cli-interactive`、`cli-flag` 或 `web-dialog` 三个人类入口来源构造。
+ApplicationService 在 Session 落盘前再次验证来源；模型文本、工具参数和不存在的模型侧安全模式工具
+都不能创建授权。同一 Session 的 `full-access` 事件可跨进程恢复；切换到其他模式会立即撤销，重新
+进入必须再次确认。Session 存在活动 Turn 时，任何安全模式切换都失败。
+
+Central Safety Policy 的 Full Access 分支仅返回 `policy.tool.full_access` 的 allow 结论。工具注册检查
+和输入正规化发生在策略之前，工具自身 Schema/语义校验、文件路径解析、执行超时与取消、输出截断、
+事件脱敏、命令子进程环境白名单和进程树终止发生在策略之外，因此不会被该分支绕过。
 
 扩展代码同样不视为可信。它只存放于当前工作区 `.echo/extensions`，在独立 Worker 中执行。Worker
 用于崩溃、超时、取消和卸载隔离，不构成 OS 沙箱。Manifest/入口/工具名/哈希/Catalog 必须严格校验；

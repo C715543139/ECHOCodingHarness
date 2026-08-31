@@ -4,6 +4,7 @@ import type { EchoEvent } from './events.js';
 import type { ProviderIdentity, SessionId, StepId, ToolCallId, TurnId } from './identifiers.js';
 import type { SafetyMode } from './safety.js';
 import type { SessionStore } from './session.js';
+import type { FullAccessConfirmation } from './p3.js';
 
 export const EVENT_SCHEMA_VERSION_P0 = 1;
 export const EVENT_SCHEMA_VERSION_P1 = 2;
@@ -91,6 +92,7 @@ export interface CreateSessionInput {
   readonly provider: ProviderIdentity;
   readonly model: EffectiveRuntimeSetting<string>;
   readonly safetyMode: EffectiveRuntimeSetting<SafetyMode>;
+  readonly fullAccessConfirmation?: FullAccessConfirmation;
 }
 
 export interface ResumeSessionInput {
@@ -99,6 +101,7 @@ export interface ResumeSessionInput {
   readonly provider: ProviderIdentity;
   readonly cliModel?: string;
   readonly cliSafetyMode?: SafetyMode;
+  readonly fullAccessConfirmation?: FullAccessConfirmation;
 }
 
 export interface RunTurnInput {
@@ -133,6 +136,10 @@ export interface ApplicationService {
   cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void>;
   respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult>;
   setSessionModel(sessionId: SessionId, modelId: string): Promise<SessionRuntimeState>;
-  setSessionSafetyMode(sessionId: SessionId, mode: SafetyMode): Promise<SessionRuntimeState>;
+  setSessionSafetyMode(
+    sessionId: SessionId,
+    mode: SafetyMode,
+    fullAccessConfirmation?: FullAccessConfirmation,
+  ): Promise<SessionRuntimeState>;
   getRuntimeState(sessionId: SessionId): Promise<SessionRuntimeState>;
 }

@@ -26,7 +26,11 @@ async function workspace(): Promise<string> {
   return directory;
 }
 
-async function writeArtifactConfig(artifactRoot: string, model = 'fake-model'): Promise<void> {
+async function writeArtifactConfig(
+  artifactRoot: string,
+  model = 'fake-model',
+  safetyMode = 'balanced',
+): Promise<void> {
   await fs.mkdir(path.join(artifactRoot, 'config'), { recursive: true });
   await fs.writeFile(
     path.join(artifactRoot, 'config', 'echo.config.json'),
@@ -34,7 +38,7 @@ async function writeArtifactConfig(artifactRoot: string, model = 'fake-model'): 
       baseUrl: 'https://provider.example/v1',
       model,
       modelCatalog: { source: 'discover' },
-      safetyMode: 'balanced',
+      safetyMode,
     }),
     'utf8',
   );
@@ -199,6 +203,217 @@ describe('CLI run integration', () => {
     expect(captured.stderr()).toContain('APPROVAL');
     expect(captured.stderr()).toContain('DENIED');
   });
+
+  it('requires both explicit non-interactive Full Access flags before creating a session', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root, 'fake-model', 'full-access');
+    const captured = output();
+    const providerFactory = vi.fn(
+      () =>
+        new FakeProvider([
+          {
+            events: [
+              { type: 'text_delta', delta: 'done' },
+              { type: 'completed', finishReason: 'stop' },
+            ],
+          },
+        ]),
+    );
+
+    const inheritedOnly = await runGoal(
+      'do the task',
+      {
+        workspace: root,
+        allowFullAccess: true,
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      { env: { ECHO_API_KEY: 'test-key' }, io: captured.io, providerFactory },
+    );
+    expect(inheritedOnly).toEqual({ exitCode: 2 });
+    expect(providerFactory).not.toHaveBeenCalled();
+
+    const missingAcknowledgement = await runGoal(
+      'do the task',
+      {
+        workspace: root,
+        safetyMode: 'full-access',
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      { env: { ECHO_API_KEY: 'test-key' }, io: captured.io, providerFactory },
+    );
+    expect(missingAcknowledgement).toEqual({ exitCode: 2 });
+    expect(providerFactory).not.toHaveBeenCalled();
+
+    const accepted = await runGoal(
+      'do the task',
+      {
+        workspace: root,
+        safetyMode: 'full-access',
+        allowFullAccess: true,
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot: root,
+      },
+      { env: { ECHO_API_KEY: 'test-key' }, io: captured.io, providerFactory },
+    );
+    expect(accepted.exitCode).toBe(0);
+    expect(providerFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create an interactive Full Access session when the human declines the risk notice', async () => {
+    const root = await workspace();
+    await writeArtifactConfig(root, 'fake-model', 'full-access');
+    const captured = output();
+    const fullAccessConfirmer = vi.fn().mockResolvedValue(false);
+
+    const outcome = await runGoal(
+      'do the task',
+      {
+        workspace: root,
+        verbose: false,
+        color: false,
+        interactive: true,
+        artifactRoot: root,
+      },
+      {
+        env: { ECHO_API_KEY: 'test-key' },
+        io: captured.io,
+        providerFactory: () =>
+          new FakeProvider([
+            {
+              events: [
+                { type: 'text_delta', delta: 'never' },
+                { type: 'completed', finishReason: 'stop' },
+              ],
+            },
+          ]),
+        fullAccessConfirmer,
+      },
+    );
+
+    expect(outcome).toEqual({ exitCode: 2 });
+    expect(fullAccessConfirmer).toHaveBeenCalledOnce();
+    await expect(fs.stat(path.join(root, '.echo', 'sessions'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  it.runIf(process.platform === 'win32')(
+    'bypasses operation approval while preserving timeout, credential, and file-tool boundaries',
+    async () => {
+      const root = await workspace();
+      await writeArtifactConfig(root);
+      const provider = new FakeProvider([
+        {
+          events: [
+            {
+              type: 'tool_call',
+              call: {
+                id: 'call-env',
+                name: 'run_command',
+                arguments: {
+                  command:
+                    "if ($null -eq $env:ECHO_API_KEY) { [Console]::Out.Write('isolated') } else { [Console]::Out.Write('leaked') }",
+                },
+              },
+            },
+            {
+              type: 'tool_call',
+              call: {
+                id: 'call-timeout',
+                name: 'run_command',
+                arguments: { command: 'Start-Sleep -Seconds 30', timeoutMs: 50 },
+              },
+            },
+            {
+              type: 'tool_call',
+              call: {
+                id: 'call-file-boundary',
+                name: 'read_file',
+                arguments: { path: '..\\outside.txt' },
+              },
+            },
+            { type: 'completed', finishReason: 'tool_calls' },
+          ],
+        },
+        {
+          events: [
+            { type: 'text_delta', delta: 'credential boundary verified' },
+            { type: 'completed', finishReason: 'stop' },
+          ],
+        },
+      ]);
+      const captured = output();
+
+      const outcome = await runGoal(
+        'verify the command boundary',
+        {
+          workspace: root,
+          safetyMode: 'full-access',
+          allowFullAccess: true,
+          verbose: false,
+          color: false,
+          interactive: false,
+          artifactRoot: root,
+        },
+        {
+          env: { ECHO_API_KEY: 'full-access-secret' },
+          io: captured.io,
+          providerFactory: () => provider,
+        },
+      );
+
+      expect(outcome.exitCode).toBe(0);
+      const [sessionFile] = await fs.readdir(path.join(root, '.echo', 'sessions'));
+      const log = await fs.readFile(
+        path.join(root, '.echo', 'sessions', sessionFile as string),
+        'utf8',
+      );
+      expect(log).toContain('isolated');
+      expect(log).not.toContain('full-access-secret');
+      expect(log).not.toContain('approval.requested');
+      expect(log).toContain('policy.tool.full_access');
+      const parsedEvents = log
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { type: string; payload?: unknown });
+      const toolCompleted = parsedEvents.find((event) => event.type === 'tool.completed');
+      expect(toolCompleted).toMatchObject({
+        payload: {
+          result: {
+            metadata: { stdout: 'isolated' },
+          },
+        },
+      });
+      expect(parsedEvents.filter((event) => event.type === 'tool.failed')).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              result: expect.objectContaining({
+                toolCallId: 'call-timeout',
+                metadata: expect.objectContaining({ code: 'COMMAND_TIMEOUT' }),
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              result: expect.objectContaining({
+                toolCallId: 'call-file-boundary',
+                metadata: expect.objectContaining({ code: 'PATH_TRAVERSAL_DENIED' }),
+              }),
+            }),
+          }),
+        ]),
+      );
+    },
+  );
 
   it('shows approval choices on stderr before accepting an interactive run decision', async () => {
     const root = await workspace();

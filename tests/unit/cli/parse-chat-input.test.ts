@@ -24,6 +24,11 @@ describe('parseIdleInput', () => {
       name: 'safety',
       argument: 'auto',
     });
+    expect(parseIdleInput('/safety full-access', 'typed')).toEqual({
+      kind: 'slash',
+      name: 'safety',
+      argument: 'full-access',
+    });
     expect(parseIdleInput('/foo', 'typed')).toMatchObject({ kind: 'error', code: 'UNKNOWN_SLASH' });
     expect(parseIdleInput('/model reset', 'typed')).toMatchObject({
       kind: 'error',

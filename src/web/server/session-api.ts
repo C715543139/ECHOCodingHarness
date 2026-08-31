@@ -137,6 +137,13 @@ function mappedError(error: unknown): {
           message: 'The requested session was not found.',
           retryable: false,
         };
+      case CONFIG_ERROR_CODES.fullAccessConfirmationRequired:
+        return {
+          status: 400,
+          code: 'INVALID_REQUEST',
+          message: 'Full Access requires explicit human confirmation.',
+          retryable: false,
+        };
       case CONFIG_ERROR_CODES.sessionWorkspaceMismatch:
         return {
           status: 400,
@@ -432,6 +439,16 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
           'Provider configuration is unavailable.',
         );
       }
+      const safetyMode = body.safetyMode ?? read.value.persistent.safetyMode;
+      if ((safetyMode === 'full-access') !== (body.fullAccessConfirmation?.acceptedRisk === true)) {
+        return errorResult(
+          reply,
+          request,
+          400,
+          'INVALID_REQUEST',
+          'Full Access requires an explicit risk confirmation for this session.',
+        );
+      }
       const runtime = await deps.application.createSession({
         workspaceRoot: deps.workspaceRoot,
         provider: deps.providerIdentity,
@@ -440,9 +457,17 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
           source: body.model === undefined ? 'config' : 'session',
         },
         safetyMode: {
-          value: body.safetyMode ?? read.value.persistent.safetyMode,
+          value: safetyMode,
           source: body.safetyMode === undefined ? 'config' : 'session',
         },
+        ...(body.fullAccessConfirmation?.acceptedRisk === true
+          ? {
+              fullAccessConfirmation: {
+                acceptedRisk: true as const,
+                source: 'web-dialog' as const,
+              },
+            }
+          : {}),
       });
       const view = await loadView(runtime.sessionId);
       return envelope(
@@ -547,6 +572,18 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
           'The runtime update must include a model or safety mode.',
         );
       }
+      if (
+        (body.safetyMode === 'full-access') !==
+        (body.fullAccessConfirmation?.acceptedRisk === true)
+      ) {
+        return errorResult(
+          reply,
+          request,
+          400,
+          'INVALID_REQUEST',
+          'Full Access requires an explicit risk confirmation for this session.',
+        );
+      }
       const active = deps.coordinator.snapshot();
       if (active.sessionId !== undefined && active.turnId !== undefined) {
         return errorResult(
@@ -563,7 +600,13 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
         await deps.application.setSessionModel(sessionId, body.model);
       }
       if (body.safetyMode !== undefined) {
-        await deps.application.setSessionSafetyMode(sessionId, body.safetyMode as SafetyMode);
+        await deps.application.setSessionSafetyMode(
+          sessionId,
+          body.safetyMode as SafetyMode,
+          body.fullAccessConfirmation?.acceptedRisk === true
+            ? { acceptedRisk: true, source: 'web-dialog' }
+            : undefined,
+        );
       }
       const view = await loadView(sessionId);
       return envelope(

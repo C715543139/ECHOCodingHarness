@@ -12,6 +12,7 @@ import { redactText } from '../session/redaction.js';
 export const DEFAULT_SAFETY_MODE: SafetyMode = 'balanced';
 
 export const POLICY_RULE_IDS = {
+  toolFullAccess: 'policy.tool.full_access',
   pathUncOrDevice: 'policy.path.unc_or_device',
   pathWorkspaceEscape: 'policy.path.workspace_escape',
   pathGitInternal: 'policy.path.git_internal',
@@ -402,6 +403,17 @@ function modeDecision(
 
 export class CentralSafetyPolicy implements SafetyPolicy {
   public evaluate(request: PolicyRequest): Promise<PolicyDecision> {
+    if (request.mode === 'full-access') {
+      return Promise.resolve({
+        action: 'allow',
+        reason: safeReason(
+          'Registered tool allowed by confirmed Full Access mode.',
+          request.workspaceRoot,
+        ),
+        ruleId: POLICY_RULE_IDS.toolFullAccess,
+      });
+    }
+
     const denyGitWrites = WRITE_FILE_TOOLS.has(request.toolName);
     const pathViolation = declaredPathViolation(
       request.normalizedInput,

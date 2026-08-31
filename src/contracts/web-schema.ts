@@ -44,7 +44,16 @@ const BODY_SCHEMA = { type: 'string', maxLength: B.bodyMax } as const;
 const ISO_TIME_SCHEMA = { type: 'string', minLength: 1, maxLength: 64 } as const;
 const NONNEG_INT = { type: 'integer', minimum: 0 } as const;
 
-const SAFETY_MODE_SCHEMA = { type: 'string', enum: ['safe', 'balanced', 'auto'] } as const;
+const SAFETY_MODE_SCHEMA = {
+  type: 'string',
+  enum: ['safe', 'balanced', 'auto', 'full-access'],
+} as const;
+const FULL_ACCESS_CONFIRMATION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['acceptedRisk'],
+  properties: { acceptedRisk: { const: true } },
+} as const;
 const SESSION_PHASE_SCHEMA = {
   type: 'string',
   enum: ['idle', 'running', 'completed', 'failed', 'cancelled', 'limited'],
@@ -299,6 +308,7 @@ const CREATE_SESSION_REQUEST_SCHEMA = {
   properties: {
     model: MODEL_SCHEMA,
     safetyMode: SAFETY_MODE_SCHEMA,
+    fullAccessConfirmation: FULL_ACCESS_CONFIRMATION_SCHEMA,
   },
 } as const;
 
@@ -308,6 +318,7 @@ const UPDATE_SESSION_RUNTIME_REQUEST_SCHEMA = {
   properties: {
     model: MODEL_SCHEMA,
     safetyMode: SAFETY_MODE_SCHEMA,
+    fullAccessConfirmation: FULL_ACCESS_CONFIRMATION_SCHEMA,
   },
 } as const;
 

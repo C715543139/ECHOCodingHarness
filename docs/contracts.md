@@ -700,5 +700,10 @@ P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继�
 
 P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。它绑定
 一个规范化工作区，只管理该工作区的 staging、安装根和 Catalog；Manifest/Catalog、工具 JSON Schema、
-路径、链接、名称冲突、完整 SHA-256 和原子写均在此边界验证。A1/A2 并行期不改冻结
+路径、链接、名称冲突、完整 SHA-256 和原子写均在此边界验证。Store 的路径派生与内容快照 API 只接收
+扩展 ID、内容哈希或 Catalog 条目，不接受调用方提供的工作区路径、扩展根或 owned root；可绕过绑定
+工作区的底层文件系统函数不从 `src/extensions/index.ts` 导出。A1/A2 并行期不改冻结
 `src/contracts/p3.ts`，EXT-01/02 的测试路径先记录在验收矩阵文档，集成任务统一同步可机读矩阵。
+
+Store 的可选 `reservedToolNames` 只能在全部 `DEFAULT_TOOLS` 之上追加宿主保留名，不能替换或缩减
+内置集合；因此测试注入或后续 Registry 组装都不能意外开放内置工具名覆盖。

@@ -35,26 +35,26 @@ describe('workspace extension paths and content hashes', () => {
 
   it('hashes a normalized sorted file collection and detects any content change', async () => {
     const store = new WorkspaceExtensionStore(await makeWorkspace());
-    const { paths, root } = await createStagedExtension(store, sampleManifest(), {
+    const { root } = await createStagedExtension(store, sampleManifest(), {
       'lib/helper.mjs': 'export const value = 1;\n',
     });
 
-    const first = await store.hashExtensionDirectory(root, paths.stagingRoot);
-    const second = await store.hashExtensionDirectory(root, paths.stagingRoot);
+    const first = (await store.snapshotStagedExtension('pdf-reader')).contentHash;
+    const second = (await store.snapshotStagedExtension('pdf-reader')).contentHash;
     expect(first).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(second).toBe(first);
 
     await fs.writeFile(path.join(root, 'lib', 'helper.mjs'), 'export const value = 2;\n');
-    expect(await store.hashExtensionDirectory(root, paths.stagingRoot)).not.toBe(first);
+    expect((await store.snapshotStagedExtension('pdf-reader')).contentHash).not.toBe(first);
   });
 
   it('rejects an extension path that escapes its owned root', async () => {
     const store = new WorkspaceExtensionStore(await makeWorkspace());
     const paths = await store.ensureWorkspace();
-    await expect(
-      store.hashExtensionDirectory(paths.workspaceRoot, paths.stagingRoot),
-    ).rejects.toMatchObject({
-      code: 'PATH_OUTSIDE_EXTENSION_ROOT',
+    await fs.symlink(paths.workspaceRoot, path.join(paths.stagingRoot, 'escape-root'), 'junction');
+
+    await expect(store.snapshotStagedExtension('escape-root')).rejects.toMatchObject({
+      code: 'LINK_DENIED',
     });
   });
 
@@ -66,7 +66,7 @@ describe('workspace extension paths and content hashes', () => {
     await fs.writeFile(path.join(linkedTarget, 'helper.mjs'), 'export {};\n');
     await fs.symlink(linkedTarget, path.join(root, 'linked'), 'junction');
 
-    await expect(store.hashExtensionDirectory(root, paths.stagingRoot)).rejects.toMatchObject({
+    await expect(store.snapshotStagedExtension('pdf-reader')).rejects.toMatchObject({
       code: 'LINK_DENIED',
     });
   });

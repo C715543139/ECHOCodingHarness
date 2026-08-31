@@ -108,7 +108,7 @@ describe('Extension Manifest v1', () => {
 
   it('rejects built-in, lifecycle namespace, and other-extension tool conflicts', async () => {
     const store = new WorkspaceExtensionStore(await makeWorkspace(), {
-      builtInToolNames: ['read_file'],
+      reservedToolNames: ['host_tool'],
     });
     const catalog = {
       schemaVersion: 1 as const,
@@ -125,7 +125,13 @@ describe('Extension Manifest v1', () => {
       ],
     };
 
-    for (const name of ['read_file', 'extension_custom', 'existing_tool']) {
+    for (const name of [
+      'read_file',
+      'write_file',
+      'host_tool',
+      'extension_custom',
+      'existing_tool',
+    ]) {
       const baseTool = sampleManifest().tools.at(0);
       if (baseTool === undefined) throw new Error('Fixture tool is missing.');
       const manifest = sampleManifest({

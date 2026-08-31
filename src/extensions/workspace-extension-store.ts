@@ -31,7 +31,7 @@ export interface AtomicCatalogWriter {
 }
 
 export interface WorkspaceExtensionStoreOptions {
-  readonly builtInToolNames?: readonly string[];
+  readonly reservedToolNames?: readonly string[];
   readonly catalogWriter?: AtomicCatalogWriter;
 }
 
@@ -60,7 +60,7 @@ export class WorkspaceExtensionStore {
     options: WorkspaceExtensionStoreOptions = {},
   ) {
     this.builtInToolNames = new Set(
-      options.builtInToolNames ?? DEFAULT_TOOLS.map((tool) => tool.name),
+      DEFAULT_TOOLS.map((tool) => tool.name).concat(options.reservedToolNames ?? []),
     );
     this.catalogWriter = options.catalogWriter ?? defaultCatalogWriter;
   }
@@ -69,36 +69,26 @@ export class WorkspaceExtensionStore {
     return ensureExtensionWorkspacePaths(this.workspaceRoot);
   }
 
-  stagingExtensionPath(paths: ExtensionWorkspacePaths, extensionId: string): string {
+  async stagingExtensionPath(extensionId: string): Promise<string> {
+    const paths = await this.ensureWorkspace();
     return stagingExtensionPath(paths, extensionId);
   }
 
-  installedExtensionPath(
-    paths: ExtensionWorkspacePaths,
-    extensionId: string,
-    contentHash: string,
-  ): string {
+  async installedExtensionPath(extensionId: string, contentHash: string): Promise<string> {
+    const paths = await this.ensureWorkspace();
     return installedExtensionPath(paths, extensionId, contentHash);
-  }
-
-  async hashExtensionDirectory(
-    extensionRoot: string,
-    ownedRoot: string,
-    expectedId?: string,
-  ): Promise<string> {
-    return (await snapshotExtensionContent(extensionRoot, ownedRoot, expectedId)).contentHash;
   }
 
   async readStagedManifest(extensionId: string): Promise<ExtensionManifest> {
     const paths = await this.ensureWorkspace();
-    const root = this.stagingExtensionPath(paths, extensionId);
+    const root = stagingExtensionPath(paths, extensionId);
     return (await snapshotExtensionContent(root, paths.stagingRoot, extensionId)).manifest;
   }
 
   async snapshotStagedExtension(extensionId: string): Promise<ExtensionContentSnapshot> {
     const paths = await this.ensureWorkspace();
     return snapshotExtensionContent(
-      this.stagingExtensionPath(paths, extensionId),
+      stagingExtensionPath(paths, extensionId),
       paths.stagingRoot,
       extensionId,
     );
@@ -109,7 +99,7 @@ export class WorkspaceExtensionStore {
   ): Promise<ExtensionContentSnapshot> {
     const paths = await this.ensureWorkspace();
     return snapshotExtensionContent(
-      this.installedExtensionPath(paths, entry.id, entry.contentHash),
+      installedExtensionPath(paths, entry.id, entry.contentHash),
       paths.extensionsRoot,
       entry.id,
     );
@@ -254,7 +244,7 @@ export class WorkspaceExtensionStore {
   ): Promise<void> {
     for (const entry of catalog.extensions) {
       try {
-        const root = this.installedExtensionPath(paths, entry.id, entry.contentHash);
+        const root = installedExtensionPath(paths, entry.id, entry.contentHash);
         const snapshot = await snapshotExtensionContent(root, paths.extensionsRoot, entry.id);
         if (
           snapshot.contentHash !== entry.contentHash ||

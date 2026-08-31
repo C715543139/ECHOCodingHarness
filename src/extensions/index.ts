@@ -3,7 +3,7 @@ export {
   serializeExtensionCatalog,
   validateExtensionCatalog,
 } from './catalog-validation.js';
-export { snapshotExtensionContent, type ExtensionContentSnapshot } from './content-hash.js';
+export type { ExtensionContentSnapshot } from './content-hash.js';
 export { ExtensionStorageError, type ExtensionStorageErrorCode } from './errors.js';
 export { validateToolInputSchema } from './json-schema.js';
 export { EXTENSION_LIMITS } from './limits.js';
@@ -14,13 +14,7 @@ export {
   normalizeExtensionRelativePath,
   parseExtensionManifest,
 } from './manifest.js';
-export {
-  assertOwnedExtensionDirectory,
-  ensureExtensionWorkspacePaths,
-  installedExtensionPath,
-  stagingExtensionPath,
-  type ExtensionWorkspacePaths,
-} from './workspace-paths.js';
+export type { ExtensionWorkspacePaths } from './workspace-paths.js';
 export {
   WorkspaceExtensionStore,
   type AtomicCatalogWriter,

@@ -53,7 +53,7 @@ export async function createStagedExtension(
   extraFiles: Readonly<Record<string, string>> = {},
 ): Promise<{ readonly paths: ExtensionWorkspacePaths; readonly root: string }> {
   const paths = await store.ensureWorkspace();
-  const root = store.stagingExtensionPath(paths, manifest.id);
+  const root = await store.stagingExtensionPath(manifest.id);
   await fs.mkdir(root, { recursive: true });
   await fs.writeFile(path.join(root, 'extension.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   await fs.writeFile(path.join(root, 'index.mjs'), 'export const handlers = {};\n');
@@ -71,9 +71,9 @@ export async function installStagedExtension(
   manifest: ExtensionManifest = sampleManifest(),
   state: ExtensionCatalogEntry['state'] = 'enabled',
 ): Promise<ExtensionCatalogEntry> {
-  const { paths, root } = await createStagedExtension(store, manifest);
-  const contentHash = await store.hashExtensionDirectory(root, paths.stagingRoot);
-  const installedRoot = store.installedExtensionPath(paths, manifest.id, contentHash);
+  const { root } = await createStagedExtension(store, manifest);
+  const contentHash = (await store.snapshotStagedExtension(manifest.id)).contentHash;
+  const installedRoot = await store.installedExtensionPath(manifest.id, contentHash);
   await fs.mkdir(path.dirname(installedRoot), { recursive: true });
   await fs.cp(root, installedRoot, { recursive: true, errorOnExist: true });
   return {

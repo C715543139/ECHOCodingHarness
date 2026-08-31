@@ -101,9 +101,8 @@ describe('Catalog v1', () => {
     const store = new WorkspaceExtensionStore(await makeWorkspace());
     const entry = await installStagedExtension(store);
     await store.replaceCatalog(0, [entry]);
-    const paths = await store.ensureWorkspace();
     await fs.writeFile(
-      path.join(store.installedExtensionPath(paths, entry.id, entry.contentHash), 'index.mjs'),
+      path.join(await store.installedExtensionPath(entry.id, entry.contentHash), 'index.mjs'),
       'export const tampered = true;\n',
     );
 

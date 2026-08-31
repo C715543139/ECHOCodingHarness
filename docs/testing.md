@@ -437,3 +437,14 @@ P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七�
   调用新工具、新 Session 可复用，以及切回 balanced 后下一模型请求不再获得扩展工具；
 - `tests/integration/web/extensions.test.ts`：验证生产 Web 装配读取真实当前工作区 Catalog，同时保留稳定错误
   映射、请求守卫和可注入测试端口。
+
+### P3-C2 synthetic PDF demo evidence
+
+- `fixtures/p3-pdf-demo/requirements.pdf` 是确定性生成的普通文本 PDF，只含合成要求；
+- `pnpm p3:demo:baseline` 要求独立测试失败，`pnpm p3:demo:verify` 要求独立测试通过；两者都先校验
+  `evidence-lock.json` 中 PDF、受保护测试和 fixture 配置的 SHA-256；
+- `tests/integration/p3-pdf-demo.test.ts` 在临时工作区使用 Fake Provider，证明 Agent 能创作并自测
+  `pdf-reader`、通过 `extension_check` 后安装、在下一请求读取 PDF、观测失败、修复源码、复测成功，
+  并在另一新 Session 复用已安装工具；
+- `scripts/accept-p3-pdf-demo.mjs` 使用构建产物和真实 Provider 做显式本地验收，完成后仍由 Harness 外
+  Node 子进程复验并确认受保护哈希不变。该脚本不属于 `pnpm check`，CI 不联网也不读取 `.env.test`。

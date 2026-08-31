@@ -130,3 +130,19 @@ Key 或模型响应正文。
 > DTOs. Deterministic Fake Provider tests, Playwright accessibility and stress scenarios, isolated
 > artifact smoke tests, fail-closed privacy scans, and an explicit non-CI real-Provider check make
 > the evidence reproducible without putting paid credentials into CI.
+
+## 10. P3 合成 PDF 与工作区扩展演示
+
+P3 镜头使用 [p3-pdf-demo](../fixtures/p3-pdf-demo/)；它不包含真实考核内容或身份信息。录制前：
+
+```powershell
+pnpm build
+pnpm p3:demo:reset
+pnpm p3:demo:baseline
+pnpm accept:p3-pdf
+```
+
+两分钟内依次展示 Full Access 风险确认、`extension_init`、真实自测、`extension_check`、
+`extension_install`、下一模型请求出现 `read_pdf`、失败测试、仅修改允许源码、成功复测，以及新 Session
+直接复用。结束后执行 `pnpm p3:demo:verify`；可信结论来自受保护输入哈希未变和 Harness 外独立复验，
+不来自模型自行声称完成。真实 Provider 命令只显式本地运行，CI 仅运行确定性 Fake Provider 故事。

@@ -1,6 +1,6 @@
 # P3：Full Access 与工作区扩展系统
 
-> 状态：In progress / P3-A1、P3-A2、P3-B1 与 P3-B2 已实现
+> 状态：In progress / P3-A1–P3-C2 已实现
 >
 > 版本：1.0
 >
@@ -93,7 +93,7 @@ Web 创建/切换 Full Access 必须确认，之后常驻红色 `FULL ACCESS` �
 | P3-B2 | 创作规范与七个生命周期工具（已实现） | A1、B1 |
 | P3-B3 | Full Access 与扩展 WebUI | A0、A1、A2，可与 B1 并行 |
 | P3-C1 | CLI/Web/ApplicationService 生产集成 | A1、B2、B3 |
-| P3-C2 | 合成 PDF 演示与可信验收 | C1 |
+| P3-C2 | 合成 PDF 演示与可信验收（已实现） | C1 |
 | P3-C3 | 文档、全量质量、双盲与视频收尾 | C2 |
 
 A0 后共享类型、Schema、状态机和路由不得由并行分支私自分叉。任何必要变更先形成集成修订。
@@ -112,6 +112,16 @@ A0 后共享类型、Schema、状态机和路由不得由并行分支私自分�
 7. 新 Session 复用，同路径的另一临时工作区看不到扩展。
 
 首版只支持可提取文本的普通 PDF，不支持 OCR、扫描件、加密 PDF 或复杂版面。
+
+已实现的可重复证据：
+
+- `pnpm p3:demo:reset` 恢复故意错误的源码并移除该 fixture 的本地 `.echo` 运行数据；
+- `pnpm p3:demo:baseline` 校验 PDF、受保护测试和 `package.json` 的 SHA-256，并要求独立测试失败；
+- `tests/integration/p3-pdf-demo.test.ts` 用离线 Fake Provider 驱动完整创作、检查、安装、热加载、修复、
+  复测和新 Session 复用；
+- `pnpm p3:demo:verify` 再次检查受保护哈希，并由 Harness 外的 Node 子进程独立要求测试通过；
+- `pnpm accept:p3-pdf` 使用 `.env.test` 的真实 OpenAI-compatible Provider 显式验收，临时工作区在结束后
+  删除，且该命令不进入 CI。
 
 ## 7. 两分钟镜头
 

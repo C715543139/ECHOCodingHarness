@@ -19,6 +19,7 @@
   "packageManager": "pnpm@11.24.0",
   "scripts": {
     "accept:web-provider": "node scripts/accept-web-provider.mjs",
+    "accept:p3-pdf": "node scripts/accept-p3-pdf-demo.mjs",
     "build": "pnpm build:node && pnpm build:web",
     "build:node": "node scripts/clean-node-dist.mjs && tsup",
     "build:web": "vite build",
@@ -27,6 +28,9 @@
     "dev:web": "vite",
     "eval": "vitest run tests/evals",
     "eval:offline": "node scripts/eval-offline.mjs",
+    "p3:demo:baseline": "node scripts/p3-pdf-demo-evidence.mjs baseline",
+    "p3:demo:reset": "node scripts/p3-pdf-demo-reset.mjs",
+    "p3:demo:verify": "node scripts/p3-pdf-demo-evidence.mjs verify",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.json\" \"*.js\" \"*.ts\" \".github/**/*.yml\"",
     "lint": "eslint . --max-warnings 0",

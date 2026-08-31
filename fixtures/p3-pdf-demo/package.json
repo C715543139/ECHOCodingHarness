@@ -1,0 +1,8 @@
+{
+  "name": "echo-p3-synthetic-pdf-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/score-summary.test.mjs"
+  }
+}

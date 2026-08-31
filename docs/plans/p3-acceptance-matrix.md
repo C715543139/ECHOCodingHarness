@@ -1,6 +1,6 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：In progress / P3-A1、P3-A2、P3-B1 与 P3-B2 runtime evidence recorded
+> 状态：In progress / P3-C2 runtime evidence recorded；等待 P3-C3 最终 Accepted
 >
 > 最后更新：2026-08-31
 
@@ -26,7 +26,7 @@
 | WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Planned |
 | INT-01 | 集成 | 同工作区复用、跨工作区隔离 | P3-C1 | Planned |
 | INT-02 | 集成 | 离开 Full Access 卸载但不删除 | P3-C1 | Planned |
-| DEMO-01 | 演示 | 失败基线、哈希、修复、独立复验和复用 | P3-C2 | Planned |
+| DEMO-01 | 演示 | 失败基线、哈希、修复、独立复验和复用 | P3-C2 | Implemented — `tests/integration/p3-pdf-demo.test.ts`, `scripts/p3-pdf-demo-evidence.mjs`, `scripts/accept-p3-pdf-demo.mjs` |
 | DONE-01 | 收尾 | 质量、隐私、产物、真实 Provider、文档与视频 | P3-C3 | Planned |
 
 ## 3. 必须保留的证据层

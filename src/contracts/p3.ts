@@ -205,7 +205,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'The synthetic PDF demo proves failing baseline, protected-input hashes, successful repair, independent recheck, and same-workspace reuse',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'pending:P3-C2',
+    runtimeEvidence: 'tests/integration/p3-pdf-demo.test.ts',
     runtimeTask: 'P3-C2',
   },
   {

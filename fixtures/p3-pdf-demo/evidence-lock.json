@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256",
+  "files": {
+    "requirements.pdf": "1bf27bafaf4676aaa10726a0232dcd454fa8d6d562f0db5d3db94e2387c089eb",
+    "test/score-summary.test.mjs": "c2a9922f846651c98706feb805fbc22e15974b37c09da6e37abb008653285c3b",
+    "package.json": "62fa7afca9fe394dd5aa2ddb31de06646ea437df64c462ad8a92a075c3511fb7"
+  }
+}

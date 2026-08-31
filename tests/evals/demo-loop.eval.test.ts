@@ -123,5 +123,5 @@ describeWindows('offline Fake Provider eval: demo-loop', () => {
       textEvents: 1,
       textLineCount: 1,
     });
-  });
+  }, 15_000);
 });

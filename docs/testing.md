@@ -365,13 +365,11 @@ response body.
   complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
   cleanup are complete.
 
-## P3 quality plan（A1/A2/B1 evidence）
+## P3 accepted quality evidence
 
 `P3_TEST_MATRIX` 位于 `src/contracts/p3.ts`，权威文档是
-[p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 使用 `pending:P3-*` 标记后续运行时所有权；
-A1–C3 必须逐项补齐存在的测试路径，最终不得保留 pending。P3-A1 专用分支按冻结要求不修改
-`src/contracts/p3.ts`；FULL-01/02/03 的真实路径先记录在验收矩阵文档，待共享合同解除冻结后由集成
-任务同步可机读矩阵。
+[p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 曾用 `pending:P3-*` 标记后续运行时所有权；
+P3-C3 已逐项补齐存在的测试路径。并行阶段保持共享合同冻结，最终由集成分支同步可机读矩阵。
 
 P3-A1 自动证据包括：
 
@@ -448,3 +446,14 @@ P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七�
   并在另一新 Session 复用已安装工具；
 - `scripts/accept-p3-pdf-demo.mjs` 使用构建产物和真实 Provider 做显式本地验收，完成后仍由 Harness 外
   Node 子进程复验并确认受保护哈希不变。该脚本不属于 `pnpm check`，CI 不联网也不读取 `.env.test`。
+
+### P3-C3 final acceptance evidence
+
+2026-09-01 本地收尾结果：`pnpm check` 通过 132 个测试文件 / 741 项测试，Statements 84%、Branches
+75.71%、Functions 89.23%、Lines 85.98%；`pnpm eval` 通过 4 个文件 / 11 项；Chromium Playwright
+通过 15 项（含 P3 Full Access 与扩展管理）；隔离 Web 产物、secret/identity/Web artifact 扫描均通过。
+
+同日 `pnpm accept:p3-pdf` 使用构建产物和 `deepseek/deepseek-v4-flash` 完成显式本地验收：失败基线
+退出码为 1，修复后的 Harness 外独立复验退出码为 0，受保护哈希未变，且新 Session 实际调用了
+已安装的 `read_pdf`。脚本没有打印模型正文、凭据或个人绝对路径，并恢复临时配置、删除临时工作区。
+远端 Windows CI 继续只运行 Fake Provider 和公开合成夹具。

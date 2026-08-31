@@ -362,7 +362,8 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A1–B3 与 C1 生产接线均已实现；PDF 演示和最终验收仍由 C2/C3 完成。
+> P3 状态：A0–C3 已验收。Full Access 仍是明确警告后的高风险能力，扩展 Worker 不是 OS 沙箱；
+> 合成 PDF 演示、受保护哈希、Harness 外复验和显式真实 Provider 检查均不进入无秘密 CI。
 > 现有 `safe`、`balanced`、`auto` 规则保持不变。
 
 P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或

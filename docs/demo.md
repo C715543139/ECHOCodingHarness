@@ -124,12 +124,13 @@ Key 或模型响应正文。
 
 > ECHO Harness is a local-first coding agent built from an explicit TypeScript agent loop rather
 > than an agent framework. Its Windows-first CLI and loopback-only Web console share the same
-> application service, safety policy, bounded tools, and redacted JSONL sessions. The Web console
-> adds resumable Chat, approvals, Provider settings, and an explainable Trace/Inspector view while
-> keeping API keys, absolute personal paths, raw reasoning, and unbounded tool output out of browser
-> DTOs. Deterministic Fake Provider tests, Playwright accessibility and stress scenarios, isolated
-> artifact smoke tests, fail-closed privacy scans, and an explicit non-CI real-Provider check make
-> the evidence reproducible without putting paid credentials into CI.
+> application service, safety policy, bounded tools, and redacted JSONL sessions. After explicit
+> Full Access confirmation, the agent can create, self-test, install, and hot-load extensions scoped
+> to one workspace. In my two-minute demo, ECHO builds a PDF reader, extracts synthetic requirements,
+> fixes failing code, verifies the tests, and reuses the tool in a new session. Protected-file hashes
+> and a test process outside the harness decide whether the task is complete. Fake Provider tests,
+> Playwright, isolated artifact checks, privacy scans, and Windows CI keep this evidence reproducible
+> without putting paid credentials or assessment material into CI.
 
 ## 10. P3 合成 PDF 与工作区扩展演示
 
@@ -146,3 +147,7 @@ pnpm accept:p3-pdf
 `extension_install`、下一模型请求出现 `read_pdf`、失败测试、仅修改允许源码、成功复测，以及新 Session
 直接复用。结束后执行 `pnpm p3:demo:verify`；可信结论来自受保护输入哈希未变和 Harness 外独立复验，
 不来自模型自行声称完成。真实 Provider 命令只显式本地运行，CI 仅运行确定性 Fake Provider 故事。
+
+2026-09-01 已使用 `deepseek/deepseek-v4-flash` 和构建产物完成一次显式验收：基线失败、修复后独立
+测试通过、受保护哈希不变、新 Session 复用均得到结构化确认。该记录不包含模型正文、真实考核材料、
+API Key 或个人路径；录制时仍需人工检查终端标题、系统通知和浏览器外框。

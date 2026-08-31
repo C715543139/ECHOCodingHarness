@@ -1,14 +1,14 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：In progress / P3-C2 runtime evidence recorded；等待 P3-C3 最终 Accepted
+> 状态：Accepted
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 1. 使用规则
 
-可机读的权威行位于 `src/contracts/p3.ts` 的 `P3_TEST_MATRIX`。A0 阶段的 `pending:P3-*` 只表示所有权，
-不表示已经实现。A1/A2 并行分支保持共享契约冻结；合并后的集成分支同步 FULL-01/02/03 与 EXT-01/02
-的真实测试路径。P3-C3 只有在不存在 pending、所有路径存在且完整门禁通过后才能把本文改为 Accepted。
+可机读的权威行位于 `src/contracts/p3.ts` 的 `P3_TEST_MATRIX`。A0 阶段曾用 `pending:P3-*` 表示所有权；
+P3-C3 已将每一行替换为存在的运行时证据路径。Accepted 表示完整门禁、离线故事和显式本地验收均通过，
+不表示扩展代码获得 OS 沙箱保护，也不把模型陈述当作验证事实。
 
 ## 2. 冻结矩阵
 
@@ -23,11 +23,11 @@
 | WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Implemented — `tests/unit/tools/tool-registry.test.ts`, `tests/unit/extensions/worker-host.test.ts` |
 | LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
 | LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
-| WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Planned |
-| INT-01 | 集成 | 同工作区复用、跨工作区隔离 | P3-C1 | Planned |
-| INT-02 | 集成 | 离开 Full Access 卸载但不删除 | P3-C1 | Planned |
-| DEMO-01 | 演示 | 失败基线、哈希、修复、独立复验和复用 | P3-C2 | Implemented — `tests/integration/p3-pdf-demo.test.ts`, `scripts/p3-pdf-demo-evidence.mjs`, `scripts/accept-p3-pdf-demo.mjs` |
-| DONE-01 | 收尾 | 质量、隐私、产物、真实 Provider、文档与视频 | P3-C3 | Planned |
+| WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Accepted — `tests/unit/web/composer.test.tsx`, `tests/unit/web/extension-settings.test.tsx`, `tests/integration/web/extensions.test.ts`, `tests/e2e/web/p3-extensions.spec.ts` |
+| INT-01 | 集成 | 同工作区复用、跨工作区隔离 | P3-C1 | Accepted — `tests/integration/p3-extension-integration.test.ts`, `tests/unit/extensions/workspace-extension-system.test.ts` |
+| INT-02 | 集成 | 离开 Full Access 卸载但不删除 | P3-C1 | Accepted — `tests/unit/extensions/workspace-extension-system.test.ts`, `tests/integration/p3-extension-integration.test.ts` |
+| DEMO-01 | 演示 | 失败基线、哈希、修复、独立复验和复用 | P3-C2 | Accepted — `tests/integration/p3-pdf-demo.test.ts`, `scripts/p3-pdf-demo-evidence.mjs`, `scripts/accept-p3-pdf-demo.mjs` |
+| DONE-01 | 收尾 | 质量、隐私、产物、真实 Provider、文档与视频 | P3-C3 | Accepted — `pnpm check`, `pnpm eval`, `pnpm test:web:e2e`, isolated artifact smoke, privacy scans, packaged real-Provider PDF acceptance, Windows CI |
 
 ## 3. 必须保留的证据层
 

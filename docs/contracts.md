@@ -681,7 +681,7 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
 
-## 15. P3 增量契约（A1–C1 已实现）
+## 15. P3 增量契约（A0–C3 已验收）
 
 P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。P3-A1 已把运行时
@@ -706,7 +706,7 @@ Session 只保留新的非 Full Access 事实，再次进入必须提供新的�
 
 P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继续返回 `ToolExecution`，继续产生现有
 工具/Policy/终态事件。Catalog 是扩展状态事实源，Session JSONL 不复制 Catalog 内容。A0 验收矩阵
-允许 `pending:P3-*`；负责实现的任务必须改为真实测试路径，P3-C3 清零全部 pending 后才能宣称完成。
+曾用 `pending:P3-*` 分配后续实现所有权；P3-C3 已将全部行替换为真实证据路径并通过路径存在性测试。
 
 P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。调用方
 必须通过异步 `WorkspaceExtensionStore.open(workspaceRoot)` 创建实例；open 一次性固定 canonical 根和

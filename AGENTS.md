@@ -12,7 +12,7 @@ repository. Read it together with the documents under `docs/` before changing co
 - Supported development platform: Windows with PowerShell as a first-class environment.
 - CLI executable: `echo-harness`.
 
-The following documents are the accepted P0/P1/P2.5 implementation baseline:
+The following documents are the accepted P0/P1/P2.5/P3 implementation baseline:
 
 - `docs/architecture.md`
 - `docs/contracts.md`

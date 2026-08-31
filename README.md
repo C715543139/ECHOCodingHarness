@@ -20,6 +20,9 @@ events, and exposes the same application service through a loopback-only Web con
   bounded output, timeouts, cancellation, and process-tree termination have automated coverage.
 - **Safety is centralized.** Six tools share workspace isolation, validation, approval, hard-deny,
   redaction, timeout, and output-limit rules.
+- **Capabilities can be created safely enough to inspect.** After explicit Full Access confirmation,
+  an Agent can author, self-test, check, install, hot-load, disable, and uninstall extensions scoped
+  to the current workspace. They persist across Sessions but never become global plugins.
 - **Quality is reproducible.** Fake Provider evals, a resettable failing-test fixture, coverage
   thresholds, malicious scan samples, and a Windows GitHub Actions gate provide reviewable evidence.
 
@@ -34,12 +37,18 @@ Agent Loop -----> Context Projector -----> OpenAI-compatible Provider
    |                    |
    +----> Safety Policy +----> redacted JSONL Session Store
    |
-   +----> Tool Registry ----> files / PowerShell
+   +----> Tool Registry ----> files / PowerShell / workspace extensions
 ```
 
 The six P0 tools are `list_files`, `search_text`, `read_file`, `write_file`, `apply_patch`, and
 `run_command`. Tool calls execute sequentially so state changes, approvals, and terminal events
 remain deterministic.
+
+P3 adds `full-access`, which requires explicit human confirmation and removes per-operation prompts
+without removing validation, cancellation, timeouts, output bounds, redaction, or process cleanup.
+Only in that mode can the Agent use seven `extension_*` lifecycle tools. Installed extension code
+runs in a bounded Worker protocol, remains under the current workspace `.echo/`, and is not an OS
+sandbox.
 
 ## Requirements
 
@@ -156,6 +165,20 @@ node scripts/demo-accept.mjs
 
 See [docs/demo.md](docs/demo.md) for reset, expected beats, privacy checks, and recording fallbacks.
 
+The P3 demonstration adds a synthetic PDF capability gap without using assessment content:
+
+```powershell
+pnpm build
+pnpm p3:demo:reset
+pnpm p3:demo:baseline
+pnpm accept:p3-pdf
+pnpm p3:demo:verify
+```
+
+It shows the Agent creating and testing `pdf-reader`, hot-loading `read_pdf`, repairing only the
+allowed source file, and reusing the extension in a new Session. Protected-input hashes and a test
+process outside the Harness decide acceptance; the model cannot certify its own work.
+
 ## Quality gate
 
 ```powershell
@@ -201,6 +224,10 @@ temporary configuration. Details and evidence are in [docs/testing.md](docs/test
 - [P1 CLI plan](docs/plans/p1-cli.md)
 - [P2 local WebUI plan](docs/plans/p2-webui.md)
 - [P2 acceptance matrix](docs/plans/p2-acceptance-matrix.md)
+- [ADR-0010: explicit Full Access mode](docs/decisions/0010-full-access-mode.md)
+- [ADR-0011: workspace-scoped extensions](docs/decisions/0011-workspace-extensions.md)
+- [P3 extension plan](docs/plans/p3-extensions.md)
+- [P3 acceptance matrix](docs/plans/p3-acceptance-matrix.md)
 - [Local Web API contract](docs/web-api.md)
 - [WebUI product and interaction specification](docs/web-ui.md)
 
@@ -208,9 +235,9 @@ temporary configuration. Details and evidence are in [docs/testing.md](docs/test
 
 - ECHO is not an operating-system sandbox. Approved PowerShell commands can still access network
   or files permitted to the current user.
-- The current release does not provide MCP, multi-agent execution, remote Web access, Session
-  export, or a general rollback system. The CLI and local Web console reuse the same application
-  service.
+- The current release does not provide MCP, multi-agent execution, remote Web access, a global
+  extension market, OCR, Session export, or a general rollback system. The CLI and local Web
+  console reuse the same application service.
 - Compatibility is verified against a bounded OpenAI-compatible service configuration, not every
   provider implementation.
 - Model requests may contain repository excerpts selected by the Context Projector. Use ECHO only

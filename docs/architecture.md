@@ -63,7 +63,7 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
-### 2.5 P3 增量（A1–C1 已实现）
+### 2.5 P3 增量（A0–C3 已验收）
 
 P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与
@@ -75,6 +75,8 @@ P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 Central Safety Policy 直通；A2–B3 已交付工作区存储、Worker、生命周期与 Web 管理。P3-C1 通过
 `WorkspaceExtensionSystem` 完成 CLI/Web 生产接线：模型请求边界按 Session 模式协调 Registry，进程关闭
 时终止 Worker，Catalog 仍是跨 Session 与重启的持久事实源。
+P3-C2/C3 以合成 PDF、受保护输入哈希、Harness 外独立复验、Fake Provider 跨 Session 故事和显式
+真实 Provider 产物验收闭合证据；这些验收不改变 Worker 非 OS 沙箱的边界。
 
 ## 3. 架构原则
 

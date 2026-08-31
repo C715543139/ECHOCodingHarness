@@ -51,16 +51,13 @@ describe('P3 contracts', () => {
     expectTypeOf<ExtensionCatalog>().toHaveProperty('revision');
   });
 
-  it('keeps every requirement uniquely owned with pending or existing runtime evidence', async () => {
+  it('keeps every accepted requirement uniquely owned with existing runtime evidence', async () => {
     const ids = P3_TEST_MATRIX.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(P3_TEST_MATRIX.length).toBeGreaterThanOrEqual(14);
     expect(P3_TEST_MATRIX.every((row) => row.contractEvidence.length > 0)).toBe(true);
     for (const row of P3_TEST_MATRIX) {
-      if (row.runtimeEvidence.startsWith('pending:')) {
-        expect(row.runtimeEvidence).toBe(`pending:${row.runtimeTask}`);
-        continue;
-      }
+      expect(row.runtimeEvidence).not.toMatch(/^pending:/u);
       await expect(fs.stat(path.join(ROOT, row.runtimeEvidence))).resolves.toBeDefined();
     }
   });

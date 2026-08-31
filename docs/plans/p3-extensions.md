@@ -1,10 +1,10 @@
 # P3：Full Access 与工作区扩展系统
 
-> 状态：In progress / P3-A1–P3-C2 已实现
+> 状态：Accepted / P3-A0–P3-C3 已完成
 >
-> 版本：1.0
+> 版本：1.1
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 1. 目标故事
 
@@ -91,10 +91,10 @@ Web 创建/切换 Full Access 必须确认，之后常驻红色 `FULL ACCESS` �
 | P3-A2 | Manifest、Catalog 与工作区存储（已实现） | A0；与 A1 合并后供 B1/B2/B3 复用 |
 | P3-B1 | Worker Host 与动态 Registry（已实现） | A2 |
 | P3-B2 | 创作规范与七个生命周期工具（已实现） | A1、B1 |
-| P3-B3 | Full Access 与扩展 WebUI | A0、A1、A2，可与 B1 并行 |
-| P3-C1 | CLI/Web/ApplicationService 生产集成 | A1、B2、B3 |
+| P3-B3 | Full Access 与扩展 WebUI（已实现） | A0、A1、A2，可与 B1 并行 |
+| P3-C1 | CLI/Web/ApplicationService 生产集成（已实现） | A1、B2、B3 |
 | P3-C2 | 合成 PDF 演示与可信验收（已实现） | C1 |
-| P3-C3 | 文档、全量质量、双盲与视频收尾 | C2 |
+| P3-C3 | 文档、全量质量、双盲与视频收尾（已完成） | C2 |
 
 A0 后共享类型、Schema、状态机和路由不得由并行分支私自分叉。任何必要变更先形成集成修订。
 

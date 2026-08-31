@@ -178,7 +178,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Web confirmation, persistent Full Access warning, and human extension management use authenticated bounded DTOs',
     contractEvidence: 'docs/web-api.md, docs/web-ui.md',
-    runtimeEvidence: 'pending:P3-B3',
+    runtimeEvidence: 'tests/e2e/web/p3-extensions.spec.ts',
     runtimeTask: 'P3-B3',
   },
   {
@@ -187,7 +187,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Enabled extensions are reusable across sessions and process restarts in one workspace but unavailable in another workspace',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'pending:P3-C1',
+    runtimeEvidence: 'tests/integration/p3-extension-integration.test.ts',
     runtimeTask: 'P3-C1',
   },
   {
@@ -196,7 +196,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Leaving Full Access unregisters dynamic tools at the next model-request boundary without deleting installed files',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'pending:P3-C1',
+    runtimeEvidence: 'tests/unit/extensions/workspace-extension-system.test.ts',
     runtimeTask: 'P3-C1',
   },
   {
@@ -214,7 +214,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'P3 closes only after full quality, privacy, artifact, real-provider, documentation, and two-minute demonstration acceptance',
     contractEvidence: 'docs/plans/p3-acceptance-matrix.md',
-    runtimeEvidence: 'pending:P3-C3',
+    runtimeEvidence: '.github/workflows/ci.yml',
     runtimeTask: 'P3-C3',
   },
 ] as const;

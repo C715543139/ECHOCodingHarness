@@ -9,11 +9,11 @@ corepack prepare pnpm@11.24.0 --activate
 pnpm install --frozen-lockfile
 pnpm build
 
-配置环境变量 ECHO_BASE_URL、ECHO_API_KEY、ECHO_MODEL；API Key 不写入配置文件。运行：
+使用 node .\dist\cli.js config 将 Provider URL、模型和默认安全模式写入 dist/config/echo.config.json；仅 API Key 通过 ECHO_API_KEY 注入，不写入配置文件。运行：
 node .\dist\cli.js run "修复失败测试" --workspace . --safety-mode balanced --non-interactive --no-color
 
-亮点：显式自主循环；工具成功与任务完成分离；工作区隔离、审批、硬拒绝、超时和脱敏集中执行；Windows PowerShell、Unicode 路径和进程树清理有测试；Fake Provider Eval、覆盖率、恶意扫描样本和 Windows CI 形成质量证据。
+亮点：显式自主循环；工具成功与任务完成分离；CLI 与本地 Web 控制台共用应用服务；工作区隔离、审批、Full Access 明确确认、硬拒绝、超时和脱敏集中执行；Agent 可在 Full Access 下创建、自测、检查并热加载当前工作区扩展，跨 Session 复用但不跨工作区；Windows PowerShell、Unicode 路径和进程树清理有测试；Fake Provider Eval、Playwright、覆盖率、恶意扫描样本和 Windows CI 形成质量证据。
 
-演示：先执行 node scripts/demo-reset.mjs，再用 fixtures/demo/prompt.txt 运行固定失败测试项目，连续展示检查、失败测试、定位、apply_patch、复测和完成。
+演示：P3 使用公开合成的 fixtures/p3-pdf-demo。先运行 pnpm p3:demo:reset 与 pnpm p3:demo:baseline，再由 Agent 创建 pdf-reader、读取 PDF 要求、修复失败代码并复测；新 Session 可直接复用扩展。pnpm p3:demo:verify 通过受保护输入哈希和 Harness 外独立测试给出完成证据。
 
-限制：本项目不是操作系统沙箱；已批准的命令仍拥有当前用户权限；不含 Web UI、MCP、多智能体或完整回滚；模型服务会接收上下文投影选取的代码片段；自动扫描不能替代提交前人工双盲复核。
+限制：本项目和扩展 Worker 都不是操作系统沙箱；Full Access 命令仍拥有当前用户权限；不含全局插件市场、远程扩展、OCR、MCP、多智能体或完整回滚；模型服务会接收上下文投影选取的代码片段；自动扫描不能替代提交前人工双盲复核。

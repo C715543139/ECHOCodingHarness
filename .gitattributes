@@ -8,5 +8,6 @@
 *.jpg binary
 *.jpeg binary
 *.png binary
+*.pdf binary
 *.webp binary
 *.zip binary

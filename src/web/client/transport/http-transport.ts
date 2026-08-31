@@ -7,13 +7,15 @@ import type {
   ChatTurnDto,
   DeletedSessionDto,
   DiscoveredModelsDto,
+  ExtensionMutationDto,
+  ExtensionSummaryDto,
   Page,
   ProviderConfigDto,
-  SafetyModeDto,
   SessionSummaryDto,
   SessionViewDto,
   TraceRecordDetailDto,
   TraceRecordDto,
+  UpdateSessionRuntimeRequest,
   WebStreamEvent,
 } from '../../../contracts/web.js';
 import { upsertChatTurn } from '../view-model/chat-projection.js';
@@ -109,6 +111,9 @@ export function createHttpTransport(): WebConsoleTransport {
     resyncRequired: false,
     loadingHistory: true,
     hasMoreSessions: false,
+    extensions: [],
+    extensionsAvailable: false,
+    extensionsLoading: false,
   };
 
   const emit = (patch: Partial<ConsoleSnapshot>): void => {
@@ -156,6 +161,96 @@ export function createHttpTransport(): WebConsoleTransport {
               message,
             },
           }),
+    });
+  };
+
+  const extensionErrorMessage = (error: unknown): string =>
+    apiError(error)?.error.message ?? '扩展管理请求失败，现有状态未改变。';
+
+  const loadExtensions = async (): Promise<void> => {
+    emit({ extensionsLoading: true, extensionError: undefined, extensionNotice: undefined });
+    try {
+      const response =
+        await request<ApiResponse<readonly ExtensionSummaryDto[]>>('/api/v1/extensions');
+      emit({
+        extensions: response.data,
+        extensionsAvailable: true,
+        extensionsLoading: false,
+        extensionError: undefined,
+      });
+    } catch (error) {
+      const parsed = apiError(error);
+      const unavailable =
+        parsed?.error.code === 'NOT_FOUND' ||
+        (parsed?.error.code === 'EXTENSION_INVALID' &&
+          parsed.error.message.includes('unavailable'));
+      emit({
+        extensionsLoading: false,
+        ...(unavailable
+          ? { extensionsAvailable: false, extensions: [] }
+          : {
+              extensionsAvailable: true,
+              extensionError: extensionErrorMessage(error),
+            }),
+      });
+    }
+  };
+
+  const mutateExtension = (
+    extensionId: string,
+    method: 'POST' | 'DELETE',
+    suffix: '' | '/enable' | '/disable',
+  ): void => {
+    run(async () => {
+      emit({
+        extensionPendingId: extensionId,
+        extensionError: undefined,
+        extensionNotice: undefined,
+      });
+      try {
+        const response = await request<ApiResponse<ExtensionMutationDto>>(
+          `/api/v1/extensions/${encodeURIComponent(extensionId)}${suffix}`,
+          { method, body: {} },
+        );
+        const mutation = response.data;
+        let extensions: readonly ExtensionSummaryDto[];
+        if (mutation.state === 'absent') {
+          extensions = snapshot.extensions.filter((extension) => extension.id !== extensionId);
+        } else {
+          const state = mutation.state;
+          extensions = snapshot.extensions.map((extension) =>
+            extension.id === extensionId
+              ? {
+                  ...extension,
+                  state,
+                  loaded: mutation.loaded,
+                  ...(mutation.contentHash === undefined
+                    ? {}
+                    : { contentHash: mutation.contentHash }),
+                  cleanupPending: mutation.cleanupPending,
+                }
+              : extension,
+          );
+        }
+        const notice = mutation.cleanupPending
+          ? '扩展已停用，但物理清理仍待完成。'
+          : mutation.state === 'absent'
+            ? '扩展已卸载。'
+            : mutation.state === 'enabled'
+              ? '扩展已启用。'
+              : '扩展已禁用。';
+        emit({
+          extensions,
+          extensionPendingId: undefined,
+          extensionNotice: notice,
+          extensionError: undefined,
+        });
+      } catch (error) {
+        emit({
+          extensionPendingId: undefined,
+          extensionError: extensionErrorMessage(error),
+        });
+      }
     });
   };
 
@@ -442,6 +537,7 @@ export function createHttpTransport(): WebConsoleTransport {
           providerFieldErrors: undefined,
           providerErrorSummary: undefined,
         });
+        await loadExtensions();
       });
     },
     closeSettings() {
@@ -522,7 +618,7 @@ export function createHttpTransport(): WebConsoleTransport {
         });
       });
     },
-    changeRuntime(update: { readonly model?: string; readonly safetyMode?: SafetyModeDto }) {
+    changeRuntime(update: UpdateSessionRuntimeRequest) {
       const sessionId = snapshot.selectedSessionId;
       if (sessionId === undefined) return;
       run(async () => {
@@ -586,6 +682,18 @@ export function createHttpTransport(): WebConsoleTransport {
     resyncFromSnapshot() {
       const sessionId = snapshot.selectedSessionId;
       if (sessionId !== undefined) run(() => loadSelected(sessionId));
+    },
+    refreshExtensions() {
+      run(loadExtensions);
+    },
+    enableExtension(extensionId) {
+      mutateExtension(extensionId, 'POST', '/enable');
+    },
+    disableExtension(extensionId) {
+      mutateExtension(extensionId, 'POST', '/disable');
+    },
+    uninstallExtension(extensionId) {
+      mutateExtension(extensionId, 'DELETE', '');
     },
   };
 

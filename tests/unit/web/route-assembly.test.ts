@@ -21,6 +21,7 @@ describe('Phase A web assembly', () => {
     expect(routes).toContain("app.get('/api/v1/bootstrap'");
     expect(routes).toContain('registerSessionApiRoutes');
     expect(routes).toContain('registerProviderApiRoutes');
+    expect(routes).toContain('registerExtensionApiRoutes');
     expect(routes).not.toContain('/export');
     expect(main).toContain('createHttpTransport');
     expect(main).not.toContain('createFakeTransport');

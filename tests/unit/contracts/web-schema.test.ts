@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { WEB_BOUNDS, WEB_ERROR_CODES, isValidRequestId } from '../../../src/contracts/web.js';
+import {
+  WEB_BOUNDS,
+  WEB_ERROR_CODES,
+  isValidRequestId,
+  type ExtensionMutationDto,
+  type ExtensionSummaryDto,
+} from '../../../src/contracts/web.js';
 import {
   WEB_JSON_SCHEMAS,
   createApiResponseSchema,
@@ -34,6 +40,10 @@ const BOUNDARY_SCHEMAS = [
   'acceptedApproval',
   'traceRecord',
   'traceRecordDetail',
+  'extensionSummary',
+  'extensionMutation',
+  'extensionListResponse',
+  'extensionMutationResponse',
   'projectionDelta',
   'webStreamEvent',
 ] as const;
@@ -116,6 +126,90 @@ describe('Web JSON Schema freeze', () => {
       validateWebJsonSchema(WEB_JSON_SCHEMAS.deletedSession, {
         sessionId: '../outside',
         stoppedActiveTurn: true,
+      }),
+    ).not.toEqual([]);
+  });
+
+  it('freezes strict bounded extension DTOs and response envelopes', () => {
+    expectTypeOf<ExtensionSummaryDto>().toMatchTypeOf<{
+      readonly id: string;
+      readonly version: string;
+      readonly contentHash: string;
+      readonly state: 'enabled' | 'disabled' | 'quarantined';
+      readonly tools: readonly string[];
+      readonly loaded: boolean;
+      readonly cleanupPending: boolean;
+    }>();
+    expectTypeOf<ExtensionMutationDto>().toMatchTypeOf<{
+      readonly id: string;
+      readonly state: 'enabled' | 'disabled' | 'quarantined' | 'absent';
+      readonly loaded: boolean;
+      readonly changed: boolean;
+      readonly cleanupPending: boolean;
+      readonly contentHash?: string;
+      readonly deactivated?: boolean;
+    }>();
+
+    const summary = {
+      id: 'pdf-reader',
+      version: '1.2.3',
+      contentHash: `sha256:${'a'.repeat(64)}`,
+      state: 'enabled',
+      tools: ['read_pdf'],
+      loaded: true,
+      cleanupPending: false,
+    };
+    const mutation = {
+      id: 'pdf-reader',
+      state: 'disabled',
+      loaded: false,
+      changed: true,
+      cleanupPending: false,
+      contentHash: `sha256:${'a'.repeat(64)}`,
+      deactivated: true,
+    };
+    expect(validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionSummary, summary)).toEqual([]);
+    expect(validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionMutation, mutation)).toEqual([]);
+    const missingCleanup: Record<string, unknown> = { ...summary };
+    Reflect.deleteProperty(missingCleanup, 'cleanupPending');
+    expect(validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionSummary, missingCleanup)).not.toEqual(
+      [],
+    );
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionListResponse, {
+        data: [summary],
+        requestId: REQUEST_ID,
+      }),
+    ).toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionMutationResponse, {
+        data: mutation,
+        requestId: REQUEST_ID,
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionSummary, {
+        ...summary,
+        sourcePath: 'C:\\Users\\private-user\\extension.mjs',
+      }),
+    ).not.toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionSummary, {
+        ...summary,
+        tools: Array.from({ length: WEB_BOUNDS.extensionToolsMax + 1 }, () => 'read_pdf'),
+      }),
+    ).not.toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionSummary, {
+        ...summary,
+        quarantineReason: repeat(WEB_BOUNDS.extensionQuarantineReasonMax + 1),
+      }),
+    ).not.toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.extensionMutation, {
+        ...mutation,
+        state: 'removed',
       }),
     ).not.toEqual([]);
   });
@@ -437,6 +531,15 @@ describe('Web JSON Schema freeze', () => {
     expect(WEB_ERROR_CODES).toContain('IDEMPOTENCY_CONFLICT');
     expect(WEB_ERROR_CODES).toContain('TURN_ACTIVE');
     expect(WEB_ERROR_CODES).toContain('RESYNC_REQUIRED');
+    expect(WEB_ERROR_CODES).toEqual(
+      expect.arrayContaining([
+        'EXTENSION_NOT_FOUND',
+        'EXTENSION_BUSY',
+        'EXTENSION_INVALID',
+        'EXTENSION_QUARANTINED',
+        'EXTENSION_CLEANUP_PENDING',
+      ]),
+    );
     expect(
       validateWebJsonSchema(WEB_JSON_SCHEMAS.apiErrorResponse, {
         error: {

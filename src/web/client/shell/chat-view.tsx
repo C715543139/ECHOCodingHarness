@@ -12,12 +12,13 @@ import {
   type WebConsoleView,
 } from '../view-model/console-controller.js';
 import { ApprovalCard } from './approval-card.js';
+import { FullAccessDialog } from './full-access-dialog.js';
 import { Glyph } from './glyph.js';
 import { TOOL_SUMMARY_LABELS } from './labels.js';
 import { MarkdownMessage } from './markdown-message.js';
 import styles from './shell.module.css';
 
-const SAFETY_MODES = ['safe', 'balanced', 'auto'] as const;
+const SAFETY_MODES = ['safe', 'balanced', 'auto', 'full-access'] as const;
 
 function blockedMessageFor(
   reason: RuntimeCapabilitiesDto['submitTurnBlockedReason'],
@@ -88,6 +89,8 @@ export function ChatView({
   const [followTail, setFollowTail] = useState(true);
   const [hasNewContent, setHasNewContent] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmFullAccess, setConfirmFullAccess] = useState(false);
+  const safetySelectRef = useRef<HTMLSelectElement>(null);
   const wired = hasWebConsoleActions(actions);
 
   useLayoutEffect(() => {
@@ -336,10 +339,15 @@ export function ChatView({
                 disabled={!capabilities.canChangeRuntime || !wired}
                 onChange={(event) => {
                   const mode = SAFETY_MODES.find((item) => item === event.target.value);
+                  if (mode === 'full-access') {
+                    setConfirmFullAccess(true);
+                    return;
+                  }
                   if (mode !== undefined) {
                     actions?.changeRuntime({ safetyMode: mode });
                   }
                 }}
+                ref={safetySelectRef}
                 value={session.safetyMode}
               >
                 {SAFETY_MODES.map((mode) => (
@@ -362,6 +370,21 @@ export function ChatView({
       <div aria-live="polite" className={styles.live}>
         {liveAnnouncement(turns, pending !== undefined)}
       </div>
+      {confirmFullAccess ? (
+        <FullAccessDialog
+          onCancel={() => {
+            setConfirmFullAccess(false);
+          }}
+          onConfirm={() => {
+            setConfirmFullAccess(false);
+            actions?.changeRuntime({
+              safetyMode: 'full-access',
+              fullAccessConfirmation: { acceptedRisk: true },
+            });
+          }}
+          returnFocusTo={safetySelectRef.current}
+        />
+      ) : null}
     </>
   );
 }

@@ -106,12 +106,18 @@ describe('HTTP Web console transport', () => {
 
   it('bootstraps, loads projections, executes commands, and applies SSE deltas', async () => {
     const calls: string[] = [];
+    const bodies: { readonly call: string; readonly body: string | undefined }[] = [];
+    let extensionState: 'enabled' | 'disabled' | 'absent' = 'enabled';
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const method = init?.method ?? 'GET';
         calls.push(`${method} ${url}`);
+        bodies.push({
+          call: `${method} ${url}`,
+          body: typeof init?.body === 'string' ? init.body : undefined,
+        });
         if (url === '/api/v1/auth/bootstrap') return new Response(null, { status: 204 });
         if (url === '/api/v1/bootstrap')
           return json({ data: bootstrap, requestId: 'request-bootstrap-1' });
@@ -163,6 +169,65 @@ describe('HTTP Web console transport', () => {
         }
         if (url === '/api/v1/provider' && method === 'PUT') {
           return json({ data: provider, requestId: 'request-provider-2' });
+        }
+        if (url === '/api/v1/extensions' && method === 'GET') {
+          return json({
+            data:
+              extensionState === 'absent'
+                ? []
+                : [
+                    {
+                      id: 'pdf-reader',
+                      version: '1.0.0',
+                      contentHash: `sha256:${'a'.repeat(64)}`,
+                      state: extensionState,
+                      tools: ['read_pdf'],
+                      loaded: extensionState === 'enabled',
+                      cleanupPending: false,
+                    },
+                  ],
+            requestId: 'request-extensions-1',
+          });
+        }
+        if (url === '/api/v1/extensions/pdf-reader/disable') {
+          extensionState = 'disabled';
+          return json({
+            data: {
+              id: 'pdf-reader',
+              state: extensionState,
+              loaded: false,
+              changed: true,
+              cleanupPending: false,
+            },
+            requestId: 'request-extension-disable',
+          });
+        }
+        if (url === '/api/v1/extensions/pdf-reader/enable') {
+          extensionState = 'enabled';
+          return json({
+            data: {
+              id: 'pdf-reader',
+              state: extensionState,
+              loaded: true,
+              changed: true,
+              cleanupPending: false,
+            },
+            requestId: 'request-extension-enable',
+          });
+        }
+        if (url === '/api/v1/extensions/pdf-reader' && method === 'DELETE') {
+          extensionState = 'absent';
+          return json({
+            data: {
+              id: 'pdf-reader',
+              state: extensionState,
+              loaded: false,
+              changed: true,
+              cleanupPending: false,
+              deactivated: true,
+            },
+            requestId: 'request-extension-uninstall',
+          });
         }
         if (url === '/api/v1/provider/discover') {
           return json({
@@ -225,6 +290,18 @@ describe('HTTP Web console transport', () => {
     transport.openSettings();
     await vi.waitFor(() => {
       expect(transport.getSnapshot().settingsOpen).toBe(true);
+      expect(transport.getSnapshot().extensions[0]?.id).toBe('pdf-reader');
+    });
+    transport.disableExtension('pdf-reader');
+    await vi.waitFor(() => {
+      expect(transport.getSnapshot().extensions[0]).toMatchObject({
+        state: 'disabled',
+        loaded: false,
+      });
+    });
+    transport.enableExtension('pdf-reader');
+    await vi.waitFor(() => {
+      expect(transport.getSnapshot().extensions[0]?.state).toBe('enabled');
     });
     transport.discoverModels();
     await vi.waitFor(() => {
@@ -254,9 +331,24 @@ describe('HTTP Web console transport', () => {
       expect(transport.getSnapshot().lastCommandError).toMatchObject({ code: 'NOT_FOUND' });
     });
     expect(transport.getSnapshot().connection).toBe('connected');
-    transport.changeRuntime({ safetyMode: 'safe' });
+    transport.changeRuntime({
+      safetyMode: 'full-access',
+      fullAccessConfirmation: { acceptedRisk: true },
+    });
     await vi.waitFor(() => {
       expect(calls.some((call) => call === 'PATCH /api/v1/sessions/session-1/runtime')).toBe(true);
+    });
+    expect(
+      bodies.find((entry) => entry.call === 'PATCH /api/v1/sessions/session-1/runtime')?.body,
+    ).toBe(
+      JSON.stringify({
+        safetyMode: 'full-access',
+        fullAccessConfirmation: { acceptedRisk: true },
+      }),
+    );
+    transport.uninstallExtension('pdf-reader');
+    await vi.waitFor(() => {
+      expect(transport.getSnapshot().extensions).toEqual([]);
     });
     transport.createSession();
     await vi.waitFor(() => {

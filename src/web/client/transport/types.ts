@@ -2,12 +2,13 @@ import type {
   ApprovalChoiceDto,
   BootstrapDto,
   ChatTurnDto,
+  ExtensionSummaryDto,
   ProviderConfigDto,
-  SafetyModeDto,
   SessionRuntimeDto,
   SessionSummaryDto,
   TraceRecordDetailDto,
   TraceRecordDto,
+  UpdateSessionRuntimeRequest,
   WebErrorCode,
 } from '../../../contracts/web.js';
 
@@ -41,6 +42,12 @@ export interface ConsoleSnapshot {
   readonly providerErrorSummary?: string | undefined;
   readonly approvalError?: string | undefined;
   readonly lastDiscoveredAt?: string | undefined;
+  readonly extensions: readonly ExtensionSummaryDto[];
+  readonly extensionsAvailable: boolean;
+  readonly extensionsLoading: boolean;
+  readonly extensionPendingId?: string | undefined;
+  readonly extensionError?: string | undefined;
+  readonly extensionNotice?: string | undefined;
 }
 
 export interface WebConsoleTransport {
@@ -60,9 +67,13 @@ export interface WebConsoleTransport {
   cancelTurn(): void;
   setProviderDraft(draft: ProviderConfigDto): void;
   saveProviderDraft(): void;
-  changeRuntime(update: { readonly model?: string; readonly safetyMode?: SafetyModeDto }): void;
+  changeRuntime(update: UpdateSessionRuntimeRequest): void;
   respondToApproval(decision: ApprovalChoiceDto): void;
   discoverModels(): void;
   loadMoreSessions(): void;
   resyncFromSnapshot(): void;
+  refreshExtensions(): void;
+  enableExtension(extensionId: string): void;
+  disableExtension(extensionId: string): void;
+  uninstallExtension(extensionId: string): void;
 }

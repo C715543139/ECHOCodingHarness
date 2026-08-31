@@ -11,6 +11,13 @@ export {
 } from './create-web-server.js';
 export { registerWebRoutes, type WebRouteDependencies } from './register-routes.js';
 export {
+  ExtensionAdministrationError,
+  registerExtensionApiRoutes,
+  type ExtensionAdministrationErrorCode,
+  type ExtensionAdministrationPort,
+  type ExtensionApiDependencies,
+} from './extension-api.js';
+export {
   registerSessionApiRoutes,
   type SessionApiDependencies,
   type SessionApiState,

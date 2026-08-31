@@ -19,6 +19,7 @@ import {
   toProviderDto,
 } from './http.js';
 import { registerProviderApiRoutes } from './provider-api.js';
+import { registerExtensionApiRoutes, type ExtensionAdministrationPort } from './extension-api.js';
 import { registerSessionApiRoutes, type SessionApiDependencies } from './session-api.js';
 
 export interface WebAdapterState {
@@ -36,6 +37,7 @@ export interface WebRouteDependencies {
   readonly assetRoot: string | undefined;
   readonly state: WebAdapterState;
   readonly sessionApi: Omit<SessionApiDependencies, 'state' | 'heartbeatIntervalMs'>;
+  readonly extensionAdministration?: ExtensionAdministrationPort;
 }
 
 export async function registerWebRoutes(
@@ -117,6 +119,18 @@ export async function registerWebRoutes(
     ...deps.sessionApi,
     state,
     heartbeatIntervalMs,
+  });
+  registerExtensionApiRoutes(app, {
+    ...(deps.extensionAdministration === undefined
+      ? {}
+      : { administration: deps.extensionAdministration }),
+    redaction: {
+      workspaceRoot: deps.sessionApi.workspaceRoot,
+      ...(deps.sessionApi.secrets === undefined ? {} : { secrets: deps.sessionApi.secrets }),
+      ...(deps.sessionApi.homeDirectory === undefined
+        ? {}
+        : { homeDirectory: deps.sessionApi.homeDirectory }),
+    },
   });
 
   app.setNotFoundHandler((request, reply) => {

@@ -1,6 +1,7 @@
 import type {
   ApprovalRequestDto,
   ChatTurnDto,
+  ExtensionSummaryDto,
   ProviderConfigDto,
   RuntimeCapabilitiesDto,
   SessionRuntimeDto,
@@ -40,6 +41,20 @@ export interface FakeTransportOptions {
   readonly pendingApproval?: ApprovalRequestDto;
   readonly loadingHistory?: boolean;
   readonly resyncRequired?: boolean;
+  readonly extensions?: readonly ExtensionSummaryDto[];
+  readonly extensionsAvailable?: boolean;
+  readonly extensionFailure?: {
+    readonly action: 'enable' | 'disable' | 'uninstall';
+    readonly code: Extract<
+      WebErrorCode,
+      | 'EXTENSION_NOT_FOUND'
+      | 'EXTENSION_BUSY'
+      | 'EXTENSION_INVALID'
+      | 'EXTENSION_QUARANTINED'
+      | 'EXTENSION_CLEANUP_PENDING'
+    >;
+    readonly message: string;
+  };
 }
 
 export interface FakeTransport extends WebConsoleTransport {
@@ -251,6 +266,7 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
   const pageSize = options.sessionPageSize ?? DEFAULT_PAGE_SIZE;
   let visibleCount = pageSize;
   let allSessions = [...(options.sessions ?? [])];
+  let extensions = [...(options.extensions ?? [])];
   const connection = options.connection ?? 'connected';
   const turnScript = options.turnScript ?? 'complete';
   const discoverableModels = options.discoverableModels ?? DEFAULT_DISCOVERABLE;
@@ -333,6 +349,9 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
     resyncRequired: options.resyncRequired ?? false,
     loadingHistory: options.loadingHistory ?? false,
     hasMoreSessions: allSessions.length > visibleCount,
+    extensions,
+    extensionsAvailable: options.extensionsAvailable ?? true,
+    extensionsLoading: false,
     bootstrap: {
       workspace: DEFAULT_WORKSPACE,
       provider: savedProvider,
@@ -702,6 +721,13 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
       if (selectedId === undefined) {
         return;
       }
+      if (
+        update.safetyMode === 'full-access' &&
+        update.fullAccessConfirmation?.acceptedRisk !== true
+      ) {
+        commandError('INVALID_REQUEST', 'Full Access 需要明确风险确认。');
+        return;
+      }
       replaceSessions(
         allSessions.map((session) =>
           session.id === selectedId
@@ -840,6 +866,63 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
         chatTurns: chatsFor(snapshot.selectedSessionId),
         lastCommandError: undefined,
       });
+    },
+    refreshExtensions(): void {
+      replace({
+        extensions: [...extensions],
+        extensionsLoading: false,
+        extensionError: undefined,
+      });
+    },
+    enableExtension(extensionId): void {
+      if (options.extensionFailure?.action === 'enable') {
+        replace({
+          extensionError: options.extensionFailure.message,
+          lastCommandError: {
+            code: options.extensionFailure.code,
+            message: options.extensionFailure.message,
+          },
+        });
+        return;
+      }
+      extensions = extensions.map((extension) =>
+        extension.id === extensionId
+          ? { ...extension, state: 'enabled' as const, loaded: true }
+          : extension,
+      );
+      replace({ extensions, extensionError: undefined, extensionNotice: '扩展已启用。' });
+    },
+    disableExtension(extensionId): void {
+      if (options.extensionFailure?.action === 'disable') {
+        replace({
+          extensionError: options.extensionFailure.message,
+          lastCommandError: {
+            code: options.extensionFailure.code,
+            message: options.extensionFailure.message,
+          },
+        });
+        return;
+      }
+      extensions = extensions.map((extension) =>
+        extension.id === extensionId
+          ? { ...extension, state: 'disabled' as const, loaded: false }
+          : extension,
+      );
+      replace({ extensions, extensionError: undefined, extensionNotice: '扩展已禁用。' });
+    },
+    uninstallExtension(extensionId): void {
+      if (options.extensionFailure?.action === 'uninstall') {
+        replace({
+          extensionError: options.extensionFailure.message,
+          lastCommandError: {
+            code: options.extensionFailure.code,
+            message: options.extensionFailure.message,
+          },
+        });
+        return;
+      }
+      extensions = extensions.filter((extension) => extension.id !== extensionId);
+      replace({ extensions, extensionError: undefined, extensionNotice: '扩展已卸载。' });
     },
   };
 

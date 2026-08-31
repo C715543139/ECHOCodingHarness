@@ -55,6 +55,12 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
     fieldErrors: snapshot.providerFieldErrors,
     errorSummary: snapshot.providerErrorSummary,
     approvalError: snapshot.approvalError,
+    extensions: snapshot.extensions,
+    extensionsAvailable: snapshot.extensionsAvailable,
+    extensionsLoading: snapshot.extensionsLoading,
+    extensionPendingId: snapshot.extensionPendingId,
+    extensionError: snapshot.extensionError,
+    extensionNotice: snapshot.extensionNotice,
   };
 
   useEffect(() => {
@@ -108,7 +114,12 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
       />
       <div className={styles.workspace}>
         <header className={styles.topBar}>
-          <h1 className={styles.sessionHeading}>{selected?.title ?? '未选择 Session'}</h1>
+          <div className={styles.sessionIdentity}>
+            <h1 className={styles.sessionHeading}>{selected?.title ?? '未选择 Session'}</h1>
+            {snapshot.selectedRuntime?.safetyMode === 'full-access' ? (
+              <span className={styles.fullAccessBadge}>FULL ACCESS</span>
+            ) : null}
+          </div>
           <div aria-label="视图" className={styles.viewSwitch} role="group">
             <button
               aria-current={snapshot.view === 'chat'}

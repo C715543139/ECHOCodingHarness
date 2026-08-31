@@ -26,6 +26,8 @@ export const WEB_SCENARIO_NAMES = [
   'provider-secret',
   'large-trace',
   'keyboard',
+  'p3-extensions',
+  'p3-full-access',
 ] as const;
 
 export type WebScenarioName = (typeof WEB_SCENARIO_NAMES)[number];
@@ -234,6 +236,31 @@ export function createWebScenarioTransport(name: WebScenarioName): FakeTransport
         sessions: [createIdleSession()],
         selectedSessionId: 'ses_idle',
       });
+    case 'p3-extensions': {
+      const session = createIdleSession({ safetyMode: 'safe' });
+      return createFakeTransport({
+        sessions: [session],
+        selectedSessionId: session.id,
+        extensions: [
+          {
+            id: 'pdf-reader',
+            version: '1.0.0',
+            contentHash: `sha256:${'b'.repeat(64)}`,
+            state: 'enabled',
+            tools: ['read_pdf', 'pdf_metadata'],
+            loaded: true,
+            cleanupPending: false,
+          },
+        ],
+      });
+    }
+    case 'p3-full-access': {
+      const session = createIdleSession({ safetyMode: 'full-access' });
+      return createFakeTransport({
+        sessions: [session],
+        selectedSessionId: session.id,
+      });
+    }
   }
 }
 

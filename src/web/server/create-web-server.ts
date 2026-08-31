@@ -27,6 +27,7 @@ import {
 } from './http.js';
 import { createProductionRuntime } from './production-runtime.js';
 import { registerWebRoutes, type WebAdapterState } from './register-routes.js';
+import type { ExtensionAdministrationPort } from './extension-api.js';
 
 export {
   WEB_ASSET_SUBDIRECTORY,
@@ -44,6 +45,7 @@ export interface CreateWebServerOptions {
   readonly env?: Record<string, string | undefined>;
   readonly configService?: ProviderConfigService;
   readonly heartbeatIntervalMs?: number;
+  readonly extensionAdministration?: ExtensionAdministrationPort;
 }
 
 export interface StartedWebServer {
@@ -187,6 +189,9 @@ export async function createWebServer(options: CreateWebServerOptions): Promise<
     assetRoot: options.assetRoot,
     state,
     sessionApi: runtime.sessionApi,
+    ...(options.extensionAdministration === undefined
+      ? {}
+      : { extensionAdministration: options.extensionAdministration }),
   });
 
   await app.listen({ host: WEB_SERVER_HOST, port });

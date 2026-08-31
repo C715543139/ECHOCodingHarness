@@ -650,10 +650,39 @@ POST /api/v1/extensions/:extensionId/disable
 DELETE /api/v1/extensions/:extensionId
 ```
 
-GET 返回当前工作区的有界 `ExtensionSummaryDto[]`：ID、版本、contentHash、
-`enabled|disabled|quarantined`、工具名、loaded、可选脱敏 quarantineReason 与 cleanupPending。三个改变
-状态的请求体均为 `{}`，使用既有 Cookie、Origin、Host、content-type 和 requestId 幂等契约。人类
-Web 管理不要求当前 Session 为 Full Access；活动扩展调用返回 `409 EXTENSION_BUSY`。稳定增量错误码
-包括 `EXTENSION_NOT_FOUND`、`EXTENSION_BUSY`、`EXTENSION_INVALID`、`EXTENSION_QUARANTINED` 与
-`EXTENSION_CLEANUP_PENDING`。Web 不提供 staging 编写、检查或安装端点；这些由 Full Access 下的
-Agent 生命周期工具完成。
+成功响应使用以下唯一 Web DTO；它们定义在 `src/contracts/web.ts`，不复制 Catalog 或生命周期状态机：
+
+```ts
+interface ExtensionSummaryDto {
+  readonly id: string;
+  readonly version: string;
+  readonly contentHash: string;
+  readonly state: 'enabled' | 'disabled' | 'quarantined';
+  readonly tools: readonly string[];
+  readonly loaded: boolean;
+  readonly quarantineReason?: string;
+  readonly cleanupPending: boolean;
+}
+
+interface ExtensionMutationDto {
+  readonly id: string;
+  readonly state: 'enabled' | 'disabled' | 'quarantined' | 'absent';
+  readonly loaded: boolean;
+  readonly changed: boolean;
+  readonly cleanupPending: boolean;
+  readonly contentHash?: string;
+  readonly deactivated?: boolean;
+}
+```
+
+`GET /api/v1/extensions` 返回 `ApiResponse<readonly ExtensionSummaryDto[]>`；enable、disable 和 DELETE
+统一返回 `ApiResponse<ExtensionMutationDto>`。所有响应都经过严格有界 Schema 校验：扩展列表、工具
+数量、标识符、版本、哈希和隔离原因均有上限，未知字段被拒绝。三个改变状态的请求体均为 `{}`，使用
+既有 Cookie、Origin、Host、content-type 和 requestId 幂等契约。
+
+人类 Web 管理不要求当前 Session 为 Full Access；活动扩展调用返回 `409 EXTENSION_BUSY`。稳定增量
+错误码包括 `EXTENSION_NOT_FOUND`、`EXTENSION_BUSY`、`EXTENSION_INVALID`、
+`EXTENSION_QUARANTINED` 与 `EXTENSION_CLEANUP_PENDING`。B3 服务端只依赖可注入的
+`ExtensionAdministrationPort`；未装配时 GET 和变更端点稳定返回 `503 EXTENSION_INVALID`，客户端隐藏
+扩展导航，真实 Catalog/Store 生命周期接线由 C1 完成。Web 不读取扩展目录推断状态，也不提供 staging
+编写、检查或安装端点；这些由 Full Access 下的 Agent 生命周期工具完成。

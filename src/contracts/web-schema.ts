@@ -409,6 +409,78 @@ const DELETED_SESSION_SCHEMA = {
   },
 } as const;
 
+const EXTENSION_ID_SCHEMA = {
+  type: 'string',
+  minLength: 1,
+  maxLength: B.extensionIdMax,
+  pattern: '^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$',
+} as const;
+
+const EXTENSION_VERSION_SCHEMA = {
+  type: 'string',
+  minLength: 5,
+  maxLength: B.extensionVersionMax,
+  pattern: '^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)$',
+} as const;
+
+const EXTENSION_CONTENT_HASH_SCHEMA = {
+  type: 'string',
+  pattern: '^sha256:[a-f0-9]{64}$',
+} as const;
+
+const EXTENSION_TOOL_NAME_SCHEMA = {
+  type: 'string',
+  minLength: 1,
+  maxLength: B.extensionToolNameMax,
+  pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$',
+} as const;
+
+const EXTENSION_SUMMARY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'version', 'contentHash', 'state', 'tools', 'loaded', 'cleanupPending'],
+  properties: {
+    id: EXTENSION_ID_SCHEMA,
+    version: EXTENSION_VERSION_SCHEMA,
+    contentHash: EXTENSION_CONTENT_HASH_SCHEMA,
+    state: { type: 'string', enum: ['enabled', 'disabled', 'quarantined'] },
+    tools: {
+      type: 'array',
+      minItems: 1,
+      maxItems: B.extensionToolsMax,
+      items: EXTENSION_TOOL_NAME_SCHEMA,
+    },
+    loaded: { type: 'boolean' },
+    quarantineReason: {
+      type: 'string',
+      minLength: 1,
+      maxLength: B.extensionQuarantineReasonMax,
+    },
+    cleanupPending: { type: 'boolean' },
+  },
+} as const;
+
+const EXTENSION_MUTATION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'state', 'loaded', 'changed', 'cleanupPending'],
+  properties: {
+    id: EXTENSION_ID_SCHEMA,
+    state: { type: 'string', enum: ['enabled', 'disabled', 'quarantined', 'absent'] },
+    loaded: { type: 'boolean' },
+    changed: { type: 'boolean' },
+    cleanupPending: { type: 'boolean' },
+    contentHash: EXTENSION_CONTENT_HASH_SCHEMA,
+    deactivated: { type: 'boolean' },
+  },
+} as const;
+
+const EXTENSION_LIST_SCHEMA = {
+  type: 'array',
+  maxItems: B.extensionEntriesMax,
+  items: EXTENSION_SUMMARY_SCHEMA,
+} as const;
+
 const APPROVAL_DECISION_REQUEST_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -636,6 +708,10 @@ export const WEB_JSON_SCHEMAS = {
   acceptedTurn: ACCEPTED_TURN_SCHEMA,
   acceptedCancellation: ACCEPTED_CANCELLATION_SCHEMA,
   deletedSession: DELETED_SESSION_SCHEMA,
+  extensionSummary: EXTENSION_SUMMARY_SCHEMA,
+  extensionMutation: EXTENSION_MUTATION_SCHEMA,
+  extensionListResponse: createApiResponseSchema(EXTENSION_LIST_SCHEMA),
+  extensionMutationResponse: createApiResponseSchema(EXTENSION_MUTATION_SCHEMA),
   approvalDecisionRequest: APPROVAL_DECISION_REQUEST_SCHEMA,
   acceptedApproval: ACCEPTED_APPROVAL_SCHEMA,
   traceRecord: TRACE_RECORD_SCHEMA,

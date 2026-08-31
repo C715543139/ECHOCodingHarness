@@ -160,7 +160,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'lifecycle',
     requirement: 'The seven lifecycle tools implement the frozen state transitions and idempotency',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'pending:P3-B2',
+    runtimeEvidence: 'tests/unit/extensions/lifecycle.test.ts',
     runtimeTask: 'P3-B2',
   },
   {
@@ -169,7 +169,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Busy extensions are not disabled or uninstalled; incomplete physical deletion is reported as cleanup pending',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'pending:P3-B2',
+    runtimeEvidence: 'tests/unit/extensions/lifecycle.test.ts',
     runtimeTask: 'P3-B2',
   },
   {

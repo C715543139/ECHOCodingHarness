@@ -1,6 +1,6 @@
 # P3 需求、测试与验收证据矩阵
 
-> 状态：In progress / P3-A1、P3-A2 与 P3-B1 runtime evidence recorded
+> 状态：In progress / P3-A1、P3-A2、P3-B1 与 P3-B2 runtime evidence recorded
 >
 > 最后更新：2026-08-31
 
@@ -21,8 +21,8 @@
 | EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Implemented — `tests/unit/extensions/manifest.test.ts`, `tests/unit/extensions/content-hash.test.ts`, `tests/unit/extensions/catalog.test.ts` |
 | WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Implemented — `tests/unit/extensions/worker-host.test.ts` |
 | WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Implemented — `tests/unit/tools/tool-registry.test.ts`, `tests/unit/extensions/worker-host.test.ts` |
-| LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Planned |
-| LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Planned |
+| LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
+| LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
 | WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Planned |
 | INT-01 | 集成 | 同工作区复用、跨工作区隔离 | P3-C1 | Planned |
 | INT-02 | 集成 | 离开 Full Access 卸载但不删除 | P3-C1 | Planned |

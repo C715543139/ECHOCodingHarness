@@ -46,6 +46,25 @@ export class ExtensionWorkerError extends Error {
   }
 }
 
+export type ExtensionLifecycleErrorCode =
+  | 'ALREADY_EXISTS'
+  | 'EXTENSION_NOT_FOUND'
+  | 'EXTENSION_CHECK_FAILED'
+  | 'EXTENSION_BUSY'
+  | 'EXTENSION_INSTALL_FAILED'
+  | 'EXTENSION_CLEANUP_PENDING'
+  | 'EXTENSION_OPERATION_CANCELLED';
+
+export class ExtensionLifecycleError extends Error {
+  readonly code: ExtensionLifecycleErrorCode;
+
+  constructor(code: ExtensionLifecycleErrorCode, message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = 'ExtensionLifecycleError';
+    this.code = code;
+  }
+}
+
 export function isFileSystemError(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }

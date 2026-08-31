@@ -405,7 +405,7 @@ P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提�
 工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
 Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。
 
-## 18. P3 增量架构（A1/A2/B1 已实现）
+## 18. P3 增量架构（A1/A2/B1/B2 已实现）
 
 P3 在现有 ApplicationService、Agent Loop 和 ToolRegistry 之间增加 `ExtensionManager`。它以固定
 `workspaceRoot` 解析 `.echo/extensions/catalog.json`，在已确认 Full Access 时启动 enabled 扩展的
@@ -430,3 +430,9 @@ Full Access 只放开 Central Safety Policy 的授权结论；输入校验、工
 清理继续存在。内置文件工具保持工作区相对路径，广泛访问通过 `run_command` 完成。Worker 是崩溃与
 生命周期隔离，不是 OS 沙箱。Session 事件继续使用现有 `safety.changed` 与工具事件；扩展安装状态由
 工作区 Catalog 持有，不复制进每个 Session JSONL。
+
+P3-B2 的 `ExtensionLifecycleManager` 串行化同一工作区的状态转换，以 Catalog revision 作为持久事实，
+以 `ExtensionRuntimeManager` 作为进程内加载事实。`extension_check` 只读取 staging、启动一次性 Worker
+并运行凭据隔离的有界自测；`extension_install` 再次取快照，经临时目录、哈希复验和 Worker 握手后才
+替换 Catalog 与 Registry。七个定义由 `createExtensionLifecycleTools()` 单独提供，P3-C1 仅在已确认
+Full Access 的模型请求边界注册，不把生命周期逻辑复制进 CLI、Web 或 ApplicationService。

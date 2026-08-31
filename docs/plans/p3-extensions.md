@@ -1,6 +1,6 @@
 # P3：Full Access 与工作区扩展系统
 
-> 状态：In progress / P3-A1、P3-A2 与 P3-B1 已实现
+> 状态：In progress / P3-A1、P3-A2、P3-B1 与 P3-B2 已实现
 >
 > 版本：1.0
 >
@@ -90,7 +90,7 @@ Web 创建/切换 Full Access 必须确认，之后常驻红色 `FULL ACCESS` �
 | P3-A1 | Full Access 授权、策略、CLI/领域运行时（已实现） | A0 |
 | P3-A2 | Manifest、Catalog 与工作区存储（已实现） | A0；与 A1 合并后供 B1/B2/B3 复用 |
 | P3-B1 | Worker Host 与动态 Registry（已实现） | A2 |
-| P3-B2 | 创作规范与七个生命周期工具 | A1、B1 |
+| P3-B2 | 创作规范与七个生命周期工具（已实现） | A1、B1 |
 | P3-B3 | Full Access 与扩展 WebUI | A0、A1、A2，可与 B1 并行 |
 | P3-C1 | CLI/Web/ApplicationService 生产集成 | A1、B2、B3 |
 | P3-C2 | 合成 PDF 演示与可信验收 | C1 |

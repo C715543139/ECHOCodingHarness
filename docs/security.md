@@ -413,3 +413,14 @@ B1 Worker 使用独立 V8 isolate 和有界内存配置，但这不是 OS 沙箱
 超过短宽限期仍未结束则终止 Worker、原子注销该扩展的全部动态工具并通知上层持久化 `quarantined`。
 业务异常只形成有界 `EXTENSION_HANDLER_FAILED`，不会自动隔离。活动调用期间 Runtime Manager 拒绝
 卸载，避免 Registry 与仍在执行的 handler 所有权分离。
+
+B2 的 staging 自测通过独立 Node 子进程执行，只继承与 Worker 相同类别的系统、路径、临时目录和区域
+允许列表，不继承 `ECHO_API_KEY` 或其他宿主秘密；自测有 15 秒时间和 16 KiB 聚合输出上限。检查通过
+只证明 Manifest、文件快照、命名、Worker 初始化、handler 对应和作者自测按契约成功，不代表 Harness
+证明了扩展业务逻辑绝对正确。安装前重新快照并复验 SHA-256，复制过程拒绝链接且在原子 rename 前再次
+哈希，避免把检查结果当作之后可重放的授权。
+
+生命周期操作按工作区串行，Catalog 仍是唯一持久事实；Worker 崩溃、协议违规或不协作的超时先同步
+注销 Registry，再通过同一管理器持久化 `quarantined`。卸载对整个扩展 ID 生效，不提供单工具删除。
+Catalog 移除后如目录移动或物理删除失败，结果明确标为 `deactivated`、`cleanupPending=true`，后续同 ID
+卸载可幂等重试遗留 trash，不从目录反向重建 Catalog。

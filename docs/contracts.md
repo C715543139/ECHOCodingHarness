@@ -729,3 +729,12 @@ P3-B1 的 `ExtensionWorkerHost` 使用独立 Node Worker 和严格的 `initializ
 `ToolRegistry.registerExtension()` 在发布前一次性检查整组名称，任何内置、动态或组内冲突都使注册原子
 失败。`definitions()` 每次返回新的定义快照，因此当前模型请求不受中途注册影响，下一次请求自然看到
 新增工具。按扩展注销会一次移除其全部工具；活动调用使生命周期卸载返回 `EXTENSION_BUSY`。
+
+P3-B2 将七个管理工具实现为同一 `ExtensionLifecycleManager` 的薄适配器。`extension_init` 以临时目录
+生成 Manifest、入口、自测和完整 `AUTHORING.md` 后原子 rename，目标已存在时返回
+`EXTENSION_ALREADY_EXISTS` 且不覆盖。`extension_check` 的 `failed` 是结构化检查结论，不写 Catalog、
+不加载工具；安装必须在同一操作中重新检查并确认内容哈希未变化。安装和启用只有在 Worker 握手、
+Registry 注册及 Catalog 写入全部成功后才返回 enabled；相同哈希、重复目标状态和重复卸载保持幂等。
+disable/uninstall 遇到活动调用返回 `EXTENSION_BUSY`。卸载先停用并原子移除 Catalog，再将该 ID 的
+staging、所有安装版本和遗留 trash 项移动/清理；物理删除失败只返回 `deactivated` 与
+`cleanupPending=true`，不得声称完全删除。

@@ -2,9 +2,9 @@
 
 > 状态：Accepted
 >
-> 版本：1.7
+> 版本：1.8
 >
-> 最后更新：2026-08-30
+> 最后更新：2026-08-31
 
 ## 1. 文档目的
 
@@ -432,13 +432,14 @@ interface SessionRepository extends SessionStore {
   list(workspaceRoot: string): Promise<readonly SessionSummary[]>;
   readAll(sessionId: SessionId): Promise<readonly EchoEvent[]>;
   getQueryView(sessionId: SessionId): Promise<SessionQueryView>;
+  delete(sessionId: SessionId): Promise<void>;
 }
 ```
 
 - 首版实现为 `.echo/sessions/*.jsonl`；
 - `append` 必须保持事件顺序并避免部分 JSON 行；
 - SessionStore 不负责上下文取舍；
-- `SessionRepository` 是 P1 查询与恢复边界：必须支持创建、列出、读取、恢复以及按 Turn/Step 整理事件。P2 必须调用该接口，不得解析 JSONL 文本细节或 CLI 输出；
+- `SessionRepository` 是 P1 查询与恢复边界：必须支持创建、列出、读取、恢复、精确删除单条 Session，以及按 Turn/Step 整理事件。P2 必须调用该接口，不得解析 JSONL 文本细节或 CLI 输出；删除只能命中固定工作区内校验后的普通 Session 文件；
 - 文件默认不纳入 Git；
 - 持久化失败必须可观测，但不得因此泄露未脱敏原始数据；
 - 恢复只从事件事实重建对话、当前模型与安全模式。损坏、不完整、跨工作区、Provider 不一致或不兼容版本必须安全失败。
@@ -463,6 +464,7 @@ interface ApplicationService {
   resumeSession(input: ResumeSessionInput): Promise<SessionRuntimeState>;
   listSessions(workspaceRoot: string): Promise<readonly SessionSummary[]>;
   getSession(sessionId: SessionId): Promise<SessionQueryView>;
+  deleteSession(sessionId: SessionId): Promise<void>;
   runTurn(input: RunTurnInput): Promise<AgentResult>;
   cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void>;
   respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult>;
@@ -474,6 +476,10 @@ interface ApplicationService {
 
 `run` 与 `chat` 必须通过同一个 `ApplicationService` 创建、恢复、执行和取消 Turn，并提交精确绑定到当前 Turn、工具请求与 `approvalKey` 的审批响应。重复、过期或非待审批的响应必须返回 `rejected`，不得当作成功或抛出未分类错误。CLI 参数解析、readline、bracketed paste 适配器和渲染器不得持有 Agent 决策。当前模型与安全模式是可测试的运行时状态；Agent Loop 在每个 Turn 开始和每次策略判断时读取当前有效值。切换从下一个尚未开始的 Turn 生效，并分别追加 `model.changed` 与 `safety.changed`。`model.changed` 只记录会话内模型 ID 与来源，不保存发现列表或凭据。P1-1A 已把 `run` 接到该服务。P1-1B 已实现 `echo-harness chat`、`--resume`、Slash、Ctrl+C 与 bracketed paste 适配器，并用 `resolveNewSessionSetting` / `resolveResumeSessionSetting` 落实 CLI > session > config。`/model` 与 `/model refresh` 只消费可注入的模型目录端口，不在 Chat 内实现第二套 `GET /models` 发现与缓存。P1-2A 已实现配置加载器与 artifact-root 解析；P1-2B 已实现模型目录发现与进程内缓存。
 
+P2.5 的 `deleteSession` 只删除用户明确选择的单条 Session。`ActiveTurnCoordinator` 必须串行执行活动
+目标的取消、终态等待和删除；repository 在删除开始后拒绝该 Session 的新追加，并只操作固定工作区
+内经过 ID 校验、非链接的普通 JSONL 文件。取消或删除失败不得清理内存投影或返回成功。
+
 ### 7.2 P2 Web adapter 契约
 
 P2 Web adapter 是 `ApplicationService`、Session 查询和共享配置服务的传输适配器，不是新的领域
@@ -482,6 +488,7 @@ P2 Web adapter 是 `ApplicationService`、Session 查询和共享配置服务的
 - 固定工作区来自服务启动参数，不接受浏览器路径；
 - 整个 Web 服务进程同时只允许一个活动 Turn；
 - Session 创建、恢复、取消、审批、模型和安全模式继续调用本节接口；
+- Session 删除由进程级协调器执行；活动目标必须先取消并等待 Turn 终态持久化，删除失败保留记录；
 - Provider 配置通过 `createProviderConfigService` 复用 CLI 背后的 Schema、artifact-root、写锁
   和原子写入，不调用或解析 CLI；Web 只使用受限的 `saveProviderSettings` merge，CLI wizard 只使用
   完整校验后的 `replacePersistentConfig`；API Key 仍只来自 `ECHO_API_KEY`，`discoverModels` 不会

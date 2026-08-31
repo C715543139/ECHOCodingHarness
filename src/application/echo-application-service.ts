@@ -196,6 +196,18 @@ export class EchoApplicationService implements ApplicationService {
     return this.options.repository.getQueryView(sessionId);
   }
 
+  async deleteSession(sessionId: SessionId): Promise<void> {
+    if (this.activeTurns.has(sessionId)) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionIncompatible,
+        'An active turn must settle before its session can be deleted.',
+      );
+    }
+    await this.options.repository.delete(sessionId);
+    this.memory.delete(sessionId);
+    this.clearApprovalState(sessionId);
+  }
+
   async runTurn(input: RunTurnInput): Promise<AgentResult> {
     if (this.activeTurns.has(input.sessionId)) {
       throw configurationError(
@@ -501,6 +513,16 @@ export class EchoApplicationService implements ApplicationService {
       this.pending.delete(key);
       this.expired.add(key);
       pending.reject(cancelledTurnError());
+    }
+  }
+
+  private clearApprovalState(sessionId: SessionId): void {
+    const prefix = `${sessionId}\0`;
+    for (const key of this.settled.keys()) {
+      if (key.startsWith(prefix)) this.settled.delete(key);
+    }
+    for (const key of this.expired) {
+      if (key.startsWith(prefix)) this.expired.delete(key);
     }
   }
 

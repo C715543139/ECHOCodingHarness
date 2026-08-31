@@ -147,7 +147,9 @@ Session rail 支持：
 - 活动 Turn 期间浏览其他 Session，并明确禁用并发提交。活动 Turn 时仍可新建，但新 Session
   输入区禁用并说明“另一会话正在运行”；活动 Session 本身只显示“当前 Session 正在运行”的提示条。
 
-P2 不实现删除、fork、跨工作区搜索或批量管理。
+P2 原始范围不实现删除、fork、跨工作区搜索或批量管理；P2.5 依据
+[ADR-0009](../decisions/0009-session-deletion-and-completion-focus.md) 只追加带确认、活动 Turn 先停止的
+单 Session 删除，仍不实现批量管理或回收站。
 
 ### 6.2 Chat
 

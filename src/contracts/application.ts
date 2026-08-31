@@ -69,6 +69,7 @@ export interface SessionRepository extends SessionStore {
   list(workspaceRoot: string): Promise<readonly SessionSummary[]>;
   readAll(sessionId: SessionId): Promise<readonly EchoEvent[]>;
   getQueryView(sessionId: SessionId): Promise<SessionQueryView>;
+  delete(sessionId: SessionId): Promise<void>;
 }
 
 export interface CreateSessionRecordInput {
@@ -127,6 +128,7 @@ export interface ApplicationService {
   resumeSession(input: ResumeSessionInput): Promise<SessionRuntimeState>;
   listSessions(workspaceRoot: string): Promise<readonly SessionSummary[]>;
   getSession(sessionId: SessionId): Promise<SessionQueryView>;
+  deleteSession(sessionId: SessionId): Promise<void>;
   runTurn(input: RunTurnInput): Promise<AgentResult>;
   cancelTurn(sessionId: SessionId, turnId?: TurnId): Promise<void>;
   respondToApproval(input: ApprovalResponseInput): Promise<ApprovalResponseResult>;

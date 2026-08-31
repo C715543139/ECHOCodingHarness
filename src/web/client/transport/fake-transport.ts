@@ -444,6 +444,30 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
         loadingHistory: false,
       });
     },
+    async deleteSession(id: string): Promise<void> {
+      const target = allSessions.find((session) => session.id === id);
+      if (target === undefined) {
+        commandError('NOT_FOUND', 'The requested session was not found.');
+        throw new Error('The requested session was not found.');
+      }
+      pendingBySession[id] = undefined;
+      Reflect.deleteProperty(chatBySession, id);
+      Reflect.deleteProperty(runtimes, id);
+      replaceSessions(allSessions.filter((session) => session.id !== id));
+      const selectedSessionId =
+        snapshot.selectedSessionId === id ? allSessions[0]?.id : snapshot.selectedSessionId;
+      replace({
+        selectedSessionId,
+        chatTurns: chatsFor(selectedSessionId),
+        traceRecords: snapshot.selectedSessionId === id ? [] : snapshot.traceRecords,
+        selectedTraceRecordId: undefined,
+        inspectorDetail: undefined,
+        composerText: snapshot.selectedSessionId === id ? '' : snapshot.composerText,
+        lastCommandError: undefined,
+        loadingHistory: false,
+        resyncRequired: false,
+      });
+    },
     selectSession(id: string): void {
       replace({
         selectedSessionId: id,

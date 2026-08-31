@@ -154,6 +154,17 @@ export class JsonlSessionRepository extends JsonlSessionStore implements Session
     return toQueryView(sessionId, this.workspaceDisplayName(), events);
   }
 
+  async delete(sessionId: SessionId): Promise<void> {
+    const events = await this.readAll(sessionId);
+    if (events.length === 0) {
+      throw configurationError(
+        CONFIG_ERROR_CODES.sessionNotFound,
+        'The requested session does not exist in this workspace.',
+      );
+    }
+    await this.deleteSessionFile(sessionId);
+  }
+
   async resume(input: ResumeSessionRecordInput): Promise<SessionQueryView> {
     this.assertWorkspace(input.workspaceRoot);
     let events: EchoEvent[];

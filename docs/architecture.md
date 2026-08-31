@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：2.0
+> 版本：2.1
 >
 > 最后更新：2026-08-30
 
@@ -13,7 +13,8 @@
 [ADR-0005](./decisions/0005-restore-artifact-config.md)
 和 [contracts.md](./contracts.md)。P2 的已接受目标边界见
 [ADR-0007](./decisions/0007-local-web-console.md)、[web-api.md](./web-api.md) 与
-[web-ui.md](./web-ui.md)；Phase A 与 B1–B4 已落地契约及独立模块，C1 已将 Provider、Session、
+[web-ui.md](./web-ui.md)，P2.5 的会话删除与完成定位见
+[ADR-0009](./decisions/0009-session-deletion-and-completion-focus.md)；Phase A 与 B1–B4 已落地契约及独立模块，C1 已将 Provider、Session、
 Turn、审批、Trace、SSE、React 根状态和真实 HTTP transport 统一装配到生产 Web 控制台。后续实现若与本文冲突，应先更新相应 ADR，再修改本文。
 
 ECHO 表示：
@@ -386,3 +387,8 @@ Inspector 与有界列表；B4 已落地
 与 CI 接线；Playwright 失败产物只在隐私扫描通过后上传。C2 已通过完整 Windows/Chromium 门禁、隔离
 产物 smoke 与受控真实 Provider 的 Chat、SSE 终态、恢复和 Trace 验收。C3 已移除临时示意资产并以
 经扫描的真实实现截图和最终证据矩阵收尾。Web API、UI 与本节状态均为已交付。
+
+P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提交 Session ID，
+`ActiveTurnCoordinator` 对活动目标串行执行取消、终态等待和删除，`SessionRepository` 只删除固定
+工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
+Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。

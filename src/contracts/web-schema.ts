@@ -388,6 +388,16 @@ const ACCEPTED_CANCELLATION_SCHEMA = {
   },
 } as const;
 
+const DELETED_SESSION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['sessionId', 'stoppedActiveTurn'],
+  properties: {
+    sessionId: ID_SCHEMA,
+    stoppedActiveTurn: { type: 'boolean' },
+  },
+} as const;
+
 const APPROVAL_DECISION_REQUEST_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -614,6 +624,7 @@ export const WEB_JSON_SCHEMAS = {
   submitTurnRequest: SUBMIT_TURN_REQUEST_SCHEMA,
   acceptedTurn: ACCEPTED_TURN_SCHEMA,
   acceptedCancellation: ACCEPTED_CANCELLATION_SCHEMA,
+  deletedSession: DELETED_SESSION_SCHEMA,
   approvalDecisionRequest: APPROVAL_DECISION_REQUEST_SCHEMA,
   acceptedApproval: ACCEPTED_APPROVAL_SCHEMA,
   traceRecord: TRACE_RECORD_SCHEMA,

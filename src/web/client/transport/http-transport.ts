@@ -5,6 +5,7 @@ import type {
   ApprovalChoiceDto,
   BootstrapDto,
   ChatTurnDto,
+  DeletedSessionDto,
   DiscoveredModelsDto,
   Page,
   ProviderConfigDto,
@@ -324,6 +325,102 @@ export function createHttpTransport(): WebConsoleTransport {
         emit({ sessions: upsertSession(snapshot.sessions, response.data.session) });
         await loadSelected(response.data.session.id);
       });
+    },
+    async deleteSession(id) {
+      let response: ApiResponse<DeletedSessionDto>;
+      try {
+        response = await request<ApiResponse<DeletedSessionDto>>(
+          `/api/v1/sessions/${encodeURIComponent(id)}`,
+          { method: 'DELETE', body: {} },
+        );
+      } catch (error) {
+        reportError(error);
+        const parsed = apiError(error);
+        throw new Error(parsed?.error.message ?? '会话删除失败，请重试。', { cause: error });
+      }
+
+      let remaining = snapshot.sessions.filter((session) => session.id !== id);
+      let sessionListRefreshed = false;
+      lastSeqBySession.delete(id);
+      try {
+        const sessionsResponse = await request<ApiResponse<Page<SessionSummaryDto>>>(
+          '/api/v1/sessions?limit=30',
+        );
+        sessionCursor = sessionsResponse.data.nextCursor;
+        remaining = [...sessionsResponse.data.items];
+        sessionListRefreshed = true;
+      } catch (error) {
+        sessionCursor = undefined;
+        reportError(error);
+      }
+
+      if (snapshot.selectedSessionId === id) {
+        const next = remaining[0];
+        emit({
+          sessions: remaining,
+          hasMoreSessions: sessionCursor !== undefined,
+          lastCommandError: undefined,
+        });
+        if (next !== undefined) {
+          try {
+            await loadSelected(next.id);
+          } catch (error) {
+            emit({
+              selectedSessionId: next.id,
+              selectedRuntime: undefined,
+              chatTurns: [],
+              traceRecords: [],
+              selectedTraceRecordId: undefined,
+              inspectorDetail: undefined,
+              loadingHistory: false,
+            });
+            reportError(error);
+          }
+          return;
+        }
+        eventSource?.close();
+        eventSource = undefined;
+        emit({
+          ...(sessionListRefreshed ? { connection: 'connected' as const } : {}),
+          sessions: [],
+          hasMoreSessions: false,
+          selectedSessionId: undefined,
+          selectedRuntime: undefined,
+          chatTurns: [],
+          traceRecords: [],
+          selectedTraceRecordId: undefined,
+          inspectorDetail: undefined,
+          composerText: '',
+          resyncRequired: false,
+          loadingHistory: false,
+          lastCommandError: undefined,
+          bootstrap: {
+            ...snapshot.bootstrap,
+            capabilities: {
+              canCreateSession: snapshot.connection === 'connected',
+              canSubmitTurn: false,
+              canChangeRuntime: false,
+              canCancelTurn: false,
+              canRespondToApproval: false,
+              submitTurnBlockedReason: 'session_unavailable',
+              changeRuntimeBlockedReason: 'session_unavailable',
+            },
+          },
+        });
+        return;
+      }
+      emit({
+        sessions: remaining,
+        hasMoreSessions: sessionCursor !== undefined,
+        lastCommandError: undefined,
+      });
+      if (response.data.stoppedActiveTurn && snapshot.selectedSessionId !== undefined) {
+        try {
+          await loadSelected(snapshot.selectedSessionId);
+        } catch (error) {
+          reportError(error);
+        }
+      }
     },
     selectSession(id) {
       run(() => loadSelected(id));

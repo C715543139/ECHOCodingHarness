@@ -33,6 +33,70 @@ async function temporaryWorkspace(): Promise<string> {
 }
 
 describe('JsonlSessionRepository', () => {
+  it('deletes only the requested regular session log and reports a missing session', async () => {
+    const workspace = await temporaryWorkspace();
+    const provider = createProviderIdentity('https://provider.example/v1');
+    let nextId = 0;
+    const repository = new JsonlSessionRepository({
+      workspaceRoot: workspace,
+      idFactory: (kind) => `${kind}-${String((nextId += 1))}`,
+    });
+    const first = await repository.create({
+      workspaceRoot: workspace,
+      provider,
+      model: 'fake-model',
+      safetyMode: 'balanced',
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+    });
+    const second = await repository.create({
+      workspaceRoot: workspace,
+      provider,
+      model: 'fake-model',
+      safetyMode: 'balanced',
+      eventSchemaVersion: EVENT_SCHEMA_VERSION,
+    });
+
+    await repository.delete(first.sessionId);
+
+    await expect(repository.getQueryView(first.sessionId)).rejects.toMatchObject({
+      code: 'CONFIG_SESSION_NOT_FOUND',
+    });
+    await expect(repository.getQueryView(second.sessionId)).resolves.toMatchObject({
+      sessionId: second.sessionId,
+    });
+    await expect(repository.delete(first.sessionId)).rejects.toMatchObject({
+      code: 'CONFIG_SESSION_NOT_FOUND',
+    });
+    await expect(
+      repository.append({
+        id: 'event-after-delete',
+        sequence: 2,
+        timestamp: '2026-08-29T00:00:01.000Z',
+        sessionId: first.sessionId,
+        type: 'session.resumed',
+        payload: {
+          eventSchemaVersion: EVENT_SCHEMA_VERSION,
+          provider,
+          model: 'fake-model',
+          safetyMode: 'balanced',
+          turnCount: 0,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_DELETED' });
+  });
+
+  it('refuses to delete a non-regular session path', async () => {
+    const workspace = await temporaryWorkspace();
+    const repository = new JsonlSessionRepository({ workspaceRoot: workspace });
+    const sessionPath = path.join(workspace, '.echo', 'sessions', 'session-directory.jsonl');
+    await fs.mkdir(sessionPath, { recursive: true });
+
+    await expect(repository.delete('session-directory')).rejects.toMatchObject({
+      code: 'SESSION_PATH_UNSAFE',
+    });
+    expect((await fs.lstat(sessionPath)).isDirectory()).toBe(true);
+  });
+
   it('creates a version-3 session summary from input without a second file read', async () => {
     const workspace = await temporaryWorkspace();
     const provider = createProviderIdentity('https://provider.example/v1');

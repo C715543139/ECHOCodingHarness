@@ -29,6 +29,11 @@ export type CancelTurnResult =
   | { readonly kind: 'cancelling'; readonly sessionId: SessionId; readonly turnId: TurnId }
   | { readonly kind: 'not_active'; readonly sessionId: SessionId; readonly turnId: TurnId };
 
+export interface DeleteSessionResult {
+  readonly sessionId: SessionId;
+  readonly stoppedActiveTurn: boolean;
+}
+
 interface ActiveTurn {
   readonly sessionId: SessionId;
   readonly turnId: TurnId;
@@ -77,9 +82,11 @@ export class ActiveTurnCoordinator {
         const turnId = await Promise.race([started, promise.then((result) => result.turnId)]);
         startWait.abort();
         this.active = { sessionId, turnId, promise };
-        void promise.finally(() => {
-          if (this.active?.promise === promise) this.active = undefined;
-        });
+        void promise
+          .finally(() => {
+            if (this.active?.promise === promise) this.active = undefined;
+          })
+          .catch(() => undefined);
         return {
           kind: 'accepted',
           sessionId,
@@ -105,6 +112,20 @@ export class ActiveTurnCoordinator {
     }
     await this.service.cancelTurn(sessionId, turnId);
     return { kind: 'cancelling', sessionId, turnId };
+  }
+
+  async deleteSession(sessionId: SessionId): Promise<DeleteSessionResult> {
+    return this.serialize(async () => {
+      const current = this.active;
+      const stopsActiveTurn = current?.sessionId === sessionId;
+      if (stopsActiveTurn && current !== undefined) {
+        await this.service.cancelTurn(current.sessionId, current.turnId);
+        await current.promise;
+        if (this.active?.promise === current.promise) this.active = undefined;
+      }
+      await this.service.deleteSession(sessionId);
+      return { sessionId, stoppedActiveTurn: stopsActiveTurn };
+    });
   }
 
   async shutdown(timeoutMs: number): Promise<void> {

@@ -215,6 +215,11 @@ fail-closed scan step succeeds.
 - process-wide active-Turn tests cover two Sessions and prove the second cannot submit or mutate
   runtime state while one Turn runs (`tests/unit/application/active-turn-coordinator.test.ts`,
   `tests/integration/web/turns.test.ts`);
+- Session deletion tests prove exact regular-file deletion, missing-session behavior, idle deletion,
+  and the active `cancel -> terminal persistence -> delete` sequence
+  (`tests/unit/session/jsonl-session-repository.test.ts`,
+  `tests/unit/application/active-turn-coordinator.test.ts`,
+  `tests/integration/web/session-delete.test.ts`);
 - idempotency tests repeat Turn, cancel, approval, and create-session requests, assert one side
   effect and reject the same requestId with a different request fingerprint
   (`tests/integration/web/idempotency.test.ts`);
@@ -237,9 +242,10 @@ fail-closed scan step succeeds.
 
 Vitest, Testing Library, `user-event`, and a DOM environment cover:
 
-- Session rail paging, new Session, restore, and process-wide active state
+- Session rail paging, new Session, restore, confirmed deletion, failure retention, and process-wide active state
   (`tests/unit/web/session-rail.test.tsx`, `tests/unit/web/fake-transport.test.ts`);
-- Chat aggregate rendering, streaming upsert, paused tail-follow, cancel, and approval
+- Chat aggregate rendering, streaming upsert, paused tail-follow, terminal positioning at the newest
+  Turn start, cancel, and approval
   (`tests/unit/web/chat-projection.test.ts`, `tests/unit/web/chat-stream.test.tsx`,
   `tests/unit/web/approval.test.tsx`, `tests/unit/web/composer.test.tsx`,
   `tests/unit/web/console-isolation.test.tsx`);
@@ -268,6 +274,7 @@ Playwright Chromium runs a deliberately small set of critical flows against a bu
 6. Provider config save without an API Key entering the DOM;
 7. keyboard-only critical flow and 200% zoom smoke;
 8. graceful shutdown with and without an active Turn.
+9. confirmed idle deletion and active Turn stop-before-delete behavior.
 
 `echo-harness web` defaults to opening the server-issued, verified loopback bootstrap URL through an
 injectable argument-array opener; tests never launch a real browser. `--no-open` prints that same

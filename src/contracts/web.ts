@@ -232,6 +232,11 @@ export interface AcceptedCancellationDto {
   readonly state: 'cancelling';
 }
 
+export interface DeletedSessionDto {
+  readonly sessionId: string;
+  readonly stoppedActiveTurn: boolean;
+}
+
 export interface ApprovalDecisionRequest {
   readonly turnId: string;
   readonly toolCallId: string;

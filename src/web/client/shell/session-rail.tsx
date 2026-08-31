@@ -36,6 +36,7 @@ export function SessionRail({
   onToggleCollapsed,
   resizer,
   onCreateSession,
+  onRequestDelete,
   onSelectSession,
   onOpenSettings,
   actions,
@@ -51,6 +52,7 @@ export function SessionRail({
   readonly onToggleCollapsed?: () => void;
   readonly resizer?: ReactNode;
   readonly onCreateSession: () => void;
+  readonly onRequestDelete?: (session: SessionSummaryDto, trigger: HTMLButtonElement) => void;
   readonly onSelectSession: (id: string) => void;
   readonly onOpenSettings: () => void;
   readonly actions?: WebConsoleActions;
@@ -133,21 +135,40 @@ export function SessionRail({
         >
           {sessions.map((session) => (
             <li key={session.id}>
-              <button
-                aria-current={session.id === selectedSessionId}
-                className={styles.sessionButton}
-                onClick={() => {
-                  onSelectSession(session.id);
-                }}
-                title={session.title}
-                type="button"
+              <div
+                className={styles.sessionItem}
+                data-selected={String(session.id === selectedSessionId)}
               >
-                <span className={styles.sessionTitle}>{session.title}</span>
-                <span className={styles.sessionMeta}>
-                  {session.updatedAt.slice(0, 16).replace('T', ' ')} ·{' '}
-                  {SESSION_PHASE_LABELS[session.phase]} · {session.model}
-                </span>
-              </button>
+                <button
+                  aria-current={session.id === selectedSessionId}
+                  className={styles.sessionButton}
+                  onClick={() => {
+                    onSelectSession(session.id);
+                  }}
+                  title={session.title}
+                  type="button"
+                >
+                  <span className={styles.sessionTitle}>{session.title}</span>
+                  <span className={styles.sessionMeta}>
+                    {session.updatedAt.slice(0, 16).replace('T', ' ')} ·{' '}
+                    {SESSION_PHASE_LABELS[session.phase]} · {session.model}
+                  </span>
+                </button>
+                {onRequestDelete === undefined ? null : (
+                  <button
+                    aria-label={`删除会话 ${session.title}`}
+                    className={styles.deleteSessionButton}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRequestDelete(session, event.currentTarget);
+                    }}
+                    title="删除会话"
+                    type="button"
+                  >
+                    <Glyph name="close" />
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

@@ -29,6 +29,7 @@ const BOUNDARY_SCHEMAS = [
   'submitTurnRequest',
   'acceptedTurn',
   'acceptedCancellation',
+  'deletedSession',
   'approvalDecisionRequest',
   'acceptedApproval',
   'traceRecord',
@@ -102,6 +103,21 @@ describe('Web JSON Schema freeze', () => {
     expect(WEB_JSON_SCHEMAS.sessionViewResponse).toEqual(
       createApiResponseSchema(WEB_JSON_SCHEMAS.sessionView),
     );
+  });
+
+  it('validates the bounded session deletion response', () => {
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.deletedSession, {
+        sessionId: 'session-1',
+        stoppedActiveTurn: true,
+      }),
+    ).toEqual([]);
+    expect(
+      validateWebJsonSchema(WEB_JSON_SCHEMAS.deletedSession, {
+        sessionId: '../outside',
+        stoppedActiveTurn: true,
+      }),
+    ).not.toEqual([]);
   });
 
   it('rejects invalid requestIds and accepts the documented opaque range', () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -183,5 +183,64 @@ describe('Session rail paging through Fake transport', () => {
     await user.click(screen.getByTitle('Other session'));
     expect(screen.getByText('other goal')).toBeTruthy();
     expect(screen.queryByText('idle goal')).toBeNull();
+  });
+
+  it('requires confirmation before deleting an idle session', async () => {
+    const user = userEvent.setup();
+    const idle = createIdleSession();
+    const other = createIdleSession({ id: 'ses_other', title: 'Keep this session' });
+    const transport = createFakeTransport({ sessions: [idle, other], selectedSessionId: idle.id });
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByRole('button', { name: `删除会话 ${idle.title}` }));
+    const dialog = screen.getByRole('dialog', { name: '删除会话？' });
+    expect(within(dialog).getByText('删除后将永久移除该会话记录，无法恢复。')).toBeTruthy();
+    await user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(screen.getByTitle(idle.title)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: `删除会话 ${idle.title}` }));
+    await user.click(screen.getByRole('button', { name: /^删除会话$/u }));
+    expect(screen.queryByTitle(idle.title)).toBeNull();
+    expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
+  });
+
+  it('explains that deleting the running session stops its Turn first', async () => {
+    const user = userEvent.setup();
+    const running = createRunningSession();
+    const other = createIdleSession({ id: 'ses_other', title: 'Other session' });
+    const transport = createFakeTransport({
+      sessions: [running, other],
+      selectedSessionId: running.id,
+    });
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByRole('button', { name: `删除会话 ${running.title}` }));
+    expect(
+      screen.getByText('当前会话仍在运行。确认后将先停止当前 Turn，等待结束，再永久删除会话。'),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '停止并删除' }));
+
+    expect(screen.queryByTitle(running.title)).toBeNull();
+    expect(transport.getSnapshot().bootstrap.capabilities.activeSessionId).toBeUndefined();
+  });
+
+  it('keeps the session and confirmation open when deletion fails', async () => {
+    const user = userEvent.setup();
+    const idle = createIdleSession();
+    const base = createFakeTransport({ sessions: [idle], selectedSessionId: idle.id });
+    const transport = {
+      ...base,
+      deleteSession: async (): Promise<void> => {
+        throw new Error('会话文件暂时无法删除。');
+      },
+    };
+    render(<App transport={transport} />);
+
+    await user.click(screen.getByRole('button', { name: `删除会话 ${idle.title}` }));
+    await user.click(screen.getByRole('button', { name: /^删除会话$/u }));
+
+    expect(await screen.findByText('会话文件暂时无法删除。')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '删除会话？' })).toBeTruthy();
+    expect(screen.getByTitle(idle.title)).toBeTruthy();
   });
 });

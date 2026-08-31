@@ -7,6 +7,7 @@ export {
   ActiveTurnCoordinator,
   type ActiveTurnSnapshot,
   type CancelTurnResult,
+  type DeleteSessionResult,
   type SubmitTurnResult,
   type TurnStartWaiter,
 } from './active-turn-coordinator.js';

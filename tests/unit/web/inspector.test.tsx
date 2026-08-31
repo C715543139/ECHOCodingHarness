@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -132,6 +132,41 @@ describe('Trace Inspector selection', () => {
     const after = screen.getAllByRole('button', { name: /用户 user completed/u });
     expect(after[0]?.textContent).toBe(firstLabel);
     expect(after.length).toBeLessThan(180);
+  });
+
+  it('pauses tail follow after a small upward scroll instead of snapping back to the bottom', async () => {
+    const records = Array.from({ length: 100 }, (_, index) => ({
+      id: `small-scroll_${String(index + 1)}`,
+      seq: index + 1,
+      turnId: 'turn-small-scroll',
+      time: '2026-08-30T09:00:00.000Z',
+      type: 'user' as const,
+      label: '用户',
+      status: 'completed',
+      hasDetails: false,
+      parameterSummary: `goal ${String(index + 1)}`,
+    }));
+
+    render(
+      <TraceView
+        onSelectRecord={() => undefined}
+        pageSize={100}
+        records={records}
+        selectedRecordId={undefined}
+      />,
+    );
+    const viewport = screen.getByRole('list');
+    Object.defineProperties(viewport, {
+      clientHeight: { configurable: true, value: 480 },
+      scrollHeight: { configurable: true, value: 7200 },
+    });
+    viewport.scrollTop = 6704;
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '回到最新' })).toBeTruthy();
+    });
+    expect(viewport.scrollTop).toBe(6704);
   });
 
   it('resets a scrolled large list when switching to a disjoint small list', async () => {

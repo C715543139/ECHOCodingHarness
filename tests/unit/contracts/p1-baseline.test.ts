@@ -123,9 +123,11 @@ describe('P1 frozen contracts', () => {
     expectTypeOf<ApplicationService['runTurn']>().toBeFunction();
     expectTypeOf<ApplicationService['resumeSession']>().toBeFunction();
     expectTypeOf<ApplicationService['getRuntimeState']>().toBeFunction();
+    expectTypeOf<ApplicationService['deleteSession']>().toBeFunction();
     expectTypeOf<SessionRepository['create']>().toBeFunction();
     expectTypeOf<SessionRepository['resume']>().toBeFunction();
     expectTypeOf<SessionRepository['getQueryView']>().toBeFunction();
+    expectTypeOf<SessionRepository['delete']>().toBeFunction();
     expectTypeOf<ModelCatalogClient['listModelIds']>().toBeFunction();
     expectTypeOf<ModelCatalogSnapshot>().toHaveProperty('configuredModel');
     expectTypeOf<ModelCatalogSnapshot['source']>().toEqualTypeOf<'discover' | 'manual'>();

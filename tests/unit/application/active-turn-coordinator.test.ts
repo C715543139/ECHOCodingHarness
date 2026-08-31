@@ -6,7 +6,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { ActiveTurnCoordinator, EchoApplicationService } from '../../../src/application/index.js';
 import { EventContextBuilder } from '../../../src/context/index.js';
-import type { EchoEvent, ModelProvider, SafetyPolicy } from '../../../src/contracts/index.js';
+import type {
+  AgentResult,
+  ApplicationService,
+  EchoEvent,
+  ModelProvider,
+  SafetyPolicy,
+} from '../../../src/contracts/index.js';
 import { FakeProvider } from '../../../src/provider/index.js';
 import { createProviderIdentity, JsonlSessionRepository } from '../../../src/session/index.js';
 import { ToolRegistry } from '../../../src/tools/index.js';
@@ -160,5 +166,59 @@ describe('ActiveTurnCoordinator', () => {
     const idle = await coordinator.cancelTurn(session.sessionId, accepted.turnId);
     expect(idle.kind).toBe('not_active');
     release();
+  });
+
+  it('stops and settles an active turn before deleting its session', async () => {
+    const workspace = await temporaryWorkspace();
+    const gate = new Promise<void>(() => undefined);
+    const { service, coordinator, identity } = await createService(
+      workspace,
+      new GatedProvider(completedProvider(), gate),
+    );
+    const session = await service.createSession({
+      workspaceRoot: workspace,
+      provider: identity,
+      model: { value: 'fake-model', source: 'config' },
+      safetyMode: { value: 'balanced', source: 'config' },
+    });
+    const accepted = await coordinator.submitTurn(session.sessionId, 'hold then delete');
+    expect(accepted.kind).toBe('accepted');
+
+    await expect(coordinator.deleteSession(session.sessionId)).resolves.toEqual({
+      sessionId: session.sessionId,
+      stoppedActiveTurn: true,
+    });
+    expect(coordinator.snapshot()).toEqual({});
+    await expect(service.getSession(session.sessionId)).rejects.toMatchObject({
+      code: 'CONFIG_SESSION_NOT_FOUND',
+    });
+  });
+
+  it('preserves the session when the cancelled turn cannot settle cleanly', async () => {
+    let rejectTurn!: (error: unknown) => void;
+    const running = new Promise<AgentResult>((_resolve, reject) => {
+      rejectTurn = reject;
+    });
+    let deleteCalls = 0;
+    const service = {
+      runTurn: () => running,
+      cancelTurn: async () => {
+        rejectTurn(new Error('terminal persistence failed'));
+      },
+      deleteSession: async () => {
+        deleteCalls += 1;
+      },
+    } as unknown as ApplicationService;
+    const coordinator = new ActiveTurnCoordinator({
+      service,
+      waiter: { waitForTurnStarted: async () => 'turn-delete-failure' },
+    });
+    const submitted = await coordinator.submitTurn('session-delete-failure', 'run');
+    expect(submitted.kind).toBe('accepted');
+
+    await expect(coordinator.deleteSession('session-delete-failure')).rejects.toThrow(
+      'terminal persistence failed',
+    );
+    expect(deleteCalls).toBe(0);
   });
 });

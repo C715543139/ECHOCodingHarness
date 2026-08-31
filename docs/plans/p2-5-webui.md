@@ -154,8 +154,9 @@ P2 交付的控制台使用深色主题、药丸式视图切换、纯文本消�
 - 同一 Session 提交 Turn 后保留既有 SSE，由直播事件更新 Session、Chat 与 Trace；`202` 只清空已
   接受的输入，不再重新加载并替换当前流。服务端返回的结构化业务错误证明 API 仍可达，只显示命令
   错误而不改连接状态；真实网络请求失败或 SSE 中断仍必须显示未连接；
-- Trace 初次进入、切换 Session 以及尾随状态收到新记录时默认定位到列表底部；用户主动上滚后继续
-  暂停尾随并保留“回到最新”；
+- Trace 初次进入、切换 Session 以及尾随状态收到新记录时默认定位到列表底部；底部判定仅容忍
+  `8px` 布局误差，用户主动上滚超出容差后立即暂停尾随并保留“回到最新”，不得以虚拟行高作为
+  暂停阈值；
 - 按本轮确认移除“跳到主内容”链接、专用目标 ID、焦点目标和相关样式。这是对原 P2.5“不改键盘
   契约”的明确例外；主 `main`、Session `nav`、Inspector 等 landmark，以及完整键盘操作和焦点环
   仍然保留。
@@ -163,7 +164,38 @@ P2 交付的控制台使用深色主题、药丸式视图切换、纯文本消�
 ### 验收证据
 
 - `tests/unit/web/http-transport.test.ts` 断言提交 Turn 不关闭或重建健康 SSE，连接状态保持已连接；
-- `tests/e2e/web/trace-large-session.spec.ts` 断言首次进入大型 Trace 已定位到尾部最新记录；
+- `tests/unit/web/inspector.test.tsx` 与 `tests/e2e/web/trace-large-session.spec.ts` 断言首次进入大型
+  Trace 已定位到尾部最新记录，且小幅上滚也会暂停尾随而不会弹回底部；
 - `tests/unit/web/app.test.tsx`、`tests/unit/web/keyboard-focus.test.tsx` 与浏览器无障碍/键盘用例共同
   守护跳转入口已移除且核心 landmark、状态文字、live region 与焦点恢复未退化；
 - `tests/e2e/web/session-flow.spec.ts` 守护 Windows 友好的选择框行高、内边距和自绘下拉标记。
+
+## WEB-006：Turn 完成定位与单 Session 删除
+
+### 问题
+
+工具调用较多的 Turn 完成后，尾随位置停在工具列表末尾，最终回答容易被遮蔽。Session rail 同时缺少
+清理无用会话的入口；直接增加叉号会遗漏活动 Turn、持久化竞态、失败保留和焦点恢复等契约。
+
+### 决定与实施
+
+- 同一 Session 从 `running` 进入任一终态时，Chat 内部滚动区定位到最新 Turn 的用户问题与回答
+  起点；流式过程、主动上滚和“回到最新”语义保持不变，也不重排回答与工具事实；
+- 每个 Session 条目增加具名叉号按钮，所有删除均弹出确认。空闲/终态显示“删除会话”，活动目标
+  显示“停止并删除”；进行中禁用关闭与重复提交，失败保留对话框和 Session；
+- 服务端通过协调器串行执行取消、等待终态和 repository 删除。存储层只删除固定工作区中经 ID 校验
+  的普通 JSONL 文件，并在删除开始后拒绝同 Session 新事件；
+- 删除当前 Session 后重新加载首屏 Session，选择下一条或进入空状态；成功删除活动目标时关闭其 SSE
+  并按新选择恢复连接；
+- 该变更由 [ADR-0009](../decisions/0009-session-deletion-and-completion-focus.md) 修订 ADR-0007 的单项
+  范围排除，不引入批量删除、回收站、通用文件删除或跨工作区管理。
+
+### 验收证据
+
+- `tests/unit/application/active-turn-coordinator.test.ts`、
+  `tests/unit/session/jsonl-session-repository.test.ts` 固定停止后删除、精确文件边界和缺失语义；
+- `tests/integration/web/session-delete.test.ts` 固定同源幂等 API、空闲删除与活动 Turn 先停止；
+- `tests/unit/web/session-rail.test.tsx`、`tests/unit/web/http-transport.test.ts` 固定确认、失败保留、
+  选中项回退与本地投影清理；
+- `tests/unit/web/chat-stream.test.tsx` 固定终态后定位最新 Turn 起点；
+- `tests/e2e/web/session-delete.spec.ts` 覆盖空闲和活动 Session 的完整浏览器交互。

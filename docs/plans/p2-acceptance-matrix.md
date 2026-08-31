@@ -43,7 +43,7 @@
 | P2-2-02 | 活动 Turn 时可浏览其他 Session，但不可并发提交；当前/其他 Session 使用准确且不重复的运行提示 | component / browser | `tests/unit/web/composer.test.tsx`, `tests/unit/web/session-rail.test.tsx`, `tests/unit/application/active-turn-coordinator.test.ts`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-03 | Chat 历史只从聚合 `model.text` 恢复；模型正文安全渲染 GFM、用户输入保持纯文本；相同的终态与 stop reason 不重复显示 | projection / browser | `tests/unit/web/chat-projection.test.ts`, `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/http-transport.test.ts`, `scripts/accept-web-provider.mjs` | Accepted |
 | P2-2-04 | 流式正文更新稳定记录，不创建 chunk DOM 行 | component / stress | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
-| P2-2-05 | 上滚暂停尾随并提供底部“回到最新”浮层恢复 | component / browser | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/inspector.test.tsx` | Accepted |
+| P2-2-05 | 上滚超过 8px 底部容差即暂停尾随并提供“回到最新”浮层；虚拟列表的小幅滚动不得弹回底部 | component / browser | `tests/unit/web/chat-stream.test.tsx`, `tests/unit/web/inspector.test.tsx`, `tests/e2e/web/trace-large-session.spec.ts` | Accepted |
 | P2-2-06 | 取消传播到 Provider、工具、Session 与 UI | integration / browser | `tests/integration/web/turns.test.ts`, `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
 | P2-2-07 | 审批三种选择精确绑定且重复点击无副作用 | integration / browser | `tests/integration/web/turns.test.ts`, `tests/unit/web/approval.test.tsx`, `tests/e2e/web/approval.spec.ts` | Accepted |
 | P2-2-08 | 模型/安全模式与 CLI 语义一致，运行中禁用 | unit / browser | `tests/integration/web/runtime-capabilities.test.ts`, `tests/unit/web/composer.test.tsx`, `tests/unit/web/http-transport.test.ts` | Accepted |
@@ -54,6 +54,8 @@
 | P2-2-13 | 顶栏常驻“绿点 + 已连接”或“红点 + 未连接”，正确反映 API、所选 Session SSE 与重连状态；提交 Turn 不替换健康 SSE，结构化业务错误不冒充断线 | component / browser | `tests/unit/web/header-status.test.tsx`, `tests/unit/web/http-transport.test.ts`, `tests/e2e/web/reconnect.spec.ts` | Accepted |
 | P2-2-14 | 同一投影不同时显示 Turn 已完成与仍在运行 | projection / component | `tests/unit/web/states.test.tsx` | Accepted |
 | P2-2-15 | 侧栏可有界调宽；文档根节点不滚动；Chat/Trace 只纵向滚动；Chat 内容与输入卡使用有界居中列；模型目录拥有独立滚动区 | component / browser | `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-flow.spec.ts`, `tests/e2e/web/responsive.spec.ts` | Accepted |
+| P2-2-16 | 单 Session 删除始终确认；活动目标先停止并等待终态，失败保留记录；删除范围限于固定工作区普通 Session 文件 | storage / API / component / browser | `tests/unit/session/jsonl-session-repository.test.ts`, `tests/unit/application/active-turn-coordinator.test.ts`, `tests/integration/web/session-delete.test.ts`, `tests/unit/web/session-rail.test.tsx`, `tests/e2e/web/session-delete.spec.ts` | Accepted |
+| P2-2-17 | 同一 Session 进入终态后定位到最新 Turn 问答起点且不重排事件 | component | `tests/unit/web/chat-stream.test.tsx` | Accepted |
 
 ## 4. P2-3：Trace 与 Inspector
 
@@ -111,10 +113,10 @@ P2 总计划。不得让 CI 与文档各自维护不同命令。
 
 - 本地候选：2026-08-31，Windows 10；P2.5 功能分支已完成本地验收，合并 SHA 与远程 CI URL 在集成
   时补录；
-- `pnpm check`：117 个测试文件、645 项测试通过；
-- 覆盖率：statements 85.19%、branches 77.32%、functions 89.61%、lines 87.01%；
-- Web E2E：Playwright Chromium 11/11 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
-  安全 Markdown、断线恢复、审批、Provider 秘密与 200 条 Trace；
+- `pnpm check`：118 个测试文件、658 项测试通过；
+- 覆盖率：statements 85.09%、branches 76.94%、functions 90.08%、lines 86.91%；
+- Web E2E：Playwright Chromium 13/13 通过，覆盖键盘、无障碍、200% 缩放、窄屏、reduced motion、
+  安全 Markdown、断线恢复、审批、单 Session 删除、完成定位、Provider 秘密与 200 条 Trace；
 - Windows 非仓库 cwd 隔离产物 smoke：通过；
 - 离线评测与 demo smoke：12/12 通过；
 - 受控真实 Provider：2026-08-31，`deepseek/deepseek-v4-flash`，生产 Web API Chat、SSE 终态、

@@ -392,4 +392,61 @@ describe('HTTP Web console transport', () => {
     expect(transport.getSnapshot().bootstrap.capabilities).toEqual(capabilities);
     transport.dispose();
   });
+
+  it('deletes the selected session and clears its local projections', async () => {
+    window.history.replaceState(null, '', '/');
+    const calls: { readonly url: string; readonly init?: RequestInit }[] = [];
+    let deleted = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push({ url, ...(init === undefined ? {} : { init }) });
+        if (url === '/api/v1/bootstrap') {
+          return json({ data: bootstrap, requestId: 'request-bootstrap-delete' });
+        }
+        if (url === '/api/v1/sessions?limit=30') {
+          return json({
+            data: { items: deleted ? [] : [summary] },
+            requestId: 'request-list-delete',
+          });
+        }
+        if (url === `/api/v1/sessions/${summary.id}` && init?.method === 'DELETE') {
+          deleted = true;
+          return json({
+            data: { sessionId: summary.id, stoppedActiveTurn: false },
+            requestId: 'request-delete-session',
+          });
+        }
+        if (url === `/api/v1/sessions/${summary.id}`) {
+          return json({ data: sessionView, requestId: 'request-view-delete' });
+        }
+        if (url.includes('/chat?') || url.includes('/trace?')) {
+          return json({ data: { items: [] }, requestId: 'request-page-delete' });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+
+    const transport = createHttpTransport();
+    await transport.start();
+    await transport.deleteSession(summary.id);
+
+    expect(transport.getSnapshot()).toMatchObject({
+      connection: 'connected',
+      sessions: [],
+      selectedSessionId: undefined,
+      selectedRuntime: undefined,
+      chatTurns: [],
+      traceRecords: [],
+    });
+    const deletion = calls.find(
+      (call) => call.url === `/api/v1/sessions/${summary.id}` && call.init?.method === 'DELETE',
+    );
+    expect(deletion?.init?.body).toBe('{}');
+    expect((deletion?.init?.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/json',
+    );
+    transport.dispose();
+  });
 });

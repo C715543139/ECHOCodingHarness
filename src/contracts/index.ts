@@ -107,6 +107,7 @@ export {
   type ChatTurnDto,
   type ChatToolSummaryStatus,
   type CreateSessionRequest,
+  type DeletedSessionDto,
   type DiscoverModelsRequest,
   type DiscoveredModelsDto,
   type Page,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 
 import { ChatView } from './shell/chat-view.js';
 import { ConnectionStatus } from './shell/connection-status.js';
+import { DeleteSessionDialog } from './shell/delete-session-dialog.js';
 import { InspectorPane } from './shell/inspector-pane.js';
 import { INSPECTOR_DEFAULT_WIDTH, InspectorResizer } from './shell/inspector-resizer.js';
 import { RAIL_DEFAULT_WIDTH, RailResizer } from './shell/rail-resizer.js';
@@ -12,6 +13,7 @@ import { TraceView } from './shell/trace-view.js';
 import { createFakeTransport } from './transport/fake-transport.js';
 import type { WebConsoleTransport } from './transport/types.js';
 import { catalogModels } from './view-model/provider-catalog.js';
+import type { SessionSummaryDto } from '../../contracts/web.js';
 
 type ShellStyle = CSSProperties & {
   '--echo-inspector-width'?: string;
@@ -29,6 +31,12 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT_WIDTH);
   const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH);
+  const [deleteRequest, setDeleteRequest] = useState<{
+    readonly session: SessionSummaryDto;
+    readonly returnFocusTo: HTMLButtonElement;
+  }>();
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
   const selected = snapshot.sessions.find((session) => session.id === snapshot.selectedSessionId);
   const inspectorOpen = snapshot.inspectorDetail !== undefined;
   const shellClass = `${styles.shell}${inspectorOpen ? ` ${styles.shellWithInspector}` : ''}${
@@ -80,6 +88,10 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
         resizer={<RailResizer onWidth={setRailWidth} width={railWidth} />}
         onCreateSession={() => {
           ownedTransport.createSession();
+        }}
+        onRequestDelete={(session, returnFocusTo) => {
+          setDeleteError(undefined);
+          setDeleteRequest({ session, returnFocusTo });
         }}
         onOpenSettings={() => {
           ownedTransport.openSettings();
@@ -177,6 +189,36 @@ export function App({ transport }: { readonly transport?: WebConsoleTransport } 
           view={controllerView}
         />
       ) : null}
+      {deleteRequest === undefined ? null : (
+        <DeleteSessionDialog
+          active={
+            snapshot.bootstrap.capabilities.activeSessionId === deleteRequest.session.id ||
+            snapshot.sessions.find((session) => session.id === deleteRequest.session.id)?.phase ===
+              'running'
+          }
+          error={deleteError}
+          onCancel={() => {
+            if (!deletePending) setDeleteRequest(undefined);
+          }}
+          onConfirm={() => {
+            setDeletePending(true);
+            setDeleteError(undefined);
+            void ownedTransport.deleteSession(deleteRequest.session.id).then(
+              () => {
+                setDeletePending(false);
+                setDeleteRequest(undefined);
+              },
+              (error: unknown) => {
+                setDeletePending(false);
+                setDeleteError(error instanceof Error ? error.message : '会话删除失败，请重试。');
+              },
+            );
+          }}
+          pending={deletePending}
+          returnFocusTo={deleteRequest.returnFocusTo}
+          session={deleteRequest.session}
+        />
+      )}
       <div aria-live="polite" className={styles.live}>
         {snapshot.connection === 'connected' ? '已连接' : '未连接'}
       </div>

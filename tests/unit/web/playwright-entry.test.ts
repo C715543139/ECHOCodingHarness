@@ -43,6 +43,7 @@ describe('independent Playwright entry', () => {
       'provider-secret.spec.ts',
       'reconnect.spec.ts',
       'responsive.spec.ts',
+      'session-delete.spec.ts',
       'session-flow.spec.ts',
       'trace-large-session.spec.ts',
     ]);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import type {
   ChatTurnDto,
@@ -80,14 +80,32 @@ export function ChatView({
   readonly view?: WebConsoleView;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const latestTurnRef = useRef<HTMLElement>(null);
+  const previousSessionStateRef = useRef<{
+    readonly id: string | undefined;
+    readonly phase: SessionRuntimeDto['phase'] | undefined;
+  }>({ id: undefined, phase: undefined });
   const [followTail, setFollowTail] = useState(true);
   const [hasNewContent, setHasNewContent] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const wired = hasWebConsoleActions(actions);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = scrollRef.current;
+    const previous = previousSessionStateRef.current;
+    const current = { id: session?.id, phase: session?.phase };
+    previousSessionStateRef.current = current;
     if (node === null) {
+      return;
+    }
+    const justFinished =
+      previous.id === current.id &&
+      previous.phase === 'running' &&
+      current.phase !== undefined &&
+      current.phase !== 'running';
+    if (justFinished && latestTurnRef.current !== null) {
+      node.scrollTop = Math.max(0, latestTurnRef.current.offsetTop - 16);
+      setHasNewContent(false);
       return;
     }
     if (followTail) {
@@ -96,7 +114,7 @@ export function ChatView({
       return;
     }
     setHasNewContent(true);
-  }, [turns, followTail]);
+  }, [turns, followTail, session?.id, session?.phase]);
 
   if (session === undefined) {
     return (
@@ -156,8 +174,13 @@ export function ChatView({
           {turns.length === 0 && !view.loadingHistory ? (
             <p>开始对话。历史只投影聚合 Session 事实。</p>
           ) : null}
-          {turns.map((turn) => (
-            <article className={styles.turn} data-turn-id={turn.turnId} key={turn.turnId}>
+          {turns.map((turn, index) => (
+            <article
+              className={styles.turn}
+              data-turn-id={turn.turnId}
+              key={turn.turnId}
+              ref={index === turns.length - 1 ? latestTurnRef : undefined}
+            >
               <h3 className={styles.srOnly}>用户</h3>
               <div className={styles.userRow}>
                 <p className={styles.userBubble}>{turn.userText}</p>

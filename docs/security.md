@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：2.0
+> 版本：2.1
 >
 > 最后更新：2026-08-31
 
@@ -11,7 +11,8 @@
 ECHO Harness 会根据模型输出读取文件、修改代码并启动本地进程。本文件定义首个版本的威胁模型、信任边界与强制控制，目标是在开发工作区内提供可审查的自动化能力。
 
 ECHO 是开发工具，不是恶意代码分析沙箱。安全设计降低误操作和信息泄露风险，但不等价于虚拟机、容器或操作系统访问控制。P2 本地 Web 控制面的已接受设计见
-[ADR-0007](./decisions/0007-local-web-console.md)。P2 已交付 loopback 传输、bootstrap 认证、请求
+[ADR-0007](./decisions/0007-local-web-console.md)，P2.5 单 Session 删除边界见
+[ADR-0009](./decisions/0009-session-deletion-and-completion-focus.md)。P2 已交付 loopback 传输、bootstrap 认证、请求
 防护、Session/Turn/审批/SSE 生产路由和真实 HTTP/SSE transport。Web Chat/设置只投影
 `apiKeyConfigured`，不把密钥写入 DOM、日志或快照；Trace 投影统一删除 reasoning、秘密与绝对路径。
 独立 Fastify 安全夹具、最小环境隔离产物 smoke、Playwright 和 fail-closed Web 产物扫描已进入
@@ -315,6 +316,8 @@ P2 Web adapter 必须同时执行：
 - API Key 只在服务端读取 `ECHO_API_KEY`，浏览器只获得 `apiKeyConfigured` 布尔值；
 - Provider 设置复用严格配置 Schema 和原子写入，活动 Turn 时只读；
 - 工作区由启动参数固定，API 不接受工作区路径；进程同时只允许一个活动 Turn；
+- 单 Session 删除始终由用户确认；活动目标先取消并等待终态持久化。repository 只删除固定工作区
+  `.echo/sessions` 下经 ID 校验的普通文件，拒绝链接、目录、路径参数和删除开始后的新事件追加；
 - P2 不提供导出会话；浏览器不得拼接 DOM 生成下载文件。
 
 bootstrap token、Cookie、Authorization、Provider 响应头和 API Key 不得进入 URL query、应用日志、

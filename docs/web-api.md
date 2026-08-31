@@ -2,7 +2,7 @@
 
 > 状态：Accepted
 >
-> 版本：2.0
+> 版本：2.1
 >
 > 最后更新：2026-08-31
 
@@ -368,6 +368,26 @@ interface UpdateSessionRuntimeRequest {
 语义与 CLI `/model`、`/safety` 相同，仅改变当前 Session，成功后追加相同领域事件。任意活动 Turn
 存在时返回 `409 TURN_ACTIVE`。成功返回更新后的 `SessionViewDto`。
 
+### 6.6 `DELETE /api/v1/sessions/:sessionId`
+
+请求体必须是空 JSON 对象 `{}`，并遵守认证、同源、JSON content-type 与 `X-Echo-Request-Id` 幂等
+规则。成功返回：
+
+```ts
+interface DeletedSessionDto {
+  readonly sessionId: string;
+  readonly stoppedActiveTurn: boolean;
+}
+```
+
+空闲或终态 Session 直接删除，`stoppedActiveTurn=false`。目标是活动 Session 时，服务端必须先取消
+活动 Turn，等待其终态事件完成持久化并释放进程级活动状态，再删除 Session，成功时
+`stoppedActiveTurn=true`。这是一条服务端原子工作流；客户端不得用两个独立 HTTP 请求模拟。
+
+目标不存在返回 `404 NOT_FOUND`。取消、终态等待或存储删除失败返回稳定错误并保留 Session；不得先
+从列表隐藏再报告成功。删除只作用于固定工作区内校验后的单个普通 Session 文件，不接受工作区或文件
+路径。若 SSE 正绑定被删除 Session，成功后服务端关闭该流，客户端按剩余选择重新连接。
+
 ## 7. Turn、取消与审批
 
 ### 7.1 `POST /api/v1/sessions/:sessionId/turns`
@@ -591,7 +611,8 @@ Chat/Trace DOM 生成导出文件。复盘继续使用 CLI 与 Session JSONL。
 
 - 所有路由使用 Schema 校验并覆盖成功、边界和拒绝路径；
 - Fastify 注入测试覆盖认证、Host、Origin、content-type、body limit 和错误脱敏；
-- 幂等测试证明重复 Turn、审批、取消和配置写入不产生第二次副作用；
+- 幂等测试证明重复 Turn、审批、取消、Session 删除和配置写入不产生第二次副作用；
+- 删除测试覆盖空闲目标、活动 Turn 先停止、缺失目标、失败保留和固定工作区普通文件边界；
 - SSE 测试覆盖判别联合、单流所有权、有序补齐、重复、断线、heartbeat、resync 和终态；
 - DTO 快照不得包含绝对路径、秘密或隐藏推理；
 - API 契约变化必须同步本文、类型、测试与 [web-ui.md](./web-ui.md)。

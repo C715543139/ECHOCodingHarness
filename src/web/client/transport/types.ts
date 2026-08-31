@@ -49,6 +49,7 @@ export interface WebConsoleTransport {
   start(): Promise<void>;
   dispose(): void;
   createSession(): void;
+  deleteSession(id: string): Promise<void>;
   selectSession(id: string): void;
   setView(view: WorkspaceView): void;
   openSettings(): void;

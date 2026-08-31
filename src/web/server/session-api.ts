@@ -100,6 +100,7 @@ const TRACE_DETAIL_RESPONSE_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.tr
 const SESSION_VIEW_RESPONSE_SCHEMA = WEB_JSON_SCHEMAS.sessionViewResponse;
 const ACCEPTED_TURN_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.acceptedTurn);
 const ACCEPTED_CANCEL_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.acceptedCancellation);
+const DELETED_SESSION_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.deletedSession);
 const ACCEPTED_APPROVAL_SCHEMA = createApiResponseSchema(WEB_JSON_SCHEMAS.acceptedApproval);
 
 function workspaceName(workspaceRoot: string): string {
@@ -470,6 +471,26 @@ export function registerSessionApiRoutes(app: FastifyInstance, deps: SessionApiD
       const mapped = mappedError(error);
       errorResult(reply, request, mapped.status, mapped.code, mapped.message, mapped.retryable);
     }
+  });
+
+  app.delete('/api/v1/sessions/:sessionId', async (request, reply) => {
+    const { sessionId } = request.params as SessionParams;
+    if (!validateSessionId(reply, request, sessionId)) return;
+    await withIdempotency(request, reply, { sessionId }, async () => {
+      const errors = validateWebJsonSchema(EMPTY_OBJECT_SCHEMA, request.body ?? {});
+      if (errors.length > 0) {
+        return errorResult(
+          reply,
+          request,
+          400,
+          'INVALID_REQUEST',
+          'The session deletion request is invalid.',
+        );
+      }
+      const deleted = await deps.coordinator.deleteSession(sessionId);
+      if (deps.hub.currentStream()?.sessionId === sessionId) deps.hub.closeStream();
+      return envelope(request, deleted, DELETED_SESSION_SCHEMA, 200, reply);
+    });
   });
 
   app.get('/api/v1/sessions/:sessionId/chat', async (request, reply) => {

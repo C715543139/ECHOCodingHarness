@@ -177,4 +177,32 @@ describe('Chat streaming projection', () => {
     await user.click(toast);
     expect(screen.queryByRole('button', { name: '回到最新' })).toBeNull();
   });
+
+  it('positions the completed Turn at its question and answer start', async () => {
+    const user = userEvent.setup();
+    const transport = createFakeTransport({
+      sessions: [createIdleSession()],
+      selectedSessionId: 'ses_idle',
+      turnScript: 'stream',
+    });
+    render(<App transport={transport} />);
+    await user.type(screen.getByLabelText('输入'), 'long tool-heavy turn');
+    await user.keyboard('{Enter}');
+
+    const scroller = screen.getByTestId('chat-scroll');
+    const latestTurn = screen.getByRole('article');
+    Object.defineProperty(scroller, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 900,
+    });
+    Object.defineProperty(latestTurn, 'offsetTop', { configurable: true, value: 420 });
+
+    act(() => {
+      transport.completeActiveTurn();
+    });
+
+    expect(scroller.scrollTop).toBe(404);
+    expect(screen.queryByRole('button', { name: '回到最新' })).toBeNull();
+  });
 });

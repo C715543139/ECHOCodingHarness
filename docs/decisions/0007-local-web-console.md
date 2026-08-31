@@ -8,7 +8,7 @@
 >
 > 决策者：项目维护者
 >
-> 修订：[ADR-0001](./0001-project-foundation.md) 中 P2 域名展示与范围条款；2026-08-30 明确顶栏范围、安全模式展示名，并排除导出会话
+> 修订：[ADR-0001](./0001-project-foundation.md) 中 P2 域名展示与范围条款；2026-08-30 明确顶栏范围、安全模式展示名，并排除导出会话；单 Session 删除由 [ADR-0009](./0009-session-deletion-and-completion-focus.md) 修订
 
 ## 1. 背景
 
@@ -32,7 +32,8 @@ WebUI 可以在固定工作区内创建、列出、恢复和浏览多个 Session
 一个活动 Turn，以避免同一工作区内的并发 Agent 修改。活动 Turn 期间可以只读浏览其他 Session，
 但不能从其他 Session 提交新 Turn，也不能改变活动 Turn 所属 Session 的模型或安全模式。
 
-P2 不提供 Session 删除、跨工作区搜索、受信工作区注册表或后台多 Turn。将来若需要全局控制台，
+P2 原始范围不提供 Session 删除；P2.5 仅按 ADR-0009 增加带确认、活动 Turn 先停止的单 Session
+删除，仍不提供批量删除或回收站。P2 不提供跨工作区搜索、受信工作区注册表或后台多 Turn。将来若需要全局控制台，
 必须以新 ADR 定义工作区登记、授权、索引和进程隔离。
 
 ### 2.2 技术边界
@@ -99,7 +100,7 @@ Session 使用普通 GET，不切断活动流。SSE 的 `id` 使用所绑定 Ses
 服务器先从 Session 查询补齐已提交事件，再进入直播。若请求位置早于可提供窗口，返回显式
 `resync_required`，客户端重新获取聚合快照，不重新提交 Turn。
 
-创建 Session、提交 Turn、取消、审批、改变 Session 运行时和写配置都携带客户端生成的
+创建/删除 Session、提交 Turn、取消、审批、改变 Session 运行时和写配置都携带客户端生成的
 `requestId`。method、规范化 route、requestId 和请求指纹相同的重放必须返回第一次结果；同一键
 对应不同请求指纹时稳定冲突，不得产生第二次工具副作用。审批仍精确绑定 Session、Turn、
 `toolCallId` 与 `approvalKey`。

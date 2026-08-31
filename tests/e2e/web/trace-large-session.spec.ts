@@ -39,11 +39,16 @@ test.describe('large Trace list', () => {
     expect(inspectorOverflow.scrollWidth).toBeLessThanOrEqual(inspectorOverflow.clientWidth);
 
     await list.evaluate((element) => {
-      element.scrollTop = 120;
+      element.scrollTop = element.scrollHeight - element.clientHeight - 16;
       element.dispatchEvent(new Event('scroll', { bubbles: true }));
     });
     const backToLatest = page.getByRole('button', { name: '回到最新' });
     await expect(backToLatest).toBeVisible();
+    await expect
+      .poll(() =>
+        list.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight),
+      )
+      .toBeGreaterThanOrEqual(8);
     expect(
       await backToLatest.evaluate((element) => ({
         bottom: getComputedStyle(element).bottom,

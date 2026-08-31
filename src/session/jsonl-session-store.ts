@@ -45,6 +45,7 @@ export class JsonlSessionStore implements SessionStore {
   private readonly redactionOptions: RedactionOptions;
   private readonly queues = new Map<SessionId, Promise<void>>();
   private readonly lastSequences = new Map<SessionId, number>();
+  private readonly deletingSessionIds = new Set<SessionId>();
 
   constructor(options: JsonlSessionStoreOptions) {
     this.workspaceRoot = path.resolve(options.workspaceRoot);
@@ -71,6 +72,11 @@ export class JsonlSessionStore implements SessionStore {
       assertSessionId(event.sessionId);
     } catch (error) {
       return Promise.reject(error);
+    }
+    if (this.deletingSessionIds.has(event.sessionId)) {
+      return Promise.reject(
+        storageError('SESSION_DELETED', 'The session is being deleted and cannot accept events.'),
+      );
     }
     const previous = this.queues.get(event.sessionId) ?? Promise.resolve();
     const next = previous.then(() => this.appendOrdered(event));
@@ -171,6 +177,39 @@ export class JsonlSessionStore implements SessionStore {
         error,
       );
     }
+  }
+
+  protected deleteSessionFile(sessionId: SessionId): Promise<void> {
+    try {
+      assertSessionId(sessionId);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    this.deletingSessionIds.add(sessionId);
+    const previous = this.queues.get(sessionId) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      try {
+        await this.prepareSessionsDirectory(false);
+        await this.assertRegularSessionFile(sessionId, false);
+        await fs.unlink(this.filePath(sessionId));
+        this.lastSequences.delete(sessionId);
+      } catch (error) {
+        if (isStorageError(error)) throw error;
+        throw storageError(
+          'SESSION_DELETE_FAILED',
+          'The session event log could not be deleted.',
+          error,
+        );
+      }
+    });
+    this.queues.set(
+      sessionId,
+      next.catch(() => undefined),
+    );
+    return next.catch((error: unknown) => {
+      this.deletingSessionIds.delete(sessionId);
+      throw error;
+    });
   }
 
   private filePath(sessionId: SessionId): string {

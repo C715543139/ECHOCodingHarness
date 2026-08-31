@@ -13,6 +13,7 @@ import styles from './shell.module.css';
 const VIRTUALIZE_AFTER = 40;
 const ROW_HEIGHT = 72;
 const OVERSCAN = 6;
+const BOTTOM_TOLERANCE = 8;
 
 export function TraceView({
   records,
@@ -98,11 +99,10 @@ export function TraceView({
         onScroll={(event) => {
           const target = event.currentTarget;
           const distance = target.scrollHeight - target.scrollTop - target.clientHeight;
-          const scrolledAway =
-            target.scrollTop > 0 && (target.clientHeight === 0 || distance > ROW_HEIGHT);
-          if (scrolledAway) {
+          const atBottom = target.clientHeight > 0 && distance <= BOTTOM_TOLERANCE;
+          if (!atBottom) {
             setList((current) => (current.followTail ? pauseTraceFollow(current) : current));
-          } else if (distance <= 8 && target.clientHeight > 0 && !list.followTail) {
+          } else if (!list.followTail) {
             setList((current) => resumeTraceFollow(current));
           }
           if (virtualized) {

@@ -63,6 +63,14 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
+### 2.5 P3 目标（Planned）
+
+P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
+[ADR-0011](./decisions/0011-workspace-extensions.md) 与
+[p3-extensions.md](./plans/p3-extensions.md) 增加显式确认的 `full-access` 和工作区级扩展。它只覆盖
+创建、检查、安装、热加载、跨 Session 复用、禁用、隔离和卸载这一条闭环；不改变 P2 当时明确排除
+插件的历史范围。
+
 ## 3. 架构原则
 
 1. **自主循环归本项目所有**：ECHO 自行维护步骤、历史、工具调度、错误处理和终止条件。
@@ -392,3 +400,28 @@ P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提�
 `ActiveTurnCoordinator` 对活动目标串行执行取消、终态等待和删除，`SessionRepository` 只删除固定
 工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
 Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。
+
+## 18. P3 目标架构（A0 契约冻结，尚未实现）
+
+P3 在现有 ApplicationService、Agent Loop 和 ToolRegistry 之间增加 `ExtensionManager`。它以固定
+`workspaceRoot` 解析 `.echo/extensions/catalog.json`，在已确认 Full Access 时启动 enabled 扩展的
+Worker，并把动态定义注入现有 Registry。Agent Loop 仍在每次模型请求前读取 Registry，因此安装或
+启用成功后的下一次请求自然获得新工具，不建立第二套循环。
+
+```text
+CLI / Web human confirmation
+          |
+          v
+ApplicationService ---- ExtensionManager ---- workspace Catalog
+          |                    |
+          v                    v
+     Agent Loop -------- dynamic ToolRegistry ---- Worker host
+          |
+          v
+ OpenAI-compatible Provider
+```
+
+Full Access 只放开 Central Safety Policy 的授权结论；输入校验、工具 limits、取消、事件、脱敏和进程
+清理继续存在。内置文件工具保持工作区相对路径，广泛访问通过 `run_command` 完成。Worker 是崩溃与
+生命周期隔离，不是 OS 沙箱。Session 事件继续使用现有 `safety.changed` 与工具事件；扩展安装状态由
+工作区 Catalog 持有，不复制进每个 Session JSONL。

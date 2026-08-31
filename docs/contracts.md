@@ -644,8 +644,10 @@ CLI 必须保证同一失败类别在交互与非交互运行中使用相同退�
 
 1. Provider 不能执行工具或控制循环。
 2. 每个已请求工具调用必须进入一个且仅一个终态。
-3. 硬拒绝不能被任何模式、用户批准或模型请求覆盖。
-4. 任何工具路径不得逃逸规范化后的工作区根目录。
+3. `safe`、`balanced`、`auto` 的硬拒绝不能被用户批准或模型请求覆盖；P3 Full Access 只按
+   ADR-0010 的人类确认门放开集中策略。
+4. 内置文件工具路径不得逃逸规范化后的工作区根目录；P3 的广泛访问只通过已确认 Full Access 的
+   `run_command` 完成。
 5. API Key 不得进入事件、日志、模型上下文或工具子进程。
 6. 发送给模型的重要操作结果必须能从脱敏事件重建。
 7. 输出截断必须显式标记，不能伪装成完整结果。
@@ -674,3 +676,24 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 - P1-1B 运行时测试覆盖 Chat 恢复、Slash、Ctrl+C、bracketed paste，以及默认目录端口接到 `ProcessModelCatalog`。
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
+
+## 15. P3 目标契约（A0 冻结，尚未实现）
+
+P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
+[ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。A1 完成后运行时
+`SafetyMode` 才从当前 `safe | balanced | auto` 迁移为
+`safe | balanced | auto | full-access`；A0 的 `P3SafetyMode` 是目标冻结，不代表现在已经可以运行。
+
+Full Access 只有在人类确认后才成为 Session 的有效并持久模式。新 Session 不能仅因配置、CLI 候选
+或继承值而静默获得；非交互 CLI 必须使用 `--allow-full-access`，Web 必须提交
+`fullAccessConfirmation.acceptedRisk=true`。模型不能调用任何接口改变模式。离开后再次进入必须重新
+确认；恢复仍处于 Full Access 的同一 Session 不重复确认。
+
+工作区扩展使用 Manifest/Catalog v1 与 `enabled | disabled | quarantined`。七个模型工具固定为
+`extension_init`、`extension_check`、`extension_install`、`extension_list`、`extension_enable`、
+`extension_disable`、`extension_uninstall`，且只在 Full Access 可见。安装或启用后的动态工具从下一次
+模型请求可见；人类 Web 管理不受当前 Session 模式限制。
+
+P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继续返回 `ToolExecution`，继续产生现有
+工具/Policy/终态事件。Catalog 是扩展状态事实源，Session JSONL 不复制 Catalog 内容。A0 验收矩阵
+允许 `pending:P3-*`；负责实现的任务必须改为真实测试路径，P3-C3 清零全部 pending 后才能宣称完成。

@@ -616,3 +616,42 @@ Chat/Trace DOM 生成导出文件。复盘继续使用 CLI 与 Session JSONL。
 - SSE 测试覆盖判别联合、单流所有权、有序补齐、重复、断线、heartbeat、resync 和终态；
 - DTO 快照不得包含绝对路径、秘密或隐藏推理；
 - API 契约变化必须同步本文、类型、测试与 [web-ui.md](./web-ui.md)。
+
+## 13. P3 API 增量（A0 冻结，尚未实现）
+
+P3 把 `SafetyModeDto` 的目标联合扩展为 `safe | balanced | auto | full-access`。当创建 Session 或
+PATCH runtime 的目标为 Full Access 时，请求必须额外包含：
+
+```ts
+interface FullAccessConfirmationDto {
+  readonly acceptedRisk: true;
+}
+
+interface CreateSessionRequest {
+  readonly model?: string;
+  readonly safetyMode?: SafetyModeDto;
+  readonly fullAccessConfirmation?: FullAccessConfirmationDto;
+}
+```
+
+`UpdateSessionRuntimeRequest` 使用相同字段。非 Full Access 请求携带确认对象应以
+`400 INVALID_REQUEST` 拒绝，避免把可重放的布尔值误作通用授权。确认只对该请求的目标 Session 生效；
+模型工具无法访问这些路由。Session DTO 以 `safetyMode: full-access` 表示已确认事实，不返回确认文本、
+客户端来源或额外秘密。
+
+扩展管理 API 固定为：
+
+```text
+GET  /api/v1/extensions
+POST /api/v1/extensions/:extensionId/enable
+POST /api/v1/extensions/:extensionId/disable
+DELETE /api/v1/extensions/:extensionId
+```
+
+GET 返回当前工作区的有界 `ExtensionSummaryDto[]`：ID、版本、contentHash、
+`enabled|disabled|quarantined`、工具名、loaded、可选脱敏 quarantineReason 与 cleanupPending。三个改变
+状态的请求体均为 `{}`，使用既有 Cookie、Origin、Host、content-type 和 requestId 幂等契约。人类
+Web 管理不要求当前 Session 为 Full Access；活动扩展调用返回 `409 EXTENSION_BUSY`。稳定增量错误码
+包括 `EXTENSION_NOT_FOUND`、`EXTENSION_BUSY`、`EXTENSION_INVALID`、`EXTENSION_QUARANTINED` 与
+`EXTENSION_CLEANUP_PENDING`。Web 不提供 staging 编写、检查或安装端点；这些由 Full Access 下的
+Agent 生命周期工具完成。

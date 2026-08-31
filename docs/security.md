@@ -360,3 +360,20 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 大输出截断与明确标记；
 - 重复工具调用终止；
 - 双盲扫描脚本在已知测试样本上的表现。
+## 19. P3 Full Access 与扩展安全增量
+
+> P3 状态：A0 契约已冻结，运行时尚未实现。现有 `safe`、`balanced`、`auto` 规则仍是当前产品行为。
+
+P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或
+hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git、删除文件并引用工作区外路径。进入
+前必须显示风险；模型不能创建授权；CLI 非交互必须有 `--allow-full-access`；Web 必须由确认对话框
+产生 `acceptedRisk=true`。`safe`、`balanced`、`auto` 行为不得发生回归。
+
+即使在 Full Access，下列边界仍强制执行：输入 Schema 与正规化、超时、取消、输出上限、事件、脱敏、
+进程清理以及不向命令/扩展 Worker 传递 `ECHO_API_KEY`。内置文件工具仍限定工作区相对路径。它们是
+可靠性和隐私边界，不是 OS 隔离；用户授权的命令仍可能对主机产生不可恢复影响。
+
+扩展代码同样不视为可信。它只存放于当前工作区 `.echo/extensions`，在独立 Worker 中执行。Worker
+用于崩溃、超时、取消和卸载隔离，不构成 OS 沙箱。Manifest/入口/工具名/哈希/Catalog 必须严格校验；
+初始化失败、崩溃或协议违规持久化为 `quarantined` 并注销工具。普通工具业务失败不能自动删除扩展。
+跨工作区扫描、全局安装、远程下载、市场和自动更新不在 P3 范围。

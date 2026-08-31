@@ -31,6 +31,10 @@ The following documents are the accepted P0/P1/P2.5 implementation baseline:
 - `docs/plans/p2-webui.md`
 - `docs/plans/p2-5-webui.md`
 - `docs/plans/p2-acceptance-matrix.md`
+- `docs/decisions/0010-full-access-mode.md`
+- `docs/decisions/0011-workspace-extensions.md`
+- `docs/plans/p3-extensions.md`
+- `docs/plans/p3-acceptance-matrix.md`
 - `docs/web-api.md`
 - `docs/web-ui.md`
 - `docs/testing.md`
@@ -50,6 +54,9 @@ new ADR.
   own.
 - P2 only includes the fixed-workspace local Web console defined by ADR-0007. Do not expand it into
   MCP, multi-agent execution, Skill/plugin support, remote access, or a showcase site.
+- P3 is limited to the explicitly confirmed `full-access` mode and workspace-scoped extension
+  lifecycle in ADR-0010/0011. Do not turn it into a global plugin platform, marketplace, remote
+  installer, MCP/Skill compatibility layer, OS sandbox, OCR system, or multi-agent runtime.
 
 ## Test-first delivery
 
@@ -109,6 +116,12 @@ a regression test that fails for the original behavior.
   competing DTOs, policy logic, or Session state machines.
 - Shared Fastify route assembly, React shell composition, package scripts, and CI workflow changes
   belong to an explicit P2 integration task after feature branches pass focused tests.
+- P3-A0 freezes the Full Access target union, confirmation contract, extension Manifest/Catalog,
+  Worker messages, lifecycle tools, Web boundary, and acceptance matrix. P3-A1 and P3-A2 may then
+  run in parallel. P3-B1 owns the Worker host and dynamic Registry; P3-B3 owns the Web increment and
+  may run alongside B1 only after A1/A2 are integrated. P3-B2 consumes A1+B1, and P3-C1 alone owns
+  final CLI/Web/ApplicationService assembly. No branch may create a competing P3 DTO or state
+  machine.
 - Keep worktree directories outside this repository and never commit host-specific absolute paths.
 
 ## Code conventions

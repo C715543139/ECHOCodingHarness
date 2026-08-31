@@ -79,6 +79,32 @@ export type { P1MatrixRow } from './p1-matrix.js';
 export { P1_TEST_MATRIX } from './p1-matrix.js';
 export type { P15MatrixRow } from './p15-matrix.js';
 export { P15_TEST_MATRIX } from './p15-matrix.js';
+export type {
+  EstablishedSafetyMode,
+  ExtensionCatalog,
+  ExtensionCatalogEntry,
+  ExtensionLifecycleToolName,
+  ExtensionManifest,
+  ExtensionState,
+  ExtensionToolManifest,
+  FullAccessConfirmation,
+  FullAccessConfirmationSource,
+  P3MatrixArea,
+  P3MatrixRow,
+  P3RuntimeTask,
+  P3SafetyMode,
+} from './p3.js';
+export {
+  FULL_ACCESS_CONFIRMATION_SOURCES,
+  P3_EXTENSION_CATALOG_SCHEMA_VERSION,
+  P3_EXTENSION_LIFECYCLE_TOOLS,
+  P3_EXTENSION_MANIFEST_SCHEMA_VERSION,
+  P3_EXTENSION_STATES,
+  P3_EXTENSION_WORKER_REQUESTS,
+  P3_EXTENSION_WORKER_RESPONSES,
+  P3_SAFETY_MODES,
+  P3_TEST_MATRIX,
+} from './p3.js';
 export type { EventRenderer, OutputChannel, RenderCapabilities, RenderChunk } from './rendering.js';
 export type { PolicyDecision, PolicyRequest, SafetyMode, SafetyPolicy } from './safety.js';
 export {

@@ -372,3 +372,19 @@ P2 不提供导出会话。不实现 Session 菜单、Markdown/JSON 下载、浏
 - 导出会话（Markdown、JSON 或其它下载）；
 - 消息刷新操作，以及把发现模型列表当作当前 Session 模型选择器；
 - 用 `Workspace Write` 或其它第三方权限名替代 `safe` / `balanced` / `auto`。
+## 13. P3 Full Access 与扩展页面增量
+
+> 状态：A0 设计冻结，尚未实现。
+
+现有 Chat/Trace/Inspector 布局保持不变。安全模式候选增加 `full-access`；用户选择后必须先看到明确
+说明网络、依赖、Git、删除、工作区外访问和任意模型命令风险的确认对话框。取消不改变模式；确认成功
+后顶栏或输入区常驻红色 `FULL ACCESS` 状态，不得仅用颜色表达，也不得在 Turn 完成后消失。恢复同一
+Full Access Session 时直接恢复标识；离开该模式后立即移除。
+
+设置导航增加一个“扩展”页面，与 Provider 页面并列并保留后续扩展性。页面只展示当前工作区的扩展
+ID、版本、内容哈希缩写、`enabled|disabled|quarantined`、提供的工具、当前进程 loaded、隔离原因和
+cleanup pending。人类可以启用、禁用和卸载；卸载始终二次确认，活动调用时显示先停止当前 Turn 的
+明确错误。UI 不提供源码编辑器、远程安装、市场、版本回滚或扩展自定义页面。
+
+Agent 调用 `extension_*` 和动态工具继续进入现有 Chat 工具摘要、Trace 时间序列与 Inspector 结构化
+详情。页面不得显示扩展源码中的秘密、绝对个人路径、Worker 原始堆栈或隐藏推理。

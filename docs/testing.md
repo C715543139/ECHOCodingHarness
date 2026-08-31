@@ -364,3 +364,18 @@ response body.
 - P2 production assembly, live Session/Turn/Trace APIs, real HTTP/SSE transport, package/CI wiring,
   complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
   cleanup are complete.
+
+## P3 quality plan（A0 contract freeze）
+
+`P3_TEST_MATRIX` 位于 `src/contracts/p3.ts`，权威文档是
+[p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 使用 `pending:P3-*` 标记后续运行时所有权；
+A1–C3 必须逐项替换为存在的测试路径，最终不得保留 pending。
+
+P3 继续以 `pnpm check` 为最小门禁，并增加：Full Access 的确认与三旧模式回归；Manifest/Catalog
+Schema、原子写与工作区隔离；Worker 超时、取消、崩溃、协议和凭据继承；动态 Registry 的下一模型
+请求边界；七个生命周期工具和故障注入；Web 风险确认、常驻 FULL ACCESS、扩展管理与无障碍；独立
+产物从非仓库 cwd 加载扩展；Fake Provider 跨 Session 故事；合成 PDF 的失败/成功控制、受保护输入
+哈希和 Harness 外独立复验。
+
+真实 Provider/PDF 验收显式本地运行，不进入 CI，不打印模型正文或凭据。普通命令 `exitCode=0` 仍只
+表示该命令成功；只有哈希未变且独立复验通过，UI/文档才可以写“可信验收通过”。

@@ -26,7 +26,7 @@ async function readDoc(relativePath: string): Promise<string> {
   return fs.readFile(path.join(ROOT, relativePath), 'utf8');
 }
 
-describe('P3-A0 frozen contracts', () => {
+describe('P3 contracts', () => {
   it('freezes the target modes, explicit confirmation, lifecycle, states, and worker messages', () => {
     expect(P3_SAFETY_MODES).toEqual(['safe', 'balanced', 'auto', 'full-access']);
     expect(FULL_ACCESS_CONFIRMATION_SOURCES).toEqual(['cli-interactive', 'cli-flag', 'web-dialog']);
@@ -51,14 +51,18 @@ describe('P3-A0 frozen contracts', () => {
     expectTypeOf<ExtensionCatalog>().toHaveProperty('revision');
   });
 
-  it('keeps every planned requirement uniquely owned by a later runtime task', () => {
+  it('keeps every requirement uniquely owned with pending or existing runtime evidence', async () => {
     const ids = P3_TEST_MATRIX.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(P3_TEST_MATRIX.length).toBeGreaterThanOrEqual(14);
     expect(P3_TEST_MATRIX.every((row) => row.contractEvidence.length > 0)).toBe(true);
-    expect(
-      P3_TEST_MATRIX.every((row) => row.runtimeEvidence === `pending:${row.runtimeTask}`),
-    ).toBe(true);
+    for (const row of P3_TEST_MATRIX) {
+      if (row.runtimeEvidence.startsWith('pending:')) {
+        expect(row.runtimeEvidence).toBe(`pending:${row.runtimeTask}`);
+        continue;
+      }
+      await expect(fs.stat(path.join(ROOT, row.runtimeEvidence))).resolves.toBeDefined();
+    }
   });
 
   it('keeps P3 documents aligned on authority, scope, lifecycle, and exclusions', async () => {

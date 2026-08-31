@@ -1,9 +1,6 @@
 import type { SafetyMode } from './safety.js';
 
-/**
- * P3 contract target. `SafetyMode` remains the accepted P0-P2 runtime union until P3-A1 wires the
- * confirmation gate and promotes this union into the runtime boundary.
- */
+/** P3 safety-mode contract. P3-A1 promotes this union into the runtime boundary. */
 export const P3_SAFETY_MODES = ['safe', 'balanced', 'auto', 'full-access'] as const;
 export type P3SafetyMode = (typeof P3_SAFETY_MODES)[number];
 export type EstablishedSafetyMode = SafetyMode;
@@ -102,7 +99,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'full-access',
     requirement: 'Full Access requires an explicit human confirmation bound to the target session',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'pending:P3-A1',
+    runtimeEvidence: 'tests/unit/application/full-access.test.ts',
     runtimeTask: 'P3-A1',
   },
   {
@@ -111,7 +108,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Confirmed Full Access bypasses per-operation policy approval while preserving validation, limits, cancellation, events, redaction, and cleanup',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'pending:P3-A1',
+    runtimeEvidence: 'tests/unit/security/command-policy.test.ts',
     runtimeTask: 'P3-A1',
   },
   {
@@ -119,7 +116,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'guard',
     requirement: 'Safe, balanced, and auto behavior remains unchanged',
     contractEvidence: 'docs/security.md',
-    runtimeEvidence: 'pending:P3-A1',
+    runtimeEvidence: 'tests/unit/application/full-access.test.ts',
     runtimeTask: 'P3-A1',
   },
   {
@@ -128,7 +125,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Extensions are persisted only under the current workspace .echo directory and never shared across workspaces',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'pending:P3-A2',
+    runtimeEvidence: 'tests/unit/extensions/workspace-isolation.test.ts',
     runtimeTask: 'P3-A2',
   },
   {
@@ -137,7 +134,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Manifest, entry paths, tool names, content hashes, and atomic catalog writes fail closed',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'pending:P3-A2',
+    runtimeEvidence: 'tests/unit/extensions/catalog.test.ts',
     runtimeTask: 'P3-A2',
   },
   {

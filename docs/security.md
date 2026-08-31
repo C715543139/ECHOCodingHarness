@@ -362,8 +362,8 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A1 Full Access 授权与安全模式运行时已实现；扩展存储、Worker、Registry、生命周期和
-> WebUI 仍由后续任务交付。
+> P3 状态：A1 Full Access 授权与安全模式运行时、A2 工作区扩展存储边界均已实现；Worker、动态
+> Registry、生命周期与 WebUI 仍由后续任务交付。现有 `safe`、`balanced`、`auto` 规则保持不变。
 
 P3 的 `full-access` 是显式知情授权，不是更强的沙箱。确认后集中策略不再对已注册工具逐项 ask 或
 hard deny，`run_command` 因而可能访问网络、安装依赖、操作 Git、删除文件并引用工作区外路径。进入
@@ -387,3 +387,17 @@ Central Safety Policy 的 Full Access 分支仅返回 `policy.tool.full_access` 
 用于崩溃、超时、取消和卸载隔离，不构成 OS 沙箱。Manifest/入口/工具名/哈希/Catalog 必须严格校验；
 初始化失败、崩溃或协议违规持久化为 `quarantined` 并注销工具。普通工具业务失败不能自动删除扩展。
 跨工作区扫描、全局安装、远程下载、市场和自动更新不在 P3 范围。
+
+A2 存储读取只信任绑定工作区中的严格 Catalog，不枚举其他工作区，也不从安装目录猜测或重建状态。
+扩展目录、Manifest 入口/自测与 Catalog 文件都拒绝链接和解析后逃逸；内容哈希读取期间发生文件身份或
+目录集合变化同样失败。Catalog 更新采用同目录临时文件、flush、原子替换和 revision 检查，任何损坏、
+不兼容、完整性不符、恢复不确定或写入失败都保持失败关闭。绑定工作区的 Store 不接受外部 paths 或
+owned root 参数，底层目录快照/路径派生函数也不作为扩展模块公共 API 暴露，避免调用方用另一工作区
+的合法路径绕过实例边界。
+
+Store 必须经异步 `open()` 固定 canonical workspace 与扩展基础目录的设备/inode/创建身份。每次文件或
+Catalog 操作前复验该绑定；原始 alias/junction 后续改指不会迁移实例，绑定目录被替换、重建、删除或
+改链分别以 `WORKSPACE_CHANGED` 或 `LINK_DENIED` 失败。公开返回的路径是副本，不能修改实例内部绑定。
+
+名称冲突检查始终包含全部 `DEFAULT_TOOLS` 和 `extension_` 生命周期命名空间。依赖注入只能通过
+`reservedToolNames` 追加宿主保留名，不能用空集或不完整列表削弱默认冲突集合。

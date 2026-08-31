@@ -20,6 +20,7 @@ export * from './config/index.js';
 export * from './context/index.js';
 export * from './contracts/index.js';
 export { PROJECT_NAME, PROJECT_TAGLINE, PROJECT_VERSION } from './core/project.js';
+export * from './extensions/index.js';
 export * from './provider/index.js';
 export { CentralSafetyPolicy, POLICY_RULE_IDS } from './security/index.js';
 export * from './session/index.js';

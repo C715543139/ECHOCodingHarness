@@ -681,12 +681,13 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
 
-## 15. P3 增量契约（A1 Full Access 已实现）
+## 15. P3 增量契约（A1/A2 已实现）
 
 P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。P3-A1 已把运行时
 `SafetyMode` 迁移为 `safe | balanced | auto | full-access`，并复用 A0 冻结的
-`FullAccessConfirmation`；Manifest、Catalog、Worker、动态 Registry 与生命周期仍由后续任务实现。
+`FullAccessConfirmation`。P3-A2 已实现 Manifest、Catalog 与工作区存储；Worker、动态 Registry 与生命
+周期仍由后续任务实现。
 
 Full Access 只有在人类确认后才成为 Session 的有效并持久模式。新 Session 不能仅因配置、CLI 候选
 或继承值而静默获得；非交互 CLI 必须使用 `--allow-full-access`，Web 必须提交
@@ -706,3 +707,15 @@ Session 只保留新的非 Full Access 事实，再次进入必须提供新的�
 P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继续返回 `ToolExecution`，继续产生现有
 工具/Policy/终态事件。Catalog 是扩展状态事实源，Session JSONL 不复制 Catalog 内容。A0 验收矩阵
 允许 `pending:P3-*`；负责实现的任务必须改为真实测试路径，P3-C3 清零全部 pending 后才能宣称完成。
+
+P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。调用方
+必须通过异步 `WorkspaceExtensionStore.open(workspaceRoot)` 创建实例；open 一次性固定 canonical 根和
+扩展基础目录身份，后续不重新解析原始 workspaceRoot。实例只管理该工作区的 staging、安装根和
+Catalog；Manifest/Catalog、工具 JSON Schema、
+路径、链接、名称冲突、完整 SHA-256 和原子写均在此边界验证。Store 的路径派生与内容快照 API 只接收
+扩展 ID、内容哈希或 Catalog 条目，不接受调用方提供的工作区路径、扩展根或 owned root；可绕过绑定
+工作区的底层文件系统函数不从 `src/extensions/index.ts` 导出。A1/A2 合并后由集成分支统一同步
+`src/contracts/p3.ts` 中 FULL-01/02/03 与 EXT-01/02 的真实运行时证据。
+
+Store 的可选 `reservedToolNames` 只能在全部 `DEFAULT_TOOLS` 之上追加宿主保留名，不能替换或缩减
+内置集合；因此测试注入或后续 Registry 组装都不能意外开放内置工具名覆盖。

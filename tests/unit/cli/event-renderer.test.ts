@@ -798,6 +798,8 @@ describe('render helpers', () => {
     expect(extractTestEvidence('# tests 2\n# pass 1\n# fail 1\n', '')).toBe('1 test failed');
     expect(extractTestEvidence('# tests 12\n# pass 12\n# fail 0\n', '')).toBe('12 tests passed');
     expect(extractTestEvidence('ℹ pass 2\nℹ fail 0\n', '')).toBe('2 tests passed');
+    expect(extractTestEvidence('Tests  3 passed (3)\n', '')).toBe('3 tests passed');
+    expect(extractTestEvidence(`Tests ${'9'.repeat(100_000)}x passed\n`, '')).toBeUndefined();
   });
 
   it('does not change run output for frozen P1 session events', () => {

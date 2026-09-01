@@ -69,12 +69,18 @@ function isAbsoluteOnAnyPlatform(value: string): boolean {
   return /^(?:[A-Za-z]:|[/\\]{2})/u.test(value) || value.startsWith('/') || value.startsWith('\\');
 }
 
+function trimWindowsPathSuffix(segment: string): string {
+  let end = segment.length;
+  while (end > 0) {
+    const code = segment.charCodeAt(end - 1);
+    if (code !== 32 && code !== 46) break;
+    end -= 1;
+  }
+  return segment.slice(0, end);
+}
+
 function isWindowsDeviceName(segment: string): boolean {
-  const base =
-    segment
-      .replace(/[ .]+$/u, '')
-      .split('.')[0]
-      ?.toUpperCase() ?? '';
+  const base = trimWindowsPathSuffix(segment).split('.')[0]?.toUpperCase() ?? '';
   return /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]|CONIN\$|CONOUT\$)$/u.test(base);
 }
 

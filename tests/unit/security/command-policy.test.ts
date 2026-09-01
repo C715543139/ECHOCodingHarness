@@ -85,6 +85,23 @@ describe('CentralSafetyPolicy', () => {
     }
   });
 
+  it.each([
+    ['Git clean force flags', 'git clean -df'],
+    ['Git force push', 'git push origin main --force-with-lease'],
+    ['long-spaced Git reset', `git${' '.repeat(50_000)}reset --hard`],
+    ['long Git clean flag', `git clean ${'-'.repeat(50_000)}f`],
+  ])('classifies %s without backtracking over untrusted command text', async (_label, command) => {
+    await expect(evaluateCommand(command)).resolves.toEqual(
+      expect.objectContaining({ action: 'deny', hard: true }),
+    );
+  });
+
+  it('keeps a long non-force Git push in the approval path', async () => {
+    await expect(
+      evaluateCommand(`git push origin main ${'-'.repeat(50_000)}x`),
+    ).resolves.toMatchObject({ action: 'ask' });
+  });
+
   it('allows every registered-tool request in Full Access without per-operation approval', async () => {
     await expect(evaluateCommand('pnpm install', 'full-access')).resolves.toMatchObject({
       action: 'allow',

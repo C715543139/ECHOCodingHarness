@@ -312,6 +312,7 @@ P2 Web adapter 必须同时执行：
 - bootstrap 成功后设置进程级 `HttpOnly; SameSite=Strict` Cookie，并立即移除 fragment；
 - 所有 API 与 SSE 验证 Cookie；所有状态改变请求验证 JSON content-type、Origin、Host 与 requestId；
 - 静态页面设置 CSP、`frame-ancestors 'none'`、nosniff 和必要的 no-store；
+- Web Shell 的 `index.html` 在服务启动时有界读取并缓存，路由不为每次请求重复访问文件系统；
 - 请求体和所有 ID/正文有界，错误响应不包含堆栈、绝对路径或敏感参数；
 - 页面关闭、刷新或 SSE 断开不得自动批准、取消、重试或重新执行；
 - API Key 只在服务端读取 `ECHO_API_KEY`，浏览器只获得 `apiKeyConfigured` 布尔值；
@@ -360,6 +361,7 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 命令超时、取消和进程树清理；
 - 大输出截断与明确标记；
 - 重复工具调用终止；
+- 面向模型输出、Manifest、文件路径和命令文本的字符串检查采用线性扫描或有界输入，避免正则回溯拒绝服务；
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 

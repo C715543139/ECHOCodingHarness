@@ -63,9 +63,9 @@ function isAsciiDigit(character: string): boolean {
 function numericTokenBeforeWord(text: string, word: string): number | undefined {
   const tokens = text.split(/\s+/u);
   for (let index = 1; index < tokens.length; index += 1) {
-    const token = tokens[index]?.toLocaleLowerCase('en-US') ?? '';
-    if (!token.startsWith(word)) continue;
-    const suffix = token[word.length];
+    const label = tokens[index]?.toLocaleLowerCase('en-US') ?? '';
+    if (!label.startsWith(word)) continue;
+    const suffix = label[word.length];
     if (suffix !== undefined && /[A-Za-z0-9_]/u.test(suffix)) continue;
     const candidate = tokens[index - 1] ?? '';
     if (candidate.length === 0 || ![...candidate].every(isAsciiDigit)) continue;

@@ -101,11 +101,18 @@ function askOrApproved(
   return { action: 'ask', reason: redacted, approvalKey: key, ruleId };
 }
 
+function trimTrailingPathSeparators(value: string): string {
+  let end = value.length;
+  while (end > 0) {
+    const code = value.charCodeAt(end - 1);
+    if (code !== 47 && code !== 92) break;
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 function normalizedRoot(workspaceRoot: string): string {
-  return path
-    .resolve(workspaceRoot)
-    .replace(/[\\/]+$/u, '')
-    .toLocaleLowerCase('en-US');
+  return trimTrailingPathSeparators(path.resolve(workspaceRoot)).toLocaleLowerCase('en-US');
 }
 
 function isInsideWorkspace(candidate: string, workspaceRoot: string): boolean {
@@ -200,6 +207,42 @@ const DELETE_COMMAND_PATTERN = /\b(?:Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
 const FILESYSTEM_WRITE_PATTERN =
   /\b(?:Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Rename-Item|Out-File|Tee-Object|Export-Clixml|Export-Csv|sc|ac|ni|cp|copy|cpi|mv|move|mi|ren|rni|tee|Remove-Item|ri|rm|del|erase|rmdir|rd)\b/iu;
 
+function trimShellTokenEdges(value: string): string {
+  let start = 0;
+  let end = value.length;
+  const edges = new Set(['"', "'", '(', ')', '{', '}']);
+  while (start < end && edges.has(value[start] ?? '')) start += 1;
+  while (end > start && edges.has(value[end - 1] ?? '')) end -= 1;
+  return value.slice(start, end);
+}
+
+function isDestructiveGitCommand(command: string): boolean {
+  const words = command
+    .toLocaleLowerCase('en-US')
+    .split(/[\s;&|]+/u)
+    .map(trimShellTokenEdges)
+    .filter((word) => word.length > 0);
+  for (let index = 0; index < words.length - 1; index += 1) {
+    if (words[index] !== 'git') continue;
+    const operation = words[index + 1];
+    const argumentsAfterOperation = words.slice(index + 2);
+    if (operation === 'reset' && argumentsAfterOperation.includes('--hard')) return true;
+    if (
+      operation === 'clean' &&
+      argumentsAfterOperation.some((argument) => argument.startsWith('-') && argument.includes('f'))
+    ) {
+      return true;
+    }
+    if (
+      operation === 'push' &&
+      argumentsAfterOperation.some((argument) => argument.startsWith('--force'))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isBroadDelete(command: string, workspaceRoot: string): boolean {
   if (!DELETE_COMMAND_PATTERN.test(command)) return false;
   const root = normalizedRoot(workspaceRoot);
@@ -272,9 +315,7 @@ function classifyCommand(command: string, workspaceRoot: string): RiskClassifica
     /\breg(?:\.exe)?\s+delete\s+(?:HKLM|HKEY_LOCAL_MACHINE|HKCU|HKEY_CURRENT_USER)\\/iu.test(
       command,
     ) ||
-    /\bgit\s+(?:reset\s+--hard|clean\s+[^\r\n]*-[^\s]*f|push\s+[^\r\n]*--force)\b/iu.test(
-      command,
-    ) ||
+    isDestructiveGitCommand(command) ||
     isBroadDelete(command, workspaceRoot)
   ) {
     return {

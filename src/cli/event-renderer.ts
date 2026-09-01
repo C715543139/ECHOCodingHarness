@@ -56,6 +56,24 @@ function plural(value: number, singular: string, pluralForm = `${singular}s`): s
   return `${String(value)} ${value === 1 ? singular : pluralForm}`;
 }
 
+function isAsciiDigit(character: string): boolean {
+  return character >= '0' && character <= '9';
+}
+
+function numericTokenBeforeWord(text: string, word: string): number | undefined {
+  const tokens = text.split(/\s+/u);
+  for (let index = 1; index < tokens.length; index += 1) {
+    const label = tokens[index]?.toLocaleLowerCase('en-US') ?? '';
+    if (!label.startsWith(word)) continue;
+    const suffix = label[word.length];
+    if (suffix !== undefined && /[A-Za-z0-9_]/u.test(suffix)) continue;
+    const candidate = tokens[index - 1] ?? '';
+    if (candidate.length === 0 || ![...candidate].every(isAsciiDigit)) continue;
+    return Number(candidate);
+  }
+  return undefined;
+}
+
 function metaString(metadata: ToolMetadata | undefined, key: string): string | undefined {
   const value = metadata?.[key];
   return typeof value === 'string' ? value : undefined;
@@ -88,14 +106,14 @@ export function extractTestEvidence(stdout: string, stderr: string): string | un
     return plural(passed, 'test passed', 'tests passed');
   }
 
-  const vitestFailed = text.match(/Tests?\s+(\d+)\s+failed/u);
-  const vitestPassed = text.match(/(\d+)\s+passed/u);
-  if (vitestFailed?.[1] !== undefined) {
-    const failed = Number(vitestFailed[1]);
+  const vitestFailed = numericTokenBeforeWord(text, 'failed');
+  const vitestPassed = numericTokenBeforeWord(text, 'passed');
+  if (vitestFailed !== undefined) {
+    const failed = vitestFailed;
     if (failed > 0) return plural(failed, 'test failed', 'tests failed');
   }
-  if (vitestPassed?.[1] !== undefined && /\bpassed\b/u.test(text) && !/\bfailed\b/iu.test(text)) {
-    return plural(Number(vitestPassed[1]), 'test passed', 'tests passed');
+  if (vitestPassed !== undefined && /\bpassed\b/u.test(text) && !/\bfailed\b/iu.test(text)) {
+    return plural(vitestPassed, 'test passed', 'tests passed');
   }
   return undefined;
 }

@@ -257,7 +257,13 @@ function isWindowsDeviceName(segment: string): boolean {
 }
 
 function trimWindowsPathSuffix(segment: string): string {
-  return segment.replace(/[ .]+$/u, '');
+  let end = segment.length;
+  while (end > 0) {
+    const code = segment.charCodeAt(end - 1);
+    if (code !== 32 && code !== 46) break;
+    end -= 1;
+  }
+  return segment.slice(0, end);
 }
 
 function assertCanonicalGitWriteAllowed(

@@ -1,5 +1,4 @@
-import { createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import fastifyStatic from '@fastify/static';
@@ -170,13 +169,14 @@ export async function registerWebRoutes(
   }
   try {
     await access(assetRoot);
+    const indexHtml = await readFile(path.join(assetRoot, 'index.html'), 'utf8');
     await app.register(fastifyStatic, {
       root: assetRoot,
+      index: false,
       wildcard: false,
     });
     app.get('/', async (_request, reply) => {
-      const index = path.join(assetRoot, 'index.html');
-      return reply.type('text/html').send(createReadStream(index));
+      return reply.type('text/html').send(indexHtml);
     });
   } catch {
     // Tests may omit packaged assets; API-only mode remains valid.

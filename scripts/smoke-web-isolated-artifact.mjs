@@ -225,6 +225,10 @@ function copyPublishTree(packageDir) {
     recursive: true,
   });
   fs.copyFileSync(path.join(repoRoot, 'pnpm-lock.yaml'), path.join(packageDir, 'pnpm-lock.yaml'));
+  fs.copyFileSync(
+    path.join(repoRoot, 'pnpm-workspace.yaml'),
+    path.join(packageDir, 'pnpm-workspace.yaml'),
+  );
   fs.mkdirSync(path.join(packageDir, 'dist', 'config'), { recursive: true });
   const publishConfig = isolatedPublishConfig();
   const configText = `${JSON.stringify(publishConfig)}\n`;

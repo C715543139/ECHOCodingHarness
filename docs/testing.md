@@ -4,7 +4,7 @@
 >
 > 版本：2.0
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## Automated quality gate
 
@@ -330,7 +330,7 @@ The 2026-08-31 C2 historical checkpoint passed `pnpm check` with 117 test files 
 coverage of 85.01% statements, 76.94% branches, 89.04% functions, and 86.80% lines. Playwright
 Chromium was 9/9 at that checkpoint.
 
-The current P2.5 acceptance baseline passes `pnpm check` with 118 test files / 658 tests and
+The 2026-08-31 P2.5 historical acceptance checkpoint passed `pnpm check` with 118 test files / 658 tests and
 coverage of 85.09% statements, 76.94% branches, 90.08% functions, and 86.91% lines. Playwright
 Chromium is 13/13 across 11 spec files; offline evals remain 11/11 and demo smoke remains 1/1.
 Controlled Provider acceptance used `deepseek/deepseek-v4-flash` and completed packaged Web Chat,
@@ -365,11 +365,12 @@ response body.
   complete browser quality gates, controlled real-Provider acceptance, and documentation/asset
   cleanup are complete.
 
-## P3 accepted quality evidence
+## P3/P3.5 accepted quality evidence
 
 `P3_TEST_MATRIX` 位于 `src/contracts/p3.ts`，权威文档是
 [p3-acceptance-matrix.md](./plans/p3-acceptance-matrix.md)。A0 曾用 `pending:P3-*` 标记后续运行时所有权；
-P3-C3 已逐项补齐存在的测试路径。并行阶段保持共享合同冻结，最终由集成分支同步可机读矩阵。
+P3-C3 已逐项补齐存在的测试路径；P3.5 将每行 `runtimeEvidence` 固定为全部主要路径组成的只读数组，
+并由契约测试验证路径存在且没有 pending 所有权。并行阶段保持共享合同冻结，最终由集成分支同步矩阵。
 
 P3-A1 自动证据包括：
 
@@ -402,11 +403,12 @@ Schema、原子写与工作区隔离；Worker 超时、取消、崩溃、协议�
 - `tests/unit/extensions/catalog.test.ts`：三种冻结状态、revision、损坏与未知版本、哈希篡改、Catalog
   链接、原子替换故障、陈旧 revision 和不确定恢复失败关闭；
 - `tests/unit/extensions/workspace-isolation.test.ts`：两个临时工作区互不可见、Store API 不接受外部根、
-  canonical workspace 在 alias/junction 改指后保持固定、目录身份替换失败关闭，并验证 `.echo/` Git
-  忽略。
+  canonical workspace 在 alias/junction 改指后保持固定、目录身份替换失败关闭；真实临时 Git 仓库还
+  验证 Store 保留已有 `.echo/.gitignore` 内容、确保最终 `*`，不修改根忽略文件且 `git status` 干净。
 
-P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七个 `extension_*` 生命周期工具或 Web
-接线。A1/A2 合并后，集成分支已把 FULL-01/02/03 与 EXT-01/02 替换为真实证据路径。
+P3-A2 当时的阶段边界是不加载或执行扩展代码，也不单独实现 Worker、动态 Registry、七个
+`extension_*` 生命周期工具或 Web 接线；这些能力随后由 B1–C1 集成。A1/A2 合并后，集成分支已把
+FULL-01/02/03 与 EXT-01/02 替换为真实证据路径。
 
 ### P3-B1 Worker and Registry evidence
 
@@ -420,11 +422,12 @@ P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七�
 
 ### P3-B2 lifecycle evidence
 
-- `tests/unit/extensions/lifecycle.test.ts`：不覆盖的四文件 staging 模板与作者规范、结构化 check、
-  Worker/自测失败、首次安装、同哈希幂等、不同哈希替换、enable/disable/list、两个工作区隔离、活动
-  调用 busy、Worker fault 持久 quarantine、卸载删除故障的 deactivated/cleanupPending 与重试；
+- `tests/unit/extensions/lifecycle.test.ts`：不覆盖的四文件 staging 模板与作者规范、精确的
+  `ToolExecution` 成功/失败形状、结构化 check、Worker/自测失败、首次安装、同哈希幂等、不同哈希
+  替换后只保留当前版本、替换清理失败的 cleanupPending 持久化与重试、enable/disable/list、两个
+  工作区隔离、活动调用 busy、Worker fault 持久 quarantine、卸载删除故障的 deactivated/pending 与重试；
 - 同文件验证七个 `extension_*` 工具的固定集合、严格输入与稳定 `ToolExecution` 错误映射；
-- LIFE-01/02 已在 `P3_TEST_MATRIX` 指向上述真实路径；C1 已负责只在确认 Full Access 的模型请求边界
+- LIFE-01/02/03 已在 `P3_TEST_MATRIX` 指向上述真实路径；C1 已负责只在确认 Full Access 的模型请求边界
   暴露这些定义，并完成进程重启加载和跨 Session 复用证据。
 
 ### P3-C1 production integration evidence
@@ -441,19 +444,28 @@ P3-A2 不加载或执行扩展代码，不实现 Worker、动态 Registry、七�
 - `fixtures/p3-pdf-demo/requirements.pdf` 是确定性生成的普通文本 PDF，只含合成要求；
 - `pnpm p3:demo:baseline` 要求独立测试失败，`pnpm p3:demo:verify` 要求独立测试通过；两者都先校验
   `evidence-lock.json` 中 PDF、受保护测试和 fixture 配置的 SHA-256；
-- `tests/integration/p3-pdf-demo.test.ts` 在临时工作区使用 Fake Provider，证明 Agent 能创作并自测
-  `pdf-reader`、通过 `extension_check` 后安装、在下一请求读取 PDF、观测失败、修复源码、复测成功，
-  并在另一新 Session 复用已安装工具；
-- `scripts/accept-p3-pdf-demo.mjs` 使用构建产物和真实 Provider 做显式本地验收，完成后仍由 Harness 外
-  Node 子进程复验并确认受保护哈希不变。该脚本不属于 `pnpm check`，CI 不联网也不读取 `.env.test`。
+- `tests/integration/p3-pdf-demo.test.ts` 在临时工作区使用 Fake Provider，证明首个模型请求没有 PDF
+  工具，Agent 能自主创作并自测扩展、检查安装后在下一请求读取 PDF、观测失败、修复源码、复测成功，
+  并在另一新 Session 复用已安装工具；同路径的新工作区首个请求仍没有该工具；
+- `scripts/accept-p3-pdf-demo.mjs` 使用构建产物和真实 Provider 做显式本地验收，只读取每轮精确新增的
+  Session，按真实 `extension_init → extension_check → extension_install → 动态工具` 事件发现 Agent
+  自主选择的扩展和工具，拒绝安装前通过现有工具直接读取 PDF，并验证精确新 Session 复用与另一
+  工作区隔离。完成后仍由 Harness 外 Node 子进程复验并确认受保护哈希不变。该脚本不属于
+  `pnpm check`，CI 不联网也不读取 `.env.test`；失败输出不回放模型正文。
 
-### P3-C3 final acceptance evidence
+### P3/P3.5 final acceptance evidence
 
-2026-09-01 本地收尾结果：`pnpm check` 通过 132 个测试文件 / 741 项测试，Statements 84%、Branches
-75.71%、Functions 89.23%、Lines 85.98%；`pnpm eval` 通过 4 个文件 / 11 项；Chromium Playwright
+2026-09-01 P3.5 本地收尾结果：`pnpm check` 通过 132 个测试文件 / 743 项测试，Statements 84.08%、
+Branches 75.87%、Functions 89.27%、Lines 86.05%；`pnpm eval` 通过 4 个文件 / 11 项；Chromium Playwright
 通过 15 项（含 P3 Full Access 与扩展管理）；隔离 Web 产物、secret/identity/Web artifact 扫描均通过。
 
-同日 `pnpm accept:p3-pdf` 使用构建产物和 `deepseek/deepseek-v4-flash` 完成显式本地验收：失败基线
-退出码为 1，修复后的 Harness 外独立复验退出码为 0，受保护哈希未变，且新 Session 实际调用了
-已安装的 `read_pdf`。脚本没有打印模型正文、凭据或个人绝对路径，并恢复临时配置、删除临时工作区。
-远端 Windows CI 继续只运行 Fake Provider 和公开合成夹具。
+同日 P3.5 严格验收使用构建产物和 `deepseek/deepseek-v4-pro`：失败基线退出码为 1，修复后的 Harness
+外独立复验退出码为 0；自主扩展生命周期、安装前无一次性 PDF 绕过、精确新 Session 复用、同路径
+另一工作区隔离和受保护哈希未变均返回结构化 true。该次历史验收使用首轮 36 Step、复用轮 4 Step、总硬超时
+10 分钟。脚本没有打印模型正文、凭据或个人绝对路径，并恢复临时配置、删除临时工作区。远端 Windows
+CI 继续只运行 Fake Provider 和公开合成夹具。
+
+录制模型排练另用 `google/gemini-3.7-flash` 在 128 Step / 15 分钟下完成相同严格
+验收，实际约两分钟返回 `accepted=true`；基线退出码 1、Harness 外复验退出码 0、自主扩展流程、无
+一次性 PDF 绕过、精确新 Session 复用、跨工作区隔离和受保护哈希均通过。环境覆盖不进入 CI，也不
+改变可信证据门槛。该预算现已成为脚本默认值；环境变量只用于显式调整，最大为 160 Step / 20 分钟。

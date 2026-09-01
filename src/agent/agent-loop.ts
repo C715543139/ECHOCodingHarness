@@ -31,6 +31,8 @@ import { redactValue, type RedactionOptions } from '../session/index.js';
 import { normalizeToolInput, toolCallSignature } from '../tools/tool-registry.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 
+export const DEFAULT_REPEATED_TOOL_CALL_LIMIT = 10;
+
 export interface ApprovalRequest {
   readonly toolCall: ModelToolCall;
   readonly normalizedInput: unknown;
@@ -629,7 +631,7 @@ export class AgentLoop {
     const signature = toolCallSignature(call.name, normalization.value);
     const repeated = (state.signatures.get(signature) ?? 0) + 1;
     state.signatures.set(signature, repeated);
-    const repeatLimit = this.options.repeatedToolCallLimit ?? 3;
+    const repeatLimit = this.options.repeatedToolCallLimit ?? DEFAULT_REPEATED_TOOL_CALL_LIMIT;
     if (repeated >= repeatLimit) {
       const summary = `Equivalent tool call repeated ${String(repeated)} times.`;
       await this.emit(

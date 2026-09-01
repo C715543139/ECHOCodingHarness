@@ -4,7 +4,7 @@
 >
 > 版本：1.8
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 1. 文档目的
 
@@ -593,8 +593,8 @@ P1 不迁移旧工作区、用户目录或 ADR-0004 工作区 `.echo/config` 中
 - 缺少配置文件时 `run`/`chat` 使用退出码 `2`，提示执行 `echo-harness config`，不得自动创建含真实 Provider 信息的文件；
 - 手动模型目录必须包含唯一非空模型 ID，且默认模型位于列表中；自动发现模式不持久化完整列表；
 - 自动发现由 P1-2B 在进程内缓存；`run` 不调用 `/models`；发现失败不得阻断已配置模型；
-- 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、40,000 字符工具输出上限、
-  300 秒 Provider 请求超时、256,000 近似 token 上下文与 16,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源，数值为 approximate。
+- 省略的限制字段在实现时使用既有内置数值：`balanced`、128 个 Step、300 秒工具超时、80,000 字符工具输出上限、
+  600 秒 Provider 请求超时、256,000 近似 token 上下文与 16,000 输出 token 预留；同一工具名与规范化参数第 10 次出现时触发重复调用限制，阈值调用不执行。这些是字段缺省规则，不是独立配置来源，数值为 approximate。
 - 稳定配置错误码见 `CONFIG_ERROR_CODES`：`CONFIG_MISSING`、`CONFIG_UNKNOWN_KEY`、`CONFIG_CREDENTIAL_FORBIDDEN`、`CONFIG_PROVIDER_MISMATCH`、`CONFIG_SESSION_INCOMPATIBLE` 等。
 
 ## 11. 错误模型
@@ -681,7 +681,7 @@ P0 证据使本文在 1.0 被接受：对应 TypeScript 接口、Fake Provider A
 
 1.2 由 P1 集成验收确认：矩阵无 `pending:` 行，`run`/`chat`/`config` 与产物 smoke 共用同一契约，且不扩大到 P2。
 
-## 15. P3 增量契约（A0–C3 已验收）
+## 15. P3/P3.5 增量契约（已验收）
 
 P3 的权威增量见 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与 `src/contracts/p3.ts`。P3-A1 已把运行时
@@ -706,15 +706,18 @@ Session 只保留新的非 Full Access 事实，再次进入必须提供新的�
 
 P3 不新增模型循环、Session 导出或 Provider 协议。动态工具继续返回 `ToolExecution`，继续产生现有
 工具/Policy/终态事件。Catalog 是扩展状态事实源，Session JSONL 不复制 Catalog 内容。A0 验收矩阵
-曾用 `pending:P3-*` 分配后续实现所有权；P3-C3 已将全部行替换为真实证据路径并通过路径存在性测试。
+曾用 `pending:P3-*` 分配后续实现所有权；P3-C3 已将全部行替换为真实证据，P3.5 将每行
+`runtimeEvidence` 固定为全部主要路径组成的只读数组，并通过路径存在性与无 pending 测试。
 
-P3-A2 提供 `WorkspaceExtensionStore` 作为后续 Worker、Registry 与生命周期工具复用的存储 API。调用方
+P3-A2 阶段提供 `WorkspaceExtensionStore`，其后由 Worker、Registry 与生命周期工具复用。调用方
 必须通过异步 `WorkspaceExtensionStore.open(workspaceRoot)` 创建实例；open 一次性固定 canonical 根和
 扩展基础目录身份，后续不重新解析原始 workspaceRoot。实例只管理该工作区的 staging、安装根和
 Catalog；Manifest/Catalog、工具 JSON Schema、
 路径、链接、名称冲突、完整 SHA-256 和原子写均在此边界验证。Store 的路径派生与内容快照 API 只接收
 扩展 ID、内容哈希或 Catalog 条目，不接受调用方提供的工作区路径、扩展根或 owned root；可绕过绑定
-工作区的底层文件系统函数不从 `src/extensions/index.ts` 导出。A1/A2 合并后由集成分支统一同步
+工作区的底层文件系统函数不从 `src/extensions/index.ts` 导出。Store 打开工作区时还维护
+`<workspace>/.echo/.gitignore`：保留已有内容并确保最后一条规则为 `*`，使扩展、Catalog 和 Session
+默认不进入目标仓库 Git，同时不修改目标仓库根 `.gitignore`。A1/A2 合并后由集成分支统一同步
 `src/contracts/p3.ts` 中 FULL-01/02/03 与 EXT-01/02 的真实运行时证据。
 
 Store 的可选 `reservedToolNames` 只能在全部 `DEFAULT_TOOLS` 之上追加宿主保留名，不能替换或缩减
@@ -738,3 +741,7 @@ Registry 注册及 Catalog 写入全部成功后才返回 enabled；相同哈希
 disable/uninstall 遇到活动调用返回 `EXTENSION_BUSY`。卸载先停用并原子移除 Catalog，再将该 ID 的
 staging、所有安装版本和遗留 trash 项移动/清理；物理删除失败只返回 `deactivated` 与
 `cleanupPending=true`，不得声称完全删除。
+
+同 ID 不同哈希的安装是替换而不是多版本共存。管理器先以 `cleanupPending=true` 保守提交新 Catalog
+事实，待新版本完成 Worker/Registry 发布后清理所有旧哈希目录与对应 trash，成功才清除该标志；清理
+失败必须保留新版本可用事实与 pending 状态，后续相同安装调用幂等重试物理清理，不得提前宣称完整。

@@ -1,6 +1,6 @@
 import type { SafetyMode } from './safety.js';
 
-/** P3 safety-mode contract. P3-A1 promotes this union into the runtime boundary. */
+/** Accepted P3 safety-mode contract, implemented by every runtime boundary. */
 export const P3_SAFETY_MODES = ['safe', 'balanced', 'auto', 'full-access'] as const;
 export type P3SafetyMode = (typeof P3_SAFETY_MODES)[number];
 export type EstablishedSafetyMode = SafetyMode;
@@ -82,14 +82,14 @@ export type P3MatrixArea =
   'full-access' | 'storage' | 'worker' | 'lifecycle' | 'web' | 'integration' | 'demo' | 'guard';
 
 export type P3RuntimeTask =
-  'P3-A1' | 'P3-A2' | 'P3-B1' | 'P3-B2' | 'P3-B3' | 'P3-C1' | 'P3-C2' | 'P3-C3';
+  'P3-A1' | 'P3-A2' | 'P3-B1' | 'P3-B2' | 'P3-B3' | 'P3-C1' | 'P3-C2' | 'P3-C3' | 'P3.5';
 
 export interface P3MatrixRow {
   readonly id: string;
   readonly area: P3MatrixArea;
   readonly requirement: string;
   readonly contractEvidence: string;
-  readonly runtimeEvidence: string;
+  readonly runtimeEvidence: readonly string[];
   readonly runtimeTask: P3RuntimeTask;
 }
 
@@ -99,7 +99,11 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'full-access',
     requirement: 'Full Access requires an explicit human confirmation bound to the target session',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'tests/unit/application/full-access.test.ts',
+    runtimeEvidence: [
+      'tests/unit/application/full-access.test.ts',
+      'tests/unit/cli/full-access-confirmation.test.ts',
+      'tests/integration/web/session-view.test.ts',
+    ],
     runtimeTask: 'P3-A1',
   },
   {
@@ -108,7 +112,11 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Confirmed Full Access bypasses per-operation policy approval while preserving validation, limits, cancellation, events, redaction, and cleanup',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'tests/unit/security/command-policy.test.ts',
+    runtimeEvidence: [
+      'tests/unit/security/command-policy.test.ts',
+      'tests/integration/tools/run-command.test.ts',
+      'tests/integration/execution/powershell.test.ts',
+    ],
     runtimeTask: 'P3-A1',
   },
   {
@@ -116,7 +124,10 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'guard',
     requirement: 'Safe, balanced, and auto behavior remains unchanged',
     contractEvidence: 'docs/security.md',
-    runtimeEvidence: 'tests/unit/application/full-access.test.ts',
+    runtimeEvidence: [
+      'tests/unit/application/full-access.test.ts',
+      'tests/unit/security/command-policy.test.ts',
+    ],
     runtimeTask: 'P3-A1',
   },
   {
@@ -125,7 +136,10 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Extensions are persisted only under the current workspace .echo directory and never shared across workspaces',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'tests/unit/extensions/workspace-isolation.test.ts',
+    runtimeEvidence: [
+      'tests/unit/extensions/workspace-isolation.test.ts',
+      'tests/unit/extensions/content-hash.test.ts',
+    ],
     runtimeTask: 'P3-A2',
   },
   {
@@ -134,7 +148,11 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Manifest, entry paths, tool names, content hashes, and atomic catalog writes fail closed',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'tests/unit/extensions/catalog.test.ts',
+    runtimeEvidence: [
+      'tests/unit/extensions/manifest.test.ts',
+      'tests/unit/extensions/content-hash.test.ts',
+      'tests/unit/extensions/catalog.test.ts',
+    ],
     runtimeTask: 'P3-A2',
   },
   {
@@ -143,7 +161,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Extension workers have bounded protocol, output, timeout, cancellation, credential inheritance, and shutdown behavior',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'tests/unit/extensions/worker-host.test.ts',
+    runtimeEvidence: ['tests/unit/extensions/worker-host.test.ts'],
     runtimeTask: 'P3-B1',
   },
   {
@@ -152,7 +170,10 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'New tools become model-visible only at the next model-request boundary and registry collisions fail closed',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'tests/unit/tools/tool-registry.test.ts',
+    runtimeEvidence: [
+      'tests/unit/tools/tool-registry.test.ts',
+      'tests/unit/extensions/worker-host.test.ts',
+    ],
     runtimeTask: 'P3-B1',
   },
   {
@@ -160,7 +181,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     area: 'lifecycle',
     requirement: 'The seven lifecycle tools implement the frozen state transitions and idempotency',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'tests/unit/extensions/lifecycle.test.ts',
+    runtimeEvidence: ['tests/unit/extensions/lifecycle.test.ts'],
     runtimeTask: 'P3-B2',
   },
   {
@@ -169,7 +190,7 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Busy extensions are not disabled or uninstalled; incomplete physical deletion is reported as cleanup pending',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'tests/unit/extensions/lifecycle.test.ts',
+    runtimeEvidence: ['tests/unit/extensions/lifecycle.test.ts'],
     runtimeTask: 'P3-B2',
   },
   {
@@ -178,7 +199,12 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Web confirmation, persistent Full Access warning, and human extension management use authenticated bounded DTOs',
     contractEvidence: 'docs/web-api.md, docs/web-ui.md',
-    runtimeEvidence: 'tests/e2e/web/p3-extensions.spec.ts',
+    runtimeEvidence: [
+      'tests/unit/web/composer.test.tsx',
+      'tests/unit/web/extension-settings.test.tsx',
+      'tests/integration/web/extensions.test.ts',
+      'tests/e2e/web/p3-extensions.spec.ts',
+    ],
     runtimeTask: 'P3-B3',
   },
   {
@@ -187,7 +213,10 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Enabled extensions are reusable across sessions and process restarts in one workspace but unavailable in another workspace',
     contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
-    runtimeEvidence: 'tests/integration/p3-extension-integration.test.ts',
+    runtimeEvidence: [
+      'tests/integration/p3-extension-integration.test.ts',
+      'tests/unit/extensions/workspace-extension-system.test.ts',
+    ],
     runtimeTask: 'P3-C1',
   },
   {
@@ -196,7 +225,10 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'Leaving Full Access unregisters dynamic tools at the next model-request boundary without deleting installed files',
     contractEvidence: 'docs/decisions/0010-full-access-mode.md',
-    runtimeEvidence: 'tests/unit/extensions/workspace-extension-system.test.ts',
+    runtimeEvidence: [
+      'tests/unit/extensions/workspace-extension-system.test.ts',
+      'tests/integration/p3-extension-integration.test.ts',
+    ],
     runtimeTask: 'P3-C1',
   },
   {
@@ -205,7 +237,11 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'The synthetic PDF demo proves failing baseline, protected-input hashes, successful repair, independent recheck, and same-workspace reuse',
     contractEvidence: 'docs/plans/p3-extensions.md',
-    runtimeEvidence: 'tests/integration/p3-pdf-demo.test.ts',
+    runtimeEvidence: [
+      'tests/integration/p3-pdf-demo.test.ts',
+      'scripts/p3-pdf-demo-evidence.mjs',
+      'scripts/accept-p3-pdf-demo.mjs',
+    ],
     runtimeTask: 'P3-C2',
   },
   {
@@ -214,7 +250,38 @@ export const P3_TEST_MATRIX: readonly P3MatrixRow[] = [
     requirement:
       'P3 closes only after full quality, privacy, artifact, real-provider, documentation, and two-minute demonstration acceptance',
     contractEvidence: 'docs/plans/p3-acceptance-matrix.md',
-    runtimeEvidence: '.github/workflows/ci.yml',
+    runtimeEvidence: [
+      '.github/workflows/ci.yml',
+      'docs/testing.md',
+      'docs/plans/p3-acceptance-matrix.md',
+    ],
     runtimeTask: 'P3-C3',
+  },
+  {
+    id: 'EXT-03',
+    area: 'storage',
+    requirement:
+      'Target-workspace runtime state is ignored by Git without editing the repository root ignore file',
+    contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
+    runtimeEvidence: ['tests/unit/extensions/workspace-isolation.test.ts'],
+    runtimeTask: 'P3.5',
+  },
+  {
+    id: 'LIFE-03',
+    area: 'lifecycle',
+    requirement:
+      'Replacing a content hash removes obsolete versions and reports cleanup pending until cleanup succeeds',
+    contractEvidence: 'docs/decisions/0011-workspace-extensions.md',
+    runtimeEvidence: ['tests/unit/extensions/lifecycle.test.ts'],
+    runtimeTask: 'P3.5',
+  },
+  {
+    id: 'DEMO-02',
+    area: 'demo',
+    requirement:
+      'The real-provider demo proves autonomous capability creation, exact new-session reuse, and cross-workspace isolation without a one-off PDF bypass',
+    contractEvidence: 'docs/plans/p3-extensions.md',
+    runtimeEvidence: ['tests/integration/p3-pdf-demo.test.ts', 'scripts/accept-p3-pdf-demo.mjs'],
+    runtimeTask: 'P3.5',
   },
 ] as const;

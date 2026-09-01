@@ -1,4 +1,4 @@
-# P3 需求、测试与验收证据矩阵
+# P3/P3.5 需求、测试与验收证据矩阵
 
 > 状态：Accepted
 >
@@ -7,27 +7,31 @@
 ## 1. 使用规则
 
 可机读的权威行位于 `src/contracts/p3.ts` 的 `P3_TEST_MATRIX`。A0 阶段曾用 `pending:P3-*` 表示所有权；
-P3-C3 已将每一行替换为存在的运行时证据路径。Accepted 表示完整门禁、离线故事和显式本地验收均通过，
+P3-C3 已将每一行替换为存在的运行时证据路径，P3.5 将可机读字段固定为全部主要路径组成的只读数组。
+Accepted 表示完整门禁、离线故事和显式本地验收均通过，
 不表示扩展代码获得 OS 沙箱保护，也不把模型陈述当作验证事实。
 
 ## 2. 冻结矩阵
 
 | ID | 领域 | 要求摘要 | 实现任务 | 状态 / 运行时证据 |
 | --- | --- | --- | --- | --- |
-| FULL-01 | Full Access | 明确人类确认并绑定 Session | P3-A1 | Implemented：`tests/unit/application/full-access.test.ts`；`tests/unit/cli/full-access-confirmation.test.ts`；`tests/integration/cli-run.test.ts`；`tests/integration/cli-chat.test.ts`；`tests/integration/web/session-view.test.ts` |
-| FULL-02 | Full Access | 免逐项审批但保留可靠性边界 | P3-A1 | Implemented：`tests/unit/security/command-policy.test.ts`；`tests/integration/cli-run.test.ts`；`tests/integration/tools/run-command.test.ts`；`tests/integration/execution/powershell.test.ts` |
-| FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Implemented：`tests/unit/security/command-policy.test.ts`；`tests/unit/application/full-access.test.ts`；`pnpm test` / `pnpm check` |
-| EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Implemented — `tests/unit/extensions/workspace-isolation.test.ts`, `tests/unit/extensions/content-hash.test.ts` |
-| EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Implemented — `tests/unit/extensions/manifest.test.ts`, `tests/unit/extensions/content-hash.test.ts`, `tests/unit/extensions/catalog.test.ts` |
-| WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Implemented — `tests/unit/extensions/worker-host.test.ts` |
-| WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Implemented — `tests/unit/tools/tool-registry.test.ts`, `tests/unit/extensions/worker-host.test.ts` |
-| LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
-| LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Implemented — `tests/unit/extensions/lifecycle.test.ts` |
+| FULL-01 | Full Access | 明确人类确认并绑定 Session | P3-A1 | Accepted：`tests/unit/application/full-access.test.ts`；`tests/unit/cli/full-access-confirmation.test.ts`；`tests/integration/web/session-view.test.ts` |
+| FULL-02 | Full Access | 免逐项审批但保留可靠性边界 | P3-A1 | Accepted：`tests/unit/security/command-policy.test.ts`；`tests/integration/tools/run-command.test.ts`；`tests/integration/execution/powershell.test.ts` |
+| FULL-03 | 回归 | safe/balanced/auto 不变 | P3-A1 | Accepted：`tests/unit/security/command-policy.test.ts`；`tests/unit/application/full-access.test.ts` |
+| EXT-01 | 存储 | 只在当前工作区持久化 | P3-A2 | Accepted：`tests/unit/extensions/workspace-isolation.test.ts`；`tests/unit/extensions/content-hash.test.ts` |
+| EXT-02 | 存储 | Manifest、路径、冲突、哈希、Catalog fail closed | P3-A2 | Accepted：`tests/unit/extensions/manifest.test.ts`；`tests/unit/extensions/content-hash.test.ts`；`tests/unit/extensions/catalog.test.ts` |
+| WRK-01 | Worker | 协议、输出、超时、取消、凭据与关闭 | P3-B1 | Accepted：`tests/unit/extensions/worker-host.test.ts` |
+| WRK-02 | Registry | 下一次模型请求可见且冲突拒绝 | P3-B1 | Accepted：`tests/unit/tools/tool-registry.test.ts`；`tests/unit/extensions/worker-host.test.ts` |
+| LIFE-01 | 生命周期 | 七工具、状态转换和幂等 | P3-B2 | Accepted：`tests/unit/extensions/lifecycle.test.ts` |
+| LIFE-02 | 生命周期 | busy 与 cleanup pending 诚实结果 | P3-B2 | Accepted：`tests/unit/extensions/lifecycle.test.ts` |
 | WEB-01 | Web | 风险确认、常驻警告和人类管理 | P3-B3 | Accepted — `tests/unit/web/composer.test.tsx`, `tests/unit/web/extension-settings.test.tsx`, `tests/integration/web/extensions.test.ts`, `tests/e2e/web/p3-extensions.spec.ts` |
 | INT-01 | 集成 | 同工作区复用、跨工作区隔离 | P3-C1 | Accepted — `tests/integration/p3-extension-integration.test.ts`, `tests/unit/extensions/workspace-extension-system.test.ts` |
 | INT-02 | 集成 | 离开 Full Access 卸载但不删除 | P3-C1 | Accepted — `tests/unit/extensions/workspace-extension-system.test.ts`, `tests/integration/p3-extension-integration.test.ts` |
 | DEMO-01 | 演示 | 失败基线、哈希、修复、独立复验和复用 | P3-C2 | Accepted — `tests/integration/p3-pdf-demo.test.ts`, `scripts/p3-pdf-demo-evidence.mjs`, `scripts/accept-p3-pdf-demo.mjs` |
-| DONE-01 | 收尾 | 质量、隐私、产物、真实 Provider、文档与视频 | P3-C3 | Accepted — `pnpm check`, `pnpm eval`, `pnpm test:web:e2e`, isolated artifact smoke, privacy scans, packaged real-Provider PDF acceptance, Windows CI |
+| DONE-01 | 收尾 | 质量、隐私、产物、真实 Provider、文档与视频 | P3-C3 | Accepted：`pnpm check`；`pnpm eval`；`pnpm test:web:e2e`；isolated artifact smoke；privacy scans；packaged real-Provider PDF acceptance；Windows CI |
+| EXT-03 | Git 隐私 | 目标工作区 `.echo/` 默认不进入 Git，且不改根忽略文件 | P3.5 | Accepted：`tests/unit/extensions/workspace-isolation.test.ts` |
+| LIFE-03 | 版本清理 | 不同哈希替换删除旧版本，失败保持 cleanupPending 并可重试 | P3.5 | Accepted：`tests/unit/extensions/lifecycle.test.ts` |
+| DEMO-02 | 自主演示 | 不提示实现流程、精确证明新 Session 复用、拒绝一次性 PDF 绕过并保持跨工作区隔离 | P3.5 | Accepted：`tests/integration/p3-pdf-demo.test.ts`；`scripts/accept-p3-pdf-demo.mjs` |
 
 ## 3. 必须保留的证据层
 

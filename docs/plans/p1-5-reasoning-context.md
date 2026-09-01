@@ -272,16 +272,17 @@ Turn failed: provider reasoning exhausted the output budget; no tool call was ex
 
 ## 8. 预算调整
 
-### 8.1 P1.5 默认值
+### 8.1 默认预算演进
 
-| 配置 | P1 当前值 | P1.5 值 |
-| --- | ---: | ---: |
-| `context.maxApproxTokens` | 32,000 | 256,000 |
-| `context.reservedOutputTokens` | 4,000 | 16,000 |
-| `maxOutputChars` | 20,000 | 40,000 |
-| `requestTimeoutMs` | 300,000 | 300,000 |
-| `maxSteps` | 24 | 24 |
-| `timeoutMs` | 120,000 | 120,000 |
+| 配置 | P1 值 | P1.5 值 | P3.5 当前值 |
+| --- | ---: | ---: | ---: |
+| `context.maxApproxTokens` | 32,000 | 256,000 | 256,000 |
+| `context.reservedOutputTokens` | 4,000 | 16,000 | 16,000 |
+| `maxOutputChars` | 20,000 | 40,000 | 80,000 |
+| `requestTimeoutMs` | 300,000 | 300,000 | 600,000 |
+| `maxSteps` | 24 | 24 | 128 |
+| `timeoutMs` | 120,000 | 120,000 | 300,000 |
+| 等价工具调用限制 | 3 | 3 | 10 |
 
 输入投影的理论预算为：
 
@@ -289,7 +290,7 @@ Turn failed: provider reasoning exhausted the output budget; no tool call was ex
 256,000 - 16,000 = 240,000 approximate tokens
 ```
 
-这些是 ECHO 的近似本地预算，不代表模型真实 token 数。当前目标 Provider/模型具有大于 256K 的上下文能力；切换到窗口更小的模型时，用户需要在产物配置中手动降低预算。按模型自动校准属于 P2 后续范围。
+这些是 ECHO 的近似本地预算，不代表模型真实 token 数。当前目标 Provider/模型具有大于 256K 的上下文能力；切换到窗口更小的模型时，用户需要在产物配置中手动降低预算。P3.5 将执行预算放宽用于复杂扩展任务和演示录制，但仍保留有限上限、取消、策略判断与超时。
 
 ### 8.2 配置兼容
 
@@ -297,7 +298,7 @@ Turn failed: provider reasoning exhausted the output budget; no tool call was ex
 - `reservedOutputTokens` 必须小于 `maxApproxTokens`；
 - 不新增环境变量；
 - 不新增 CLI token 参数；
-- 配置向导生成的新配置应写入 P1.5 默认预算；
+- 配置向导生成的新配置写入当前 `maxOutputChars` 与上下文预算；其余省略字段由加载器采用当前内置默认值；
 - 配置检查和帮助文本必须明确数值为 approximate。
 
 ## 9. CLI 行为

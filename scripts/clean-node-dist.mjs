@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const defaultDist = fileURLToPath(new URL('../dist', import.meta.url));
 const distRoot = process.argv[2] === undefined ? defaultDist : path.resolve(process.argv[2]);
-const preserved = new Set(['web']);
+const preserved = new Set(['config', 'web']);
 
 if (!fs.existsSync(distRoot)) {
   process.exit(0);

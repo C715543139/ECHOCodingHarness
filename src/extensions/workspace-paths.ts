@@ -25,6 +25,9 @@ export interface BoundExtensionWorkspace {
   readonly directories: readonly BoundDirectoryIdentity[];
 }
 
+const ECHO_GITIGNORE_MARKER = '# Managed by ECHO: keep workspace runtime state out of Git.';
+const MAX_ECHO_GITIGNORE_BYTES = 64 * 1024;
+
 function ensureContained(
   root: string,
   candidate: string,
@@ -67,6 +70,82 @@ async function ensurePlainDirectory(parent: string, name: string): Promise<strin
   return resolved;
 }
 
+async function ensureEchoGitIgnore(echoRoot: string): Promise<void> {
+  const target = path.join(echoRoot, '.gitignore');
+  const managedRule = `${ECHO_GITIGNORE_MARKER}\n*\n`;
+  try {
+    await fs.writeFile(target, managedRule, { encoding: 'utf8', flag: 'wx' });
+    return;
+  } catch (error) {
+    if (!isFileSystemError(error, 'EEXIST')) throw error;
+  }
+
+  const stats = await fs.lstat(target);
+  if (stats.isSymbolicLink()) {
+    throw new ExtensionStorageError(
+      'LINK_DENIED',
+      'The ECHO Git ignore file cannot be a symbolic link or junction.',
+    );
+  }
+  if (!stats.isFile() || stats.size > MAX_ECHO_GITIGNORE_BYTES) {
+    throw new ExtensionStorageError(
+      'WORKSPACE_INVALID',
+      'The ECHO Git ignore file must be a bounded regular file.',
+    );
+  }
+
+  const handle = await fs.open(target, 'r+');
+  try {
+    const openedStats = await handle.stat();
+    if (
+      !openedStats.isFile() ||
+      openedStats.dev !== stats.dev ||
+      openedStats.ino !== stats.ino ||
+      openedStats.birthtimeMs !== stats.birthtimeMs ||
+      openedStats.size !== stats.size
+    ) {
+      throw new ExtensionStorageError(
+        'WORKSPACE_CHANGED',
+        'The ECHO Git ignore file changed while the workspace was opened.',
+      );
+    }
+
+    const contents = await handle.readFile({ encoding: 'utf8' });
+    const lastRule = contents
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#'))
+      .at(-1);
+    if (lastRule !== '*') {
+      const addition = `${contents.length === 0 || /\r?\n$/u.test(contents) ? '' : '\n'}${managedRule}`;
+      if (openedStats.size + Buffer.byteLength(addition, 'utf8') > MAX_ECHO_GITIGNORE_BYTES) {
+        throw new ExtensionStorageError(
+          'WORKSPACE_INVALID',
+          'The ECHO Git ignore file has no room for the managed ignore rule.',
+        );
+      }
+      await handle.write(addition, openedStats.size, 'utf8');
+      await handle.sync();
+    }
+  } finally {
+    await handle.close();
+  }
+
+  const finalStats = await fs.lstat(target);
+  if (
+    finalStats.isSymbolicLink() ||
+    !finalStats.isFile() ||
+    finalStats.dev !== stats.dev ||
+    finalStats.ino !== stats.ino ||
+    finalStats.birthtimeMs !== stats.birthtimeMs
+  ) {
+    throw new ExtensionStorageError(
+      'WORKSPACE_CHANGED',
+      'The ECHO Git ignore file was replaced while the workspace was opened.',
+    );
+  }
+}
+
 export async function ensureExtensionWorkspacePaths(
   workspaceRoot: string,
 ): Promise<ExtensionWorkspacePaths> {
@@ -87,6 +166,7 @@ export async function ensureExtensionWorkspacePaths(
     );
   }
   const echoRoot = await ensurePlainDirectory(canonicalRoot, '.echo');
+  await ensureEchoGitIgnore(echoRoot);
   const stagingRoot = await ensurePlainDirectory(echoRoot, 'extension-staging');
   const extensionsRoot = await ensurePlainDirectory(echoRoot, 'extensions');
   const trashRoot = await ensurePlainDirectory(extensionsRoot, '.trash');

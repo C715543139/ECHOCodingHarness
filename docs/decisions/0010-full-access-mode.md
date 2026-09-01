@@ -1,8 +1,8 @@
 # ADR-0010：显式确认的 Full Access 模式
 
-> 状态：Accepted for P3 implementation
+> 状态：Accepted
 >
-> 日期：2026-08-31
+> 日期：2026-09-01
 
 ## 背景
 
@@ -70,5 +70,6 @@ Agent 的扩展生命周期工具只在已确认的 `full-access` 中注册。�
 
 ## 后果
 
-P3-A1 负责把本 ADR 的目标联合迁移到现有运行时类型、配置、CLI 和 Web DTO。P3-A0 只冻结目标
-契约；在 A1 完成前，P0–P2 的 `SafetyMode` 仍是已交付运行时联合。
+P3-A1 已把本 ADR 的四值联合迁移到运行时类型、配置、CLI 和 Web DTO；A2–C3 在同一授权语义下完成
+扩展存储、Worker、生命周期、Web 管理、生产接线和演示验收。`safe`、`balanced`、`auto` 继续由既有
+回归门禁保护，`full-access` 只在上述人类确认事实存在时生效。

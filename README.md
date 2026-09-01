@@ -175,8 +175,10 @@ pnpm accept:p3-pdf
 pnpm p3:demo:verify
 ```
 
-It shows the Agent creating and testing `pdf-reader`, hot-loading `read_pdf`, repairing only the
-allowed source file, and reusing the extension in a new Session. Protected-input hashes and a test
+It gives the Agent only the capability gap and durability constraints. The Agent chooses the
+extension and tool names, creates and tests the implementation, hot-loads it, repairs only the
+allowed source file, and reuses the capability in an exact new Session. The acceptance helper
+rejects one-off PDF-reading bypasses and cross-workspace leakage. Protected-input hashes and a test
 process outside the Harness decide acceptance; the model cannot certify its own work.
 
 ## Quality gate

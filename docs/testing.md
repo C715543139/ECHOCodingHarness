@@ -266,8 +266,8 @@ Vitest, Testing Library, `user-event`, and a DOM environment cover:
 
 ### Browser and artifact layer
 
-Playwright Chromium runs 11 deliberately small spec files (13 test cases) against a built local
-server. The current P2.5 browser baseline covers:
+Playwright Chromium currently runs 12 deliberately small spec files (15 test cases) against a built
+local server. The current P3.5 browser baseline covers:
 
 1. bootstrap without a paid Provider;
 2. first Fake Provider Session plus fixed-shell and owned-scroll behavior;
@@ -280,6 +280,8 @@ server. The current P2.5 browser baseline covers:
 9. confirmed idle deletion and active Turn stop-before-delete behavior;
 10. bounded, virtualized rendering of 200 Trace records;
 11. landmarks, text status, and polite live-region accessibility.
+12. Full Access confirmation and persistent warning, plus extension management, recovery, and private
+    output.
 
 `echo-harness web` defaults to opening the server-issued, verified loopback bootstrap URL through an
 injectable argument-array opener; tests never launch a real browser. `--no-open` prints that same
@@ -455,7 +457,7 @@ FULL-01/02/03 与 EXT-01/02 替换为真实证据路径。
 
 ### P3/P3.5 final acceptance evidence
 
-2026-09-01 P3.5 本地收尾结果：`pnpm check` 通过 132 个测试文件 / 743 项测试，Statements 84.08%、
+2026-09-01 P3.5 本地收尾结果：`pnpm check` 通过 132 个测试文件 / 744 项测试，Statements 84.08%、
 Branches 75.87%、Functions 89.27%、Lines 86.05%；`pnpm eval` 通过 4 个文件 / 11 项；Chromium Playwright
 通过 15 项（含 P3 Full Access 与扩展管理）；隔离 Web 产物、secret/identity/Web artifact 扫描均通过。
 

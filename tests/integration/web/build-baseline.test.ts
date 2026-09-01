@@ -17,4 +17,17 @@ describe('Web build baseline', () => {
 
     expect(packageJson.files).toEqual(['dist/*.js', 'dist/*.js.map', 'dist/*.d.ts', 'dist/web']);
   });
+
+  it('pins patched static serving and build tooling versions', async () => {
+    const packageJson = JSON.parse(
+      await readFile(new URL('../../../package.json', import.meta.url), 'utf8'),
+    ) as { dependencies?: Record<string, string> };
+    const workspaceConfig = await readFile(
+      new URL('../../../pnpm-workspace.yaml', import.meta.url),
+      'utf8',
+    );
+
+    expect(packageJson.dependencies?.['@fastify/static']).toBe('10.1.3');
+    expect(workspaceConfig).toMatch(/^overrides:\r?\n {2}esbuild: 0\.28\.2$/mu);
+  });
 });

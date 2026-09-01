@@ -190,6 +190,10 @@ fail-closes `trace.zip` as `unscannable-archive`, and fail-closes files larger t
 into package scripts and Windows CI. Playwright failure artifacts are uploaded only when the
 fail-closed scan step succeeds.
 
+`tests/integration/web/build-baseline.test.ts` also freezes the patched `@fastify/static` runtime
+version and the workspace-wide `esbuild` override so a dependency refresh cannot silently restore
+the known vulnerable versions.
+
 ### Fast unit and integration layer
 
 - Web DTO, JSON Schema, RuntimeCapabilities, SSE union, and requestId idempotency tests live under
@@ -289,9 +293,10 @@ URL and must not call the opener. Phase A `pnpm smoke:web-artifact` starts the p
 `dist/cli.js web --no-open` from a temporary cwd, parses the verified `127.0.0.1` bootstrap URL,
 redeems the one-time Cookie, fetches `/` and `/api/v1/bootstrap`, and stops the process by closing
 non-TTY stdin. Windows does not deliver `SIGTERM` to listeners, so stdin-end is the supported CI
-shutdown. B4 adds `scripts/smoke-web-isolated-artifact.mjs`: it copies `dist/*.js`, `dist/web/`, and
-minimal `package.json` metadata into a temporary package, starts `web --no-open` from a separate
-non-repo cwd, redeems the Cookie, fetches `/` and `/api/v1/bootstrap`, and shuts down via stdin-end.
+shutdown. B4 adds `scripts/smoke-web-isolated-artifact.mjs`: it copies `dist/*.js`, `dist/web/`,
+minimal `package.json` metadata, the lockfile, and its `pnpm-workspace.yaml` resolution policy into a
+temporary package, starts `web --no-open` from a separate non-repo cwd, redeems the Cookie, fetches
+`/` and `/api/v1/bootstrap`, and shuts down via stdin-end.
 pnpm and Web child processes receive an explicit Windows env allowlist (`PATH`, `SystemRoot`,
 `ComSpec`, `PATHEXT`, `TEMP`, `TMP`, and similar runtime variables). The Web process gets only a
 controlled `ECHO_API_KEY`; other `ECHO_*` and common CI/cloud/token/key variables are not inherited.

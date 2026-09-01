@@ -366,6 +366,7 @@
 }
 
 .railFooter {
+  margin-top: auto;
   padding-top: var(--echo-space-2);
   border-top: 0.0625rem solid var(--echo-color-border);
 }
@@ -1268,6 +1269,11 @@
   gap: var(--echo-space-3);
 }
 
+.settingsHeaderAction {
+  flex: none;
+  white-space: nowrap;
+}
+
 .settingsBody h2 {
   margin: 0;
   font-size: var(--echo-text-lg);
@@ -1357,6 +1363,15 @@
   border-radius: var(--echo-radius-sm);
   background: var(--echo-color-surface-subtle);
   font-family: var(--echo-font-mono);
+}
+
+.modelDeleteButton {
+  min-height: 2rem;
+  flex: none;
+  padding: 0 var(--echo-space-2);
+  font-family: var(--echo-font-ui);
+  font-size: var(--echo-text-sm);
+  white-space: nowrap;
 }
 
 .apiKeyCard {

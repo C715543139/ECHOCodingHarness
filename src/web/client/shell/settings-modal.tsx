@@ -256,7 +256,8 @@ export function SettingsModal({
                       <li className={styles.modelListItem} key={model}>
                         {model}
                         <button
-                          className={styles.ghostButton}
+                          aria-label={`删除模型 ${model}`}
+                          className={`${styles.ghostButton} ${styles.modelDeleteButton}`}
                           disabled={readOnly}
                           onClick={() => {
                             const next = models.filter((item) => item !== model);
@@ -270,7 +271,7 @@ export function SettingsModal({
                           }}
                           type="button"
                         >
-                          {`删除 ${model}`}
+                          删除
                         </button>
                       </li>
                     ))}

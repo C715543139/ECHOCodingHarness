@@ -105,7 +105,7 @@ export function ExtensionSettingsPage({
           </p>
         </div>
         <button
-          className={styles.secondaryButton}
+          className={`${styles.secondaryButton} ${styles.settingsHeaderAction}`}
           disabled={view.extensionsLoading || actions === undefined}
           onClick={() => {
             actions?.refreshExtensions();

@@ -41,6 +41,8 @@ describe('Extension settings', () => {
     await user.click(screen.getByRole('button', { name: '设置' }));
     await user.click(screen.getByRole('button', { name: '扩展' }));
     expect(screen.getByRole('heading', { name: '扩展' })).toBeTruthy();
+    const refreshButton = screen.getByRole('button', { name: '刷新' });
+    expect(refreshButton.className).toContain('settingsHeaderAction');
     expect(screen.getByText('pdf-reader')).toBeTruthy();
     expect(screen.getByText('1.0.0')).toBeTruthy();
     expect(screen.getByText('read_pdf、pdf_metadata')).toBeTruthy();

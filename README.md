@@ -1,5 +1,7 @@
 # ECHO Harness
 
+[中文说明](README.zh.md)
+
 **Execution · Context · Harness · Orchestration**
 
 A lightweight, local-first autonomous coding agent built from scratch.

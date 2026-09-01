@@ -184,4 +184,23 @@ describe('Provider settings modal', () => {
     expect(status.textContent).toBe('已通过环境变量配置');
     expect(screen.getByRole('list', { name: '发现的模型' }).textContent).toContain('echo-model');
   });
+
+  it('uses a compact, model-specific delete action for a manual catalog', async () => {
+    const user = userEvent.setup();
+    render(
+      <App
+        transport={createFakeTransport({
+          sessions: [createIdleSession()],
+          selectedSessionId: 'ses_idle',
+        })}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: '设置' }));
+    await user.click(screen.getByRole('radio', { name: '手动维护' }));
+
+    const deleteButton = screen.getByRole('button', { name: '删除模型 echo-model' });
+    expect(deleteButton.textContent).toBe('删除');
+    await user.click(deleteButton);
+    expect(screen.queryByRole('button', { name: '删除模型 echo-model' })).toBeNull();
+  });
 });

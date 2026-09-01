@@ -199,3 +199,18 @@ P2 交付的控制台使用深色主题、药丸式视图切换、纯文本消�
   选中项回退与本地投影清理；
 - `tests/unit/web/chat-stream.test.tsx` 固定终态后定位最新 Turn 起点；
 - `tests/e2e/web/session-delete.spec.ts` 覆盖空闲和活动 Session 的完整浏览器交互。
+
+## WEB-007：设置页与空会话侧栏收尾
+
+### 决定与实施
+
+- 扩展页头部“刷新”操作保持单行且不参与收缩，窄设置窗口中也不拆分文字；
+- 手动模型目录将模型 ID 与操作视觉分离：条目保留等宽模型 ID，按钮只显示“删除”，同时通过具名
+  `aria-label` 保留目标模型信息；
+- Session 为空时仍由弹性布局把“设置”固定在会话栏底部，空状态提示不改变全局导航位置。
+
+### 验收证据
+
+- `tests/unit/web/extension-settings.test.tsx` 守护刷新操作使用单行页头样式；
+- `tests/unit/web/provider-settings.test.tsx` 守护手动目录删除按钮的精简文案与模型级可访问名称；
+- `tests/unit/web/session-rail.test.tsx` 守护空 Session 状态仍保留独立底部设置区域。

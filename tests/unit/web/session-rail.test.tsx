@@ -63,6 +63,9 @@ describe('Session rail', () => {
 
     await user.click(screen.getByRole('button', { name: '新会话' }));
     expect(created).toBe(true);
+    expect(screen.getByRole('button', { name: '设置' }).parentElement?.className).toContain(
+      'railFooter',
+    );
   });
 
   it('disables 新会话 and explains why when creation is blocked', () => {

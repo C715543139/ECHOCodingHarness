@@ -10,6 +10,8 @@ const cliPath = path.join(repositoryRoot, 'dist', 'cli.js');
 const configDirectory = path.join(repositoryRoot, 'dist', 'config');
 const configPath = path.join(configDirectory, 'echo.config.json');
 const envPath = process.env.ECHO_ENV_FILE ?? path.join(repositoryRoot, '.env.test');
+const FIRST_RUN_MAX_STEPS = 36;
+const ACCEPTANCE_TIMEOUT_MS = 10 * 60_000;
 
 function loadEnvFile() {
   if (!fs.existsSync(envPath)) return;
@@ -71,7 +73,7 @@ function temporaryConfig(baseUrl, model) {
       model,
       modelCatalog: { source: 'manual', models: [model] },
       safetyMode: 'full-access',
-      maxSteps: 24,
+      maxSteps: FIRST_RUN_MAX_STEPS,
       timeoutMs: 60_000,
       maxOutputChars: 24_000,
       requestTimeoutMs: 120_000,
@@ -85,7 +87,8 @@ function temporaryConfig(baseUrl, model) {
   };
 }
 
-function runCli(workspace, apiKey, goal, maxSteps) {
+function runCli(workspace, apiKey, goal, maxSteps, timeoutMs) {
+  const previousSessions = new Set(sessionFiles(workspace));
   const args = [
     cliPath,
     'run',
@@ -107,41 +110,113 @@ function runCli(workspace, apiKey, goal, maxSteps) {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    let output = '';
-    const append = (chunk) => {
-      output += chunk.toString();
-      if (output.length > 512_000) output = output.slice(-256_000);
-    };
-    child.stdout.on('data', append);
-    child.stderr.on('data', append);
+    child.stdout.resume();
+    child.stderr.resume();
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error('P3 real Provider acceptance timed out.'));
-    }, 10 * 60_000);
+    }, timeoutMs);
     child.once('error', (error) => {
       clearTimeout(timer);
       reject(error);
     });
     child.once('close', (code) => {
       clearTimeout(timer);
-      resolve({ exitCode: code ?? 1, output });
+      resolve({
+        exitCode: code ?? 1,
+        createdSessions: sessionFiles(workspace).filter((file) => !previousSessions.has(file)),
+      });
     });
   });
 }
 
-function sessionRequestedTool(workspace, toolName) {
+function sessionFiles(workspace) {
   const sessionsRoot = path.join(workspace, '.echo', 'sessions');
-  const files = fs.readdirSync(sessionsRoot).filter((file) => file.endsWith('.jsonl'));
-  return files.some((file) =>
-    fs
-      .readFileSync(path.join(sessionsRoot, file), 'utf8')
-      .split(/\r?\n/u)
-      .filter(Boolean)
-      .some((line) => {
-        const event = JSON.parse(line);
-        return event.type === 'tool.requested' && event.payload?.call?.name === toolName;
-      }),
+  if (!fs.existsSync(sessionsRoot)) return [];
+  return fs.readdirSync(sessionsRoot).filter((file) => file.endsWith('.jsonl'));
+}
+
+function sessionEvents(workspace, sessionFile) {
+  return fs
+    .readFileSync(path.join(workspace, '.echo', 'sessions', sessionFile), 'utf8')
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function requestedTools(events) {
+  return events
+    .filter((event) => event.type === 'tool.requested')
+    .map((event) => event.payload?.call)
+    .filter((call) => call && typeof call.name === 'string');
+}
+
+function requireSingleSession(run, label) {
+  if (run.createdSessions.length !== 1) {
+    throw new Error(`${label} must create exactly one Session log.`);
+  }
+  return run.createdSessions[0];
+}
+
+function observedToolNames(workspace, run) {
+  if (run.createdSessions.length !== 1) return 'no single Session log';
+  const names = requestedTools(sessionEvents(workspace, run.createdSessions[0])).map(
+    (call) => call.name,
   );
+  return names.length === 0 ? 'none' : names.slice(0, 64).join(', ');
+}
+
+function inspectAutonomousExtensionFlow(workspace, sessionFile) {
+  const calls = requestedTools(sessionEvents(workspace, sessionFile));
+  const observedNames = calls.map((call) => call.name).join(', ') || 'none';
+  const initIndex = calls.findIndex((call) => call.name === 'extension_init');
+  if (initIndex < 0) {
+    throw new Error(
+      `The Agent did not initialize a durable extension. Observed tools: ${observedNames}.`,
+    );
+  }
+  const init = calls[initIndex];
+  const extensionId = init.arguments?.extensionId;
+  const toolNames = init.arguments?.toolNames;
+  if (
+    typeof extensionId !== 'string' ||
+    !Array.isArray(toolNames) ||
+    toolNames.length === 0 ||
+    toolNames.some((name) => typeof name !== 'string')
+  ) {
+    throw new Error('The extension_init request did not declare a valid reusable tool.');
+  }
+  const checkIndex = calls.findIndex(
+    (call, index) =>
+      index > initIndex &&
+      call.name === 'extension_check' &&
+      call.arguments?.extensionId === extensionId,
+  );
+  const installIndex = calls.findIndex(
+    (call, index) =>
+      index > checkIndex &&
+      call.name === 'extension_install' &&
+      call.arguments?.extensionId === extensionId,
+  );
+  const pdfIndex = calls.findIndex(
+    (call, index) =>
+      index > installIndex &&
+      toolNames.includes(call.name) &&
+      JSON.stringify(call.arguments ?? {}).includes('requirements.pdf'),
+  );
+  if (checkIndex < 0 || installIndex < 0 || pdfIndex < 0) {
+    throw new Error('The Agent did not check, install, and then use its PDF capability in order.');
+  }
+  const bypass = calls.find(
+    (call, index) =>
+      index < pdfIndex &&
+      call.name !== 'extension_init' &&
+      JSON.stringify(call.arguments ?? {}).includes('requirements.pdf'),
+  );
+  if (bypass !== undefined) {
+    throw new Error(`The Agent bypassed the durable PDF capability with ${bypass.name}.`);
+  }
+  return { extensionId, toolName: calls[pdfIndex].name };
 }
 
 loadEnvFile();
@@ -151,8 +226,16 @@ const model = required('ECHO_MODEL');
 if (!fs.existsSync(cliPath)) throw new Error('Run pnpm build before P3 real Provider acceptance.');
 
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'echo-p3-real-'));
+const isolatedWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'echo-p3-isolated-'));
 fs.cpSync(p3FixtureRoot, workspace, { recursive: true });
+fs.cpSync(p3FixtureRoot, isolatedWorkspace, { recursive: true });
 const restoreConfig = temporaryConfig(baseUrl, model);
+const deadline = Date.now() + ACCEPTANCE_TIMEOUT_MS;
+const remainingTime = () => {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error('P3 real Provider acceptance timed out.');
+  return remaining;
+};
 try {
   await verifyProtectedInputs(workspace);
   const baseline = await runIndependentTest(workspace);
@@ -162,12 +245,16 @@ try {
     workspace,
     apiKey,
     fs.readFileSync(path.join(workspace, 'prompt.txt'), 'utf8'),
-    24,
+    FIRST_RUN_MAX_STEPS,
+    remainingTime(),
   );
   if (first.exitCode !== 0) {
-    process.stderr.write(first.output);
-    throw new Error(`P3 real Provider task exited with ${String(first.exitCode)}.`);
+    throw new Error(
+      `P3 real Provider task exited with ${String(first.exitCode)}. Observed tools: ${observedToolNames(workspace, first)}.`,
+    );
   }
+  const firstSession = requireSingleSession(first, 'The first run');
+  const autonomousFlow = inspectAutonomousExtensionFlow(workspace, firstSession);
   await verifyProtectedInputs(workspace);
   const independent = await runIndependentTest(workspace);
   if (independent.exitCode !== 0) throw new Error('Harness-external verification failed.');
@@ -175,12 +262,28 @@ try {
   const second = await runCli(
     workspace,
     apiKey,
-    'In this new Session, use the installed read_pdf tool to read requirements.pdf, then state the allowed source file.',
+    'In this new Session, read requirements.pdf and state the allowed source file. Reuse the durable capability already available in this workspace without repeating setup.',
     4,
+    remainingTime(),
   );
-  if (second.exitCode !== 0 || !sessionRequestedTool(workspace, 'read_pdf')) {
-    process.stderr.write(second.output);
-    throw new Error('The new Session did not reuse read_pdf successfully.');
+  const secondSession = requireSingleSession(second, 'The reuse run');
+  const secondCalls = requestedTools(sessionEvents(workspace, secondSession));
+  if (
+    second.exitCode !== 0 ||
+    !secondCalls.some(
+      (call) =>
+        call.name === autonomousFlow.toolName &&
+        JSON.stringify(call.arguments ?? {}).includes('requirements.pdf'),
+    )
+  ) {
+    throw new Error(
+      `The new Session did not reuse the installed PDF capability successfully. Observed tools: ${observedToolNames(workspace, second)}.`,
+    );
+  }
+  if (
+    fs.existsSync(path.join(isolatedWorkspace, '.echo', 'extensions', autonomousFlow.extensionId))
+  ) {
+    throw new Error('The workspace extension unexpectedly appeared in another workspace.');
   }
   console.log(
     JSON.stringify({
@@ -188,6 +291,8 @@ try {
       baselineExitCode: baseline.exitCode,
       independentVerificationExitCode: independent.exitCode,
       reusedInNewSession: true,
+      isolatedFromOtherWorkspace: true,
+      autonomousExtensionFlow: true,
       protectedHashesUnchanged: true,
       accepted: true,
     }),
@@ -195,4 +300,5 @@ try {
 } finally {
   restoreConfig();
   fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(isolatedWorkspace, { recursive: true, force: true });
 }

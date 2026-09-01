@@ -1,1 +1,5 @@
-Read the synthetic requirements.pdf and complete its coding task. This workspace deliberately has no PDF tool. In Full Access mode, create a reusable workspace extension named pdf-reader with one read_pdf tool; implement a real deterministic self-test, run extension_check, and install it before reading the PDF. Then prove the existing tests fail, inspect and fix only the allowed source file, and run the tests again. Do not modify requirements.pdf, the protected tests, or package.json. Base the final answer on actual tool results.
+Read requirements.pdf and complete the coding task it describes.
+
+Some capabilities needed for this task may not currently be available. Solve any capability gap in a durable, workspace-scoped way so that a new Session in this same workspace can perform the same operation without repeating the setup. Do not use a one-off manual extraction or temporary command as the missing capability. Until that reusable capability is ready, do not pass requirements.pdf to any existing file-reading, search, or command tool. Keep all investigation and changes inside this workspace.
+
+Do not modify requirements.pdf, protected tests, or package.json. Change only files permitted by the PDF. Run the existing tests before and after the change, and base your final answer only on actual tool results.

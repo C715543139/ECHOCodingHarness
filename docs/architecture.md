@@ -4,7 +4,7 @@
 >
 > 版本：2.1
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 1. 文档目的
 
@@ -63,7 +63,7 @@ P1 不实现 WebUI。配置查找不得使用 `process.cwd()`；唯一持久文�
 - 不封装现有 coding agent，也不使用 Agent 框架或其托管工具执行能力；
 - 不承诺所有 OpenAI-compatible 服务行为完全一致，只保证经验证的目标服务与配置方式。
 
-### 2.5 P3 增量（A0–C3 已验收）
+### 2.5 P3/P3.5 增量（已验收）
 
 P3 按 [ADR-0010](./decisions/0010-full-access-mode.md)、
 [ADR-0011](./decisions/0011-workspace-extensions.md) 与
@@ -76,7 +76,9 @@ Central Safety Policy 直通；A2–B3 已交付工作区存储、Worker、生�
 `WorkspaceExtensionSystem` 完成 CLI/Web 生产接线：模型请求边界按 Session 模式协调 Registry，进程关闭
 时终止 Worker，Catalog 仍是跨 Session 与重启的持久事实源。
 P3-C2/C3 以合成 PDF、受保护输入哈希、Harness 外独立复验、Fake Provider 跨 Session 故事和显式
-真实 Provider 产物验收闭合证据；这些验收不改变 Worker 非 OS 沙箱的边界。
+真实 Provider 产物验收闭合证据。P3.5 又收紧目标工作区 Git 忽略、扩展旧哈希清理，以及自主创建、
+精确新 Session 复用、禁止一次性 PDF 绕过和跨工作区隔离证据；这些验收不改变 Worker 非 OS 沙箱
+的边界。
 
 ## 3. 架构原则
 
@@ -408,7 +410,7 @@ P2.5 依据 ADR-0009 增加最小的单 Session 删除链路：浏览器只提�
 工作区内经校验的普通 JSONL 文件。删除开始后同 Session 不再接受新事件，失败不清理客户端记录。
 Chat 在同一 Session 从运行中进入终态时只调整内部滚动位置到最新 Turn 起点，不改变事件顺序。
 
-## 18. P3 增量架构（A1–C1 已实现）
+## 18. P3/P3.5 增量架构（已验收）
 
 P3 在现有 ApplicationService、Agent Loop 和 ToolRegistry 之间增加 `ExtensionManager`。它以固定
 `workspaceRoot` 解析 `.echo/extensions/catalog.json`，在已确认 Full Access 时启动 enabled 扩展的
@@ -441,3 +443,8 @@ P3-B2 的 `ExtensionLifecycleManager` 串行化同一工作区的状态转换，
 并运行凭据隔离的有界自测；`extension_install` 再次取快照，经临时目录、哈希复验和 Worker 握手后才
 替换 Catalog 与 Registry。七个定义由 `createExtensionLifecycleTools()` 单独提供，生产接线仅在已确认
 Full Access 的模型请求边界注册，不把生命周期逻辑复制进 CLI、Web 或 ApplicationService。
+
+P3.5 收紧了两个持久边界：Store 在每个工作区的 `.echo/.gitignore` 内维护最终 `*` 规则，使运行数据
+默认不污染目标 Git；不同哈希替换先持久化 `cleanupPending`，发布新版本后再清理旧哈希及 trash，失败
+则保留可重试事实。真实 Provider 验收按每轮新增的精确 Session 读取事件，动态识别模型选择的扩展与
+工具，拒绝安装前借其他工具直接读取 PDF，并单独验证同工作区复用与跨工作区隔离。

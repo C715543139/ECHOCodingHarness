@@ -1,8 +1,8 @@
 # P3：Full Access 与工作区扩展系统
 
-> 状态：Accepted / P3-A0–P3-C3 已完成
+> 状态：Accepted / P3-A0–P3-C3 与 P3.5 已完成
 >
-> 版本：1.1
+> 版本：1.2
 >
 > 最后更新：2026-09-01
 
@@ -13,14 +13,14 @@ P3 只交付一条可解释、可验证的扩展闭环：
 ```text
 人类确认 full-access
   → Agent 识别缺少 PDF 能力
-  → extension_init 创建工作区模板
+  → Agent 自主选择扩展与工具名称并创建工作区模板
   → Agent 编写处理器与自测
   → extension_check 给出结构化检查事实
   → extension_install 原子安装并热加载
-  → 下一次模型请求出现 read_pdf
+  → 下一次模型请求出现新 PDF 工具
   → Agent 读取合成 PDF、修改代码并运行测试
   → Harness 外独立复验
-  → 同工作区新 Session 直接复用 read_pdf
+  → 同工作区新 Session 直接复用该工具
 ```
 
 它展示 ECHO 的 Execution、Context、Harness 与 Orchestration，不把项目扩张成通用插件平台。
@@ -95,6 +95,7 @@ Web 创建/切换 Full Access 必须确认，之后常驻红色 `FULL ACCESS` �
 | P3-C1 | CLI/Web/ApplicationService 生产集成（已实现） | A1、B2、B3 |
 | P3-C2 | 合成 PDF 演示与可信验收（已实现） | C1 |
 | P3-C3 | 文档、全量质量、双盲与视频收尾（已完成） | C2 |
+| P3.5 | 可信演示证据、旧版本清理、目标工作区 Git 隐私与文档收口（已完成） | C3 审查 |
 
 A0 后共享类型、Schema、状态机和路由不得由并行分支私自分叉。任何必要变更先形成集成修订。
 
@@ -105,7 +106,7 @@ A0 后共享类型、Schema、状态机和路由不得由并行分支私自分�
 
 1. 证明基线测试失败；
 2. 记录 PDF、测试和配置哈希；
-3. 让 Agent 创建、检查、安装并使用 `pdf-reader`；
+3. 只描述能力缺口和持久复用结果，让 Agent 自主选择扩展 ID、工具名与实现并完成检查、安装和使用；
 4. 运行实际测试成功；
 5. 确认受保护输入哈希未变；
 6. 从 Harness 外再次执行独立验收；
@@ -118,17 +119,30 @@ A0 后共享类型、Schema、状态机和路由不得由并行分支私自分�
 - `pnpm p3:demo:reset` 恢复故意错误的源码并移除该 fixture 的本地 `.echo` 运行数据；
 - `pnpm p3:demo:baseline` 校验 PDF、受保护测试和 `package.json` 的 SHA-256，并要求独立测试失败；
 - `tests/integration/p3-pdf-demo.test.ts` 用离线 Fake Provider 驱动完整创作、检查、安装、热加载、修复、
-  复测和新 Session 复用；
+  复测、新 Session 复用和另一工作区不可见，并锁定首个模型请求尚无 PDF 工具；
 - `pnpm p3:demo:verify` 再次检查受保护哈希，并由 Harness 外的 Node 子进程独立要求测试通过；
 - `pnpm accept:p3-pdf` 使用 `.env.test` 的真实 OpenAI-compatible Provider 显式验收，临时工作区在结束后
-  删除，且该命令不进入 CI。
+  删除，且该命令不进入 CI。P3.5 要求提示词不得出现扩展 ID、工具名或生命周期步骤；脚本只根据首个
+  Session 实际的 `extension_init → extension_check → extension_install → 动态 PDF 工具` 事件发现模型
+  自主设计的能力，拒绝此前用其他工具直接读取 `requirements.pdf`，并且只在第二个 Session 自己的
+  JSONL 中判定复用，避免扫描全部历史 Session 造成假阳性。首轮最多 36 步、复用轮最多 4 步，两轮
+  共享 10 分钟总硬超时；失败时只报告有界工具名，不回放模型正文。
+
+## 6.1 P3.5 审查收口
+
+- Store 自行维护 `.echo/.gitignore`，不修改目标仓库根文件，真实 `git status --short` 必须保持干净；
+- 同 ID 不同哈希替换后只保留当前版本；物理清理失败以 `cleanupPending=true` 持久化并允许幂等重试；
+- 可机读矩阵每行列出全部主要运行时证据，不再只挂一个代表文件；
+- ADR 状态、页眉日期和测试数字区分历史检查点与当前 P3/P3.5 基线。
+- 真实 Provider 严格验收已证明自主生命周期、安装前无一次性 PDF 绕过、精确新 Session 复用、
+  跨工作区隔离、独立复验和受保护哈希不变；失败输出不包含模型正文。
 
 ## 7. 两分钟镜头
 
 - 0–15 秒：失败测试和合成 PDF 目标；
 - 15–30 秒：Full Access 风险确认；
 - 30–65 秒：创建、自测、安装并在 Trace 中看到扩展生命周期；
-- 65–95 秒：热加载 `read_pdf`、读取要求、修改代码、复测；
+- 65–95 秒：热加载 Agent 自主创建的 PDF 工具、读取要求、修改代码、复测；
 - 95–110 秒：可信验收卡与 Inspector 的真实命令证据；
 - 110–120 秒：同工作区新 Session 直接复用并总结隔离/卸载。
 

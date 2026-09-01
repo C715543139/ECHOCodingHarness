@@ -4,7 +4,7 @@
 >
 > 版本：2.1
 >
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 1. 文档目的
 
@@ -362,7 +362,7 @@ Session、Turn、`toolCallId` 与 `approvalKey`，并由应用服务独立拒绝
 - 双盲扫描脚本在已知测试样本上的表现。
 ## 19. P3 Full Access 与扩展安全增量
 
-> P3 状态：A0–C3 已验收。Full Access 仍是明确警告后的高风险能力，扩展 Worker 不是 OS 沙箱；
+> P3/P3.5 状态：已验收。Full Access 仍是明确警告后的高风险能力，扩展 Worker 不是 OS 沙箱；
 > 合成 PDF 演示、受保护哈希、Harness 外复验和显式真实 Provider 检查均不进入无秘密 CI。
 > 现有 `safe`、`balanced`、`auto` 规则保持不变。
 
@@ -388,6 +388,10 @@ Central Safety Policy 的 Full Access 分支仅返回 `policy.tool.full_access` 
 用于崩溃、超时、取消和卸载隔离，不构成 OS 沙箱。Manifest/入口/工具名/哈希/Catalog 必须严格校验；
 初始化失败、崩溃或协议违规持久化为 `quarantined` 并注销工具。普通工具业务失败不能自动删除扩展。
 跨工作区扫描、全局安装、远程下载、市场和自动更新不在 P3 范围。
+
+Store 创建或打开 `.echo` 时维护目录内 `.gitignore`，保留既有内容并以最终 `*` 忽略该目录全部运行
+数据；它不修改目标仓库根忽略文件。该约束防止扩展源码、Catalog、Session 和临时数据被默认提交，
+但不能替代提交前的 secret/identity scan 与人工双盲复核。
 
 A2 存储读取只信任绑定工作区中的严格 Catalog，不枚举其他工作区，也不从安装目录猜测或重建状态。
 扩展目录、Manifest 入口/自测与 Catalog 文件都拒绝链接和解析后逃逸；内容哈希读取期间发生文件身份或
@@ -425,3 +429,8 @@ B2 的 staging 自测通过独立 Node 子进程执行，只继承与 Worker 相
 注销 Registry，再通过同一管理器持久化 `quarantined`。卸载对整个扩展 ID 生效，不提供单工具删除。
 Catalog 移除后如目录移动或物理删除失败，结果明确标为 `deactivated`、`cleanupPending=true`，后续同 ID
 卸载可幂等重试遗留 trash，不从目录反向重建 Catalog。
+
+不同哈希替换同样先保守持久化 `cleanupPending=true`；只有旧哈希目录和对应 trash 全部清理后才清除。
+真实 Provider 验收按精确新增 Session 检查事件，不跨历史日志推断成功，并拒绝安装前用现有文件、搜索
+或命令工具直接读取 PDF 的一次性绕过。脚本只输出结构化结论和有界工具名，失败时不回放模型正文、
+Provider 凭据或个人绝对路径。

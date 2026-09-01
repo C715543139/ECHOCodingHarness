@@ -1,8 +1,8 @@
 # ADR-0011：工作区级扩展、Worker 与持久生命周期
 
-> 状态：Accepted for P3 implementation
+> 状态：Accepted
 >
-> 日期：2026-08-31
+> 日期：2026-09-01
 
 ## 背景
 
@@ -29,8 +29,10 @@ ECHO 的内置工具固定且有界。P3 希望演示 Agent 遇到 PDF 等能力
          └─ extension.test.mjs
 ```
 
-`.echo/` 继续默认不进入 Git。Provider 配置仍位于 artifact-root 的 `config/echo.config.json`；工作区
-扩展不是安装目录配置，也不跨工作区同步。
+`.echo/` 继续默认不进入 Git。Store 创建或打开该目录时维护 `.echo/.gitignore`，保留已有内容，并确保
+最后一条有效规则为 `*`；因此不用改动用户仓库根部的 `.gitignore`，新建 Session、staging、Catalog
+和安装内容也不会出现在目标仓库的 `git status`。Provider 配置仍位于 artifact-root 的
+`config/echo.config.json`；工作区扩展不是安装目录配置，也不跨工作区同步。
 
 ### Manifest v1
 
@@ -56,7 +58,9 @@ ID、路径、描述、工具数量和 Schema 大小均使用实现常量设上�
 Node 内置模块或当前工作区已经安装的依赖。
 
 安装内容以规范化文件集合的 SHA-256 标识为 `sha256:<hex>`。同 ID/同哈希安装幂等；同 ID/不同哈希
-是原子替换，首版不保留可选版本和回滚 UI。
+是原子替换，首版不保留可选版本和回滚 UI。替换提交时先保守记录 `cleanupPending=true`，再经 `.trash`
+删除所有旧哈希目录；只有清理和第二次 Catalog 原子写均成功才清除该标志。失败时新版本仍可用，但
+列表必须诚实显示待清理，后续同哈希安装会重试。
 
 ### Catalog v1
 

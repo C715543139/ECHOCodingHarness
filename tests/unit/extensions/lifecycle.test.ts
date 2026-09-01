@@ -91,9 +91,13 @@ describe('ExtensionLifecycleManager authoring and checks', () => {
     await expect(fs.readdir(root)).resolves.toEqual(
       expect.arrayContaining(['AUTHORING.md', 'extension.json', 'extension.test.mjs', 'index.mjs']),
     );
-    expect(await fs.readFile(path.join(root, 'AUTHORING.md'), 'utf8')).toContain(
+    const authoringGuide = await fs.readFile(path.join(root, 'AUTHORING.md'), 'utf8');
+    expect(authoringGuide).toContain(
       'Worker isolates crashes and cancellation but is not an OS sandbox',
     );
+    expect(authoringGuide).toContain("status: 'completed'");
+    expect(authoringGuide).toContain("status: 'failed'");
+    expect(authoringGuide).toContain('Never use `success`, `ok`, or `error` as the status value');
     const report = await fixture.lifecycle.check('pdf-reader', new AbortController().signal);
     expect(report).toMatchObject({ status: 'passed', passedChecks: 4, failedChecks: 0 });
     expect(report.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
@@ -170,6 +174,39 @@ describe('ExtensionLifecycleManager state machine', () => {
     const execution = await fixture.registry.execute('read_pdf', {}, context(fixture.workspace));
     expect(execution).toMatchObject({ status: 'completed', summary: 'updated' });
     expect((await fixture.lifecycle.store.readCatalog()).extensions).toHaveLength(1);
+    const paths = await fixture.lifecycle.store.ensureWorkspace();
+    expect(await fs.readdir(path.join(paths.extensionsRoot, 'pdf-reader'))).toHaveLength(1);
+    await fixture.lifecycle.close();
+  });
+
+  it('reports and retries cleanup when a replaced hash cannot be removed immediately', async () => {
+    let cleanupAllowed = false;
+    const removeTree = vi.fn(async (target: string) => {
+      if (!cleanupAllowed)
+        throw Object.assign(new Error('injected cleanup failure'), { code: 'EPERM' });
+      await fs.rm(target, { recursive: true, force: true });
+    });
+    const fixture = await manager({ removeTree });
+    await writeStaging(fixture.lifecycle, manifest(), completedSource('read_pdf', 'original'));
+    await fixture.lifecycle.install('pdf-reader', new AbortController().signal);
+    const root = await fixture.lifecycle.store.stagingExtensionPath('pdf-reader');
+    await fs.writeFile(path.join(root, 'index.mjs'), completedSource('read_pdf', 'replacement'));
+
+    await expect(
+      fixture.lifecycle.install('pdf-reader', new AbortController().signal),
+    ).resolves.toMatchObject({ changed: true, cleanupPending: true });
+    expect((await fixture.lifecycle.store.readCatalog()).extensions[0]).toMatchObject({
+      cleanupPending: true,
+    });
+
+    cleanupAllowed = true;
+    await expect(
+      fixture.lifecycle.install('pdf-reader', new AbortController().signal),
+    ).resolves.toMatchObject({ changed: true, cleanupPending: false });
+    expect((await fixture.lifecycle.store.readCatalog()).extensions[0]).toMatchObject({
+      cleanupPending: false,
+    });
+    expect(removeTree).toHaveBeenCalledTimes(2);
     await fixture.lifecycle.close();
   });
 
@@ -311,6 +348,24 @@ describe('ExtensionLifecycleManager state machine', () => {
       cleanupPending: false,
     });
     await retry.close();
+  });
+
+  it('does not remove a hyphenated extension trash entry with a shared id prefix', async () => {
+    const fixture = await manager();
+    await writeStaging(fixture.lifecycle, manifest(), completedSource());
+    await fixture.lifecycle.install('pdf-reader', new AbortController().signal);
+    const paths = await fixture.lifecycle.store.ensureWorkspace();
+    const unrelatedTrash = path.join(
+      paths.trashRoot,
+      'pdf-reader-extra-00000000-0000-4000-8000-000000000000',
+    );
+    await fs.mkdir(unrelatedTrash);
+
+    await expect(fixture.lifecycle.uninstall('pdf-reader')).resolves.toMatchObject({
+      cleanupPending: false,
+    });
+    await expect(fs.stat(unrelatedTrash)).resolves.toBeDefined();
+    await fixture.lifecycle.close();
   });
 });
 

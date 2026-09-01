@@ -159,6 +159,14 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+const UUID_FILE_SUFFIX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function isOwnedTrashEntry(name: string, extensionId: string): boolean {
+  const prefix = `${extensionId}-`;
+  return name.startsWith(prefix) && UUID_FILE_SUFFIX.test(name.slice(prefix.length));
+}
+
 async function runSelfTest(
   extensionRoot: string,
   manifest: ExtensionManifest,
@@ -372,6 +380,7 @@ export class ExtensionLifecycleManager {
       if (
         existing?.contentHash === snapshot.contentHash &&
         existing.state === 'enabled' &&
+        existing.cleanupPending !== true &&
         (this.runtime.isLoaded(extensionId) || !this.runtimeAllowed())
       ) {
         return this.mutation(existing, false);
@@ -405,6 +414,9 @@ export class ExtensionLifecycleManager {
         }
       }
 
+      const cleanupNeeded =
+        existing !== undefined &&
+        (existing.contentHash !== snapshot.contentHash || existing.cleanupPending === true);
       const entry: ExtensionCatalogEntry = {
         id: snapshot.manifest.id,
         version: snapshot.manifest.version,
@@ -415,6 +427,7 @@ export class ExtensionLifecycleManager {
           existing?.contentHash === snapshot.contentHash
             ? existing.installedAt
             : this.now().toISOString(),
+        ...(cleanupNeeded ? { cleanupPending: true } : {}),
       };
       try {
         await this.store.replaceCatalog(catalog.revision, replaceEntry(catalog, entry));
@@ -431,7 +444,22 @@ export class ExtensionLifecycleManager {
           `Extension "${extensionId}" worker closed during installation.`,
         );
       }
-      return this.mutation(entry, true);
+      if (!cleanupNeeded) return this.mutation(entry, true);
+
+      const cleanupComplete = await this.cleanupSupersededExtensionArtifacts(
+        extensionId,
+        snapshot.contentHash,
+      );
+      if (!cleanupComplete) return this.mutation(entry, true);
+
+      const cleanedEntry: ExtensionCatalogEntry = { ...entry, cleanupPending: false };
+      try {
+        await this.store.replaceCatalog(catalog.revision + 1, replaceEntry(catalog, cleanedEntry));
+        return this.mutation(cleanedEntry, true);
+      } catch {
+        // The installed version is usable and the persisted flag remains conservatively true.
+        return this.mutation(entry, true);
+      }
     });
   }
 
@@ -841,12 +869,57 @@ export class ExtensionLifecycleManager {
     ];
     const trashChildren = await fs.readdir(paths.trashRoot, { withFileTypes: true });
     for (const child of trashChildren) {
-      if (child.name.startsWith(`${extensionId}-`))
+      if (isOwnedTrashEntry(child.name, extensionId))
         candidates.push(path.join(paths.trashRoot, child.name));
     }
     let complete = true;
     for (const candidate of candidates) {
       if (!(await pathExists(candidate))) continue;
+      let cleanupTarget = candidate;
+      if (path.dirname(candidate) !== paths.trashRoot) {
+        cleanupTarget = path.join(paths.trashRoot, `${extensionId}-${randomUUID()}`);
+        try {
+          await fs.rename(candidate, cleanupTarget);
+        } catch {
+          complete = false;
+          continue;
+        }
+      }
+      try {
+        await this.removeTree(cleanupTarget);
+      } catch {
+        complete = false;
+      }
+    }
+    return complete;
+  }
+
+  private async cleanupSupersededExtensionArtifacts(
+    extensionId: string,
+    currentContentHash: string,
+  ): Promise<boolean> {
+    const paths = await this.store.ensureWorkspace();
+    const currentRoot = await this.store.installedExtensionPath(extensionId, currentContentHash);
+    const extensionRoot = path.dirname(currentRoot);
+    const candidates: string[] = [];
+    if (await pathExists(extensionRoot)) {
+      const children = await fs.readdir(extensionRoot, { withFileTypes: true });
+      for (const child of children) {
+        const candidate = path.join(extensionRoot, child.name);
+        if (candidate === currentRoot) continue;
+        if (!child.isDirectory() || !/^[a-f0-9]{64}$/u.test(child.name)) return false;
+        candidates.push(candidate);
+      }
+    }
+    const trashChildren = await fs.readdir(paths.trashRoot, { withFileTypes: true });
+    for (const child of trashChildren) {
+      if (isOwnedTrashEntry(child.name, extensionId)) {
+        candidates.push(path.join(paths.trashRoot, child.name));
+      }
+    }
+
+    let complete = true;
+    for (const candidate of candidates) {
       let cleanupTarget = candidate;
       if (path.dirname(candidate) !== paths.trashRoot) {
         cleanupTarget = path.join(paths.trashRoot, `${extensionId}-${randomUUID()}`);

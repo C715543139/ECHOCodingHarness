@@ -143,11 +143,15 @@ pnpm p3:demo:baseline
 pnpm accept:p3-pdf
 ```
 
-两分钟内依次展示 Full Access 风险确认、`extension_init`、真实自测、`extension_check`、
-`extension_install`、下一模型请求出现 `read_pdf`、失败测试、仅修改允许源码、成功复测，以及新 Session
-直接复用。结束后执行 `pnpm p3:demo:verify`；可信结论来自受保护输入哈希未变和 Harness 外独立复验，
-不来自模型自行声称完成。真实 Provider 命令只显式本地运行，CI 仅运行确定性 Fake Provider 故事。
+两分钟内依次展示 Full Access 风险确认、Agent 自主识别能力缺口、扩展创建与真实自测、结构化检查、
+原子安装、下一模型请求出现新工具、失败测试、仅修改允许源码、成功复测，以及精确的新 Session 直接
+复用。演示提示词不提供扩展 ID、工具名或生命周期调用顺序，也禁止安装前用一次性命令读取 PDF。
+结束后执行 `pnpm p3:demo:verify`；可信结论来自受保护输入哈希未变和 Harness 外独立复验，不来自模型
+自行声称完成。真实 Provider 命令只显式本地运行，CI 仅运行确定性 Fake Provider 故事。
 
-2026-09-01 已使用 `deepseek/deepseek-v4-flash` 和构建产物完成一次显式验收：基线失败、修复后独立
-测试通过、受保护哈希不变、新 Session 复用均得到结构化确认。该记录不包含模型正文、真实考核材料、
-API Key 或个人路径；录制时仍需人工检查终端标题、系统通知和浏览器外框。
+2026-09-01 P3.5 已使用 `deepseek/deepseek-v4-pro` 和构建产物通过严格显式验收：基线退出码 1，修复后
+Harness 外独立复验退出码 0；脚本从首个 Session 的真实生命周期事件动态识别扩展及其工具，确认安装
+前没有其他工具读取 `requirements.pdf`，只在本次创建的第二个 Session 中判定复用，并确认同路径的
+另一工作区不可见、受保护哈希不变。首轮上限 36 Step、复用轮上限 4 Step、总硬超时 10 分钟；失败
+只报告有界工具名，不回放模型正文。该记录不包含真实考核材料、API Key 或个人路径；录制时仍需人工
+检查终端标题、系统通知和浏览器外框。

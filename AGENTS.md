@@ -116,12 +116,11 @@ a regression test that fails for the original behavior.
   competing DTOs, policy logic, or Session state machines.
 - Shared Fastify route assembly, React shell composition, package scripts, and CI workflow changes
   belong to an explicit P2 integration task after feature branches pass focused tests.
-- P3-A0 freezes the Full Access target union, confirmation contract, extension Manifest/Catalog,
-  Worker messages, lifecycle tools, Web boundary, and acceptance matrix. P3-A1 and P3-A2 may then
-  run in parallel. P3-B1 owns the Worker host and dynamic Registry; P3-B3 owns the Web increment and
-  may run alongside B1 only after A1/A2 are integrated. P3-B2 consumes A1+B1, and P3-C1 alone owns
-  final CLI/Web/ApplicationService assembly. No branch may create a competing P3 DTO or state
-  machine.
+- P3 is accepted on `main`. Its implementation history froze the Full Access target union,
+  confirmation contract, Manifest/Catalog, Worker messages, lifecycle tools, Web boundary, and
+  acceptance matrix in A0 before parallel A1/A2 and B1/B3 work; B2 and C1 then owned lifecycle and
+  final assembly. Future changes must extend those accepted contracts and must not create a
+  competing P3 DTO or state machine.
 - Keep worktree directories outside this repository and never commit host-specific absolute paths.
 
 ## Code conventions

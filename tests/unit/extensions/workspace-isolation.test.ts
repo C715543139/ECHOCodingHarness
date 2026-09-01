@@ -1,6 +1,7 @@
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 
@@ -15,7 +16,7 @@ import {
   sampleManifest,
 } from './fixtures.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const execFileAsync = promisify(execFile);
 
 afterEach(cleanupWorkspaces);
 
@@ -122,8 +123,27 @@ describe('extension workspace isolation', () => {
     });
   });
 
-  it('keeps every workspace extension artifact ignored by Git', async () => {
-    const gitignore = await fs.readFile(path.join(ROOT, '.gitignore'), 'utf8');
-    expect(gitignore.split(/\r?\n/u)).toContain('.echo/');
+  it('keeps every target-workspace extension artifact ignored by Git', async () => {
+    const workspace = await makeWorkspace('echo-extension-git-');
+    await execFileAsync('git', ['init', '--quiet'], { cwd: workspace, windowsHide: true });
+    await fs.mkdir(path.join(workspace, '.echo'));
+    await fs.writeFile(path.join(workspace, '.echo', '.gitignore'), '!keep-for-user\n', 'utf8');
+
+    await WorkspaceExtensionStore.open(workspace);
+
+    const gitignore = await fs.readFile(path.join(workspace, '.echo', '.gitignore'), 'utf8');
+    expect(gitignore).toContain('!keep-for-user');
+    expect(
+      gitignore
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#'))
+        .at(-1),
+    ).toBe('*');
+    const { stdout } = await execFileAsync('git', ['status', '--short'], {
+      cwd: workspace,
+      windowsHide: true,
+    });
+    expect(stdout).toBe('');
   });
 });

@@ -57,8 +57,11 @@ describe('P3 contracts', () => {
     expect(P3_TEST_MATRIX.length).toBeGreaterThanOrEqual(14);
     expect(P3_TEST_MATRIX.every((row) => row.contractEvidence.length > 0)).toBe(true);
     for (const row of P3_TEST_MATRIX) {
-      expect(row.runtimeEvidence).not.toMatch(/^pending:/u);
-      await expect(fs.stat(path.join(ROOT, row.runtimeEvidence))).resolves.toBeDefined();
+      expect(row.runtimeEvidence.length).toBeGreaterThan(0);
+      for (const evidence of row.runtimeEvidence) {
+        expect(evidence).not.toMatch(/^pending:/u);
+        await expect(fs.stat(path.join(ROOT, evidence))).resolves.toBeDefined();
+      }
     }
   });
 

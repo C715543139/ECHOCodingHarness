@@ -180,6 +180,12 @@ describe('P3 synthetic PDF demo', () => {
     expect(await protectedHashes(root)).toEqual(locked.files);
     expect(await independentTest(root)).toBe(1);
 
+    const prompt = await fs.readFile(path.join(root, 'prompt.txt'), 'utf8');
+    expect(prompt).not.toMatch(/pdf-reader|read_pdf|extension_(?:init|check|install)/u);
+    expect(prompt).toContain('durable, workspace-scoped');
+    expect(prompt).toContain('Do not use a one-off manual extraction');
+    expect(prompt).toContain('do not pass requirements.pdf');
+
     const provider = new FakeProvider([
       tool({
         id: 'init',
@@ -229,7 +235,7 @@ describe('P3 synthetic PDF demo', () => {
       text('The synthetic PDF task is fixed and independently verifiable.'),
     ]);
     const first = await runGoal(
-      await fs.readFile(path.join(root, 'prompt.txt'), 'utf8'),
+      prompt,
       {
         workspace: root,
         safetyMode: 'full-access',
@@ -243,6 +249,9 @@ describe('P3 synthetic PDF demo', () => {
       { env: { ECHO_API_KEY: 'fake-key' }, providerFactory: () => provider },
     );
     expect(first.exitCode).toBe(0);
+    expect(provider.requests[0]?.tools.some((candidate) => candidate.name === 'read_pdf')).toBe(
+      false,
+    );
     expect(provider.requests[6]?.tools.some((candidate) => candidate.name === 'read_pdf')).toBe(
       true,
     );
@@ -271,5 +280,28 @@ describe('P3 synthetic PDF demo', () => {
     expect(
       reuseProvider.requests[0]?.tools.some((candidate) => candidate.name === 'read_pdf'),
     ).toBe(true);
+
+    const isolatedRoot = await copyFixture();
+    const isolatedProvider = new FakeProvider([
+      text('No workspace extension is installed in this separate workspace.'),
+    ]);
+    const isolated = await runGoal(
+      'Inspect the capabilities available in this separate workspace.',
+      {
+        workspace: isolatedRoot,
+        safetyMode: 'full-access',
+        allowFullAccess: true,
+        maxSteps: 2,
+        verbose: false,
+        color: false,
+        interactive: false,
+        artifactRoot,
+      },
+      { env: { ECHO_API_KEY: 'fake-key' }, providerFactory: () => isolatedProvider },
+    );
+    expect(isolated.exitCode).toBe(0);
+    expect(
+      isolatedProvider.requests[0]?.tools.some((candidate) => candidate.name === 'read_pdf'),
+    ).toBe(false);
   }, 30_000);
 });

@@ -383,8 +383,8 @@ artifact-root 解析、严格配置校验、`echo-harness config` 与 `run` 对�
 只通过公开事件和 `AgentResult` 观察循环。P1 类型位于 `src/contracts/application.ts`、
 `src/contracts/config.ts`、`src/contracts/model.ts` 与 `src/contracts/chat-input.ts`。
 
-已由自动化测试固定的默认限制包括 24 个 Step、单工具 120 秒、单结果 40,000 字符、
-256,000 近似 token 上下文（其中预留 16,000 输出 token），以及同一规范化工具调用第三次
+已由自动化测试固定的默认限制包括 128 个 Step、单工具 300 秒、单结果 80,000 字符、
+Provider 请求 600 秒、256,000 近似 token 上下文（其中预留 16,000 输出 token），以及同一规范化工具调用第 10 次
 出现时终止。P1.5 把普通正文和 Provider 允许的推理字段分别聚合为单一 `model.text` 与
 `model.reasoning` Session 事件；等价且无额外状态的纯文本 `reasoning_details` 归一化为 canonical `reasoning`，特殊或不一致数组保持原结构。Provider 流仍在内存中逐分片消费，新 Writer 不再持久化正文 delta，旧 Session
 由 Reader 按 Step 兼容聚合。推理内容参与 Context 投影和近似计数，但 CLI 默认不展示；聚合正文保持原有

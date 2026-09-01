@@ -593,8 +593,8 @@ P1 不迁移旧工作区、用户目录或 ADR-0004 工作区 `.echo/config` 中
 - 缺少配置文件时 `run`/`chat` 使用退出码 `2`，提示执行 `echo-harness config`，不得自动创建含真实 Provider 信息的文件；
 - 手动模型目录必须包含唯一非空模型 ID，且默认模型位于列表中；自动发现模式不持久化完整列表；
 - 自动发现由 P1-2B 在进程内缓存；`run` 不调用 `/models`；发现失败不得阻断已配置模型；
-- 省略的限制字段在实现时使用既有内置数值：`balanced`、24 个 Step、120 秒工具超时、40,000 字符工具输出上限、
-  300 秒 Provider 请求超时、256,000 近似 token 上下文与 16,000 输出 token 预留。这些是字段缺省规则，不是独立配置来源，数值为 approximate。
+- 省略的限制字段在实现时使用既有内置数值：`balanced`、128 个 Step、300 秒工具超时、80,000 字符工具输出上限、
+  600 秒 Provider 请求超时、256,000 近似 token 上下文与 16,000 输出 token 预留；同一工具名与规范化参数第 10 次出现时触发重复调用限制，阈值调用不执行。这些是字段缺省规则，不是独立配置来源，数值为 approximate。
 - 稳定配置错误码见 `CONFIG_ERROR_CODES`：`CONFIG_MISSING`、`CONFIG_UNKNOWN_KEY`、`CONFIG_CREDENTIAL_FORBIDDEN`、`CONFIG_PROVIDER_MISMATCH`、`CONFIG_SESSION_INCOMPATIBLE` 等。
 
 ## 11. 错误模型

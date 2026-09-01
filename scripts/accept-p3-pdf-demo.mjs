@@ -10,8 +10,23 @@ const cliPath = path.join(repositoryRoot, 'dist', 'cli.js');
 const configDirectory = path.join(repositoryRoot, 'dist', 'config');
 const configPath = path.join(configDirectory, 'echo.config.json');
 const envPath = process.env.ECHO_ENV_FILE ?? path.join(repositoryRoot, '.env.test');
-const FIRST_RUN_MAX_STEPS = 36;
-const ACCEPTANCE_TIMEOUT_MS = 10 * 60_000;
+
+function boundedEnvironmentInteger(name, fallback, maximum) {
+  const raw = process.env[name]?.trim();
+  if (raw === undefined || raw.length === 0) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > maximum) {
+    throw new Error(`${name} must be an integer between 1 and ${String(maximum)}.`);
+  }
+  return parsed;
+}
+
+const FIRST_RUN_MAX_STEPS = boundedEnvironmentInteger('ECHO_ACCEPT_P3_MAX_STEPS', 128, 160);
+const ACCEPTANCE_TIMEOUT_MS = boundedEnvironmentInteger(
+  'ECHO_ACCEPT_P3_TIMEOUT_MS',
+  15 * 60_000,
+  20 * 60_000,
+);
 
 function loadEnvFile() {
   if (!fs.existsSync(envPath)) return;
@@ -74,9 +89,9 @@ function temporaryConfig(baseUrl, model) {
       modelCatalog: { source: 'manual', models: [model] },
       safetyMode: 'full-access',
       maxSteps: FIRST_RUN_MAX_STEPS,
-      timeoutMs: 60_000,
-      maxOutputChars: 24_000,
-      requestTimeoutMs: 120_000,
+      timeoutMs: 300_000,
+      maxOutputChars: 80_000,
+      requestTimeoutMs: 600_000,
       context: { maxApproxTokens: 256_000, reservedOutputTokens: 16_000 },
     })}\n`,
     { encoding: 'utf8', mode: 0o600 },
@@ -166,6 +181,23 @@ function observedToolNames(workspace, run) {
   return names.length === 0 ? 'none' : names.slice(0, 64).join(', ');
 }
 
+function observedTerminalResult(workspace, run) {
+  if (run.createdSessions.length !== 1) return 'no single Session terminal';
+  const terminal = sessionEvents(workspace, run.createdSessions[0])
+    .toReversed()
+    .find((event) => event.type === 'turn.completed' || event.type === 'turn.failed');
+  const result = terminal?.payload?.result;
+  if (result === undefined || result === null || typeof result !== 'object') {
+    return 'no terminal result';
+  }
+  return [
+    `status=${String(result.status ?? 'unknown')}`,
+    `stopReason=${String(result.stopReason ?? 'unknown')}`,
+    `steps=${String(result.steps ?? 'unknown')}`,
+    `toolCalls=${String(result.toolCalls ?? 'unknown')}`,
+  ].join(', ');
+}
+
 function inspectAutonomousExtensionFlow(workspace, sessionFile) {
   const calls = requestedTools(sessionEvents(workspace, sessionFile));
   const observedNames = calls.map((call) => call.name).join(', ') || 'none';
@@ -250,7 +282,7 @@ try {
   );
   if (first.exitCode !== 0) {
     throw new Error(
-      `P3 real Provider task exited with ${String(first.exitCode)}. Observed tools: ${observedToolNames(workspace, first)}.`,
+      `P3 real Provider task exited with ${String(first.exitCode)} (${observedTerminalResult(workspace, first)}). Observed tools: ${observedToolNames(workspace, first)}.`,
     );
   }
   const firstSession = requireSingleSession(first, 'The first run');

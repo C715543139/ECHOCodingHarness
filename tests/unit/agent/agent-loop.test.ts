@@ -8,7 +8,11 @@ import type {
   ToolDefinition,
 } from '../../../src/contracts/index.js';
 import { EventContextBuilder } from '../../../src/context/index.js';
-import { AgentLoop, type ApprovalHandler } from '../../../src/agent/index.js';
+import {
+  AgentLoop,
+  DEFAULT_REPEATED_TOOL_CALL_LIMIT,
+  type ApprovalHandler,
+} from '../../../src/agent/index.js';
 import { FakeProvider } from '../../../src/provider/index.js';
 import { ToolRegistry } from '../../../src/tools/index.js';
 
@@ -112,7 +116,9 @@ function createLoop(options: {
     workspaceRoot: 'C:\\workspace',
     safetyMode: 'balanced',
     maxSteps: options.maxSteps ?? 4,
-    repeatedToolCallLimit: options.repeatedToolCallLimit ?? 3,
+    ...(options.repeatedToolCallLimit === undefined
+      ? {}
+      : { repeatedToolCallLimit: options.repeatedToolCallLimit }),
     contextBudget: { maxApproxTokens: 4_000, reservedOutputTokens: 500 },
     toolLimits: { timeoutMs: 1_000, maxOutputChars: 4_000 },
     ...(options.approvalHandler === undefined ? {} : { approvalHandler: options.approvalHandler }),
@@ -254,6 +260,41 @@ describe('AgentLoop', () => {
     expect(inspect.execute).toHaveBeenCalledOnce();
     expect(store.events.some((item) => item.type === 'limit.reached')).toBe(true);
     expect(store.events.filter((item) => item.type === 'tool.denied')).toHaveLength(1);
+  });
+
+  it('uses the demonstration-friendly default repeated tool-call limit', async () => {
+    const inspect = tool();
+    const scripted = Array.from({ length: DEFAULT_REPEATED_TOOL_CALL_LIMIT }, (_, index) => ({
+      events: [
+        {
+          type: 'tool_call' as const,
+          call: {
+            id: `call-${String(index + 1)}`,
+            name: 'inspect',
+            arguments: { path: 'same.txt' },
+          },
+        },
+        { type: 'completed' as const, finishReason: 'tool_calls' as const },
+      ],
+    }));
+    const store = new MemoryStore();
+
+    const result = await createLoop({
+      provider: new FakeProvider(scripted),
+      store,
+      tools: [inspect],
+      maxSteps: DEFAULT_REPEATED_TOOL_CALL_LIMIT,
+    }).run('loop with the built-in limit');
+
+    expect(result).toMatchObject({
+      status: 'limited',
+      stopReason: 'repeated_tool_call',
+      steps: DEFAULT_REPEATED_TOOL_CALL_LIMIT,
+    });
+    expect(inspect.execute).toHaveBeenCalledTimes(DEFAULT_REPEATED_TOOL_CALL_LIMIT - 1);
+    expect(store.events.find((item) => item.type === 'limit.reached')).toMatchObject({
+      payload: { kind: 'repeated_tool_call', limit: DEFAULT_REPEATED_TOOL_CALL_LIMIT },
+    });
   });
 
   it('returns provider_error and records the normalized provider failure', async () => {

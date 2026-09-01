@@ -90,6 +90,7 @@ P1-0 只冻结契约、ADR 与测试矩阵。P1-2A 实现 `loadConfig`、artifac
 ## 5. 后果
 
 - P1-2A 必须同时改加载器、错误码、文档和测试；不能只改运行时。
+- 产物清理和重建必须保留 `<artifact-root>/config/`；只清理可再生的 Node/Web 构建输出。
 - 只读安装目录与多用户系统不是本决策的目标环境。
 - `pnpm dev` 必须注入 artifact-root，否则会误写 `src/config/`。
 

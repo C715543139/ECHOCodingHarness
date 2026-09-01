@@ -185,6 +185,8 @@ describe('P3 synthetic PDF demo', () => {
     expect(prompt).toContain('durable, workspace-scoped');
     expect(prompt).toContain('Do not use a one-off manual extraction');
     expect(prompt).toContain('do not pass requirements.pdf');
+    expect(prompt).toContain('stop optional improvements');
+    expect(prompt).toContain('do not repeat an unchanged command');
 
     const provider = new FakeProvider([
       tool({
